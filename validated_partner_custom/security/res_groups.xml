@@ -1,0 +1,5 @@
+<odoo>
+    <record id="group_modify_validated_supplier" model="res.groups">
+        <field name="name">Modify Validated Supplier</field>
+    </record>
+</odoo>
