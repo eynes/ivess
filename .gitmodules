@@ -10,3 +10,7 @@
 	path = month_year_widget
 	url = https://gitlab.eynes.com.ar/otros/month_year_widget.git
 	branch = 19.0
+[submodule "server-ux"]
+	path = server-ux
+	url = https://github.com/fvkugit/server-ux.git
+	branch = 19.0-mig-multi_step_wizard
