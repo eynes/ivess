@@ -6,3 +6,7 @@
 	path = reporting-engine
 	url = https://github.com/OCA/reporting-engine.git
 	branch = 19.0
+[submodule "month_year_widget"]
+	path = month_year_widget
+	url = https://gitlab.eynes.com.ar/otros/month_year_widget.git
+	branch = 19.0
