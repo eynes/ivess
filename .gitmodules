@@ -18,3 +18,7 @@
 	path = web
 	url = https://github.com/adhoc-dev/web.git
 	branch = 19.0-mig-web_notify
+[submodule "popup_messages"]
+	path = popup_messages
+	url = https://gitlab.eynes.com.ar/otros/popup_messages.git
+	branch = 19.0
