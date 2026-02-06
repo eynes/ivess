@@ -14,7 +14,3 @@
 	path = server-ux
 	url = https://github.com/fvkugit/server-ux.git
 	branch = 19.0-mig-multi_step_wizard
-[submodule "web"]
-	path = web
-	url = https://github.com/adhoc-dev/web.git
-	branch = 19.0-mig-web_notify
