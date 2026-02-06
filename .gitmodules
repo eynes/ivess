@@ -1,0 +1,4 @@
+[submodule "l10n_ar_eynes"]
+	path = l10n_ar_eynes
+	url = https://gitlab.eynes.com.ar/localization/l10n_ar_eynes.git
+	branch = 19.0
