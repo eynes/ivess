@@ -1,0 +1,28 @@
+[submodule "l10n_ar_eynes"]
+	path = l10n_ar_eynes
+	url = https://gitlab.eynes.com.ar/localization/l10n_ar_eynes.git
+	branch = 19.0
+[submodule "reporting-engine"]
+	path = reporting-engine
+	url = https://github.com/OCA/reporting-engine.git
+	branch = 19.0
+[submodule "month_year_widget"]
+	path = month_year_widget
+	url = https://gitlab.eynes.com.ar/otros/month_year_widget.git
+	branch = 19.0
+[submodule "server-ux"]
+	path = server-ux
+	url = https://github.com/fvkugit/server-ux.git
+	branch = 19.0-mig-multi_step_wizard
+[submodule "web"]
+	path = web
+	url = https://github.com/adhoc-dev/web.git
+	branch = 19.0-mig-web_notify
+[submodule "popup_messages"]
+	path = popup_messages
+	url = https://gitlab.eynes.com.ar/otros/popup_messages.git
+	branch = 19.0
+[submodule "odooapps"]
+	path = odooapps
+	url = https://github.com/odoomates/odooapps.git
+	branch = 19.0
