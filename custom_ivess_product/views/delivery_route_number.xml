@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Vista de lista -->
+    <record id="view_delivery_route_number_tree" model="ir.ui.view">
+        <field name="name">delivery.route.number.tree</field>
+        <field name="model">delivery.route.number</field>
+        <field name="arch" type="xml">
+            <list string="Delivery Route Numbers">
+                <field name="number"/>
+                <field name="allow_price_editing"/>
+                <field name="allow_free_of_charge"/>
+                <field name="allow_reordering"/>
+                <field name="is_cold_hot_delivery"/>
+                <field name="allow_previous_price"/>
+                <field name="allow_cash_sale"/>
+                <field name="allow_manual_address"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Vista de formulario -->
+    <record id="view_delivery_route_number_form" model="ir.ui.view">
+        <field name="name">delivery.route.number.form</field>
+        <field name="model">delivery.route.number</field>
+        <field name="arch" type="xml">
+            <form string="Delivery Route Number">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="number"/>
+                        </group>
+                    </group>
+                    <group string="Configuración" name="conf_group">
+                        <group>
+                            <field name="allow_price_editing"/>
+                            <field name="allow_free_of_charge"/>
+                            <field name="allow_reordering"/>
+                        </group>
+                        <group>
+                            <field name="allow_sale_without_stock"/>
+                            <field name="allow_previous_price"/>
+                            <field name="allow_cash_sale"/>
+                            <field name="is_cold_hot_delivery"/>
+                            <field name="allow_manual_address"/>
+                            <field name="allow_closing_with_rake" invisible="is_cold_hot_delivery == False"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Acción -->
+    <record id="action_delivery_route_number" model="ir.actions.act_window">
+        <field name="name">Delivery Route Numbers</field>
+        <field name="res_model">delivery.route.number</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your delivery route numbers here.
+            </p>
+        </field>
+    </record>
+    <menuitem id="menu_delivery_route_number"
+            name="Route Numbers"
+            parent="sale.menu_sale_config"
+            action="action_delivery_route_number" />
+</odoo>

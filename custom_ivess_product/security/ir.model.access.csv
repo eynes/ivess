@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_template_delivery_route,access.template.delivery.route,model_template_delivery_route,base.group_user,1,1,1,1
+access_role,access.role,model_role,base.group_user,1,1,1,1
+access_partner_distribution,access.partner.distribution,model_partner_distribution,base.group_user,1,1,1,1
+access_delivery_route_number,access_delivery_route_number,model_delivery_route_number,base.group_user,1,1,1,1
