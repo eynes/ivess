@@ -9,11 +9,19 @@
     'depends': [
         'base',
         'product',
+        'stock',
+        'sale_stock',
+        'stock_request'
     ],
 
     'data': [
         'views/product_category.xml',
         'views/product_template.xml',
+        'views/template_delivery_route.xml',
+        'views/res_users.xml',
+        'views/res_partner.xml',
+        'views/delivery_route_number.xml',
+        'security/ir.model.access.csv',
     ],
     'demo': [],
     'test': [],

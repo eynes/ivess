@@ -1,0 +1,39 @@
+<odoo>
+    <record id="view_partner_form_inherit_sales_purchases" model="ir.ui.view">
+        <field name="name">partner.form.inherit.sales.purchases</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='sales_purchases']" position="inside">
+                <group invisible="not id">
+                    <group name="group_route" string="Reparto">
+                        <field name="distributions_ids">
+                            <list>
+                                <field name="distribution"/>
+                                <field name="visit_day"/>
+                                <field name="frequency"/>
+                            </list>
+                        </field>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_distribution_form" model="ir.ui.view">
+        <field name="name">partner.distribution.form</field>
+        <field name="model">partner.distribution</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="distribution"/>
+                        <field name="visit_day"/>
+                        <field name="frequency"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>
