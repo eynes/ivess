@@ -1,4 +1,5 @@
 from odoo import models, fields, _, api
+from odoo.exceptions import ValidationError
 
 
 class ProductTemplate(models.Model):
@@ -72,12 +73,18 @@ class ProductTemplate(models.Model):
         Returns:
             str: The generated default_code based on the category's sequence, or an empty string if no sequence is available.
         """
-        default_code = ''
-        categ_obj = self.env['product.category'].browse(categ_id) if categ_id else None
-
-        if state == 'new' and categ_obj and categ_obj.new_sequence_id:
-            default_code = categ_obj.new_sequence_id.next_by_id()
-        elif state == 'repairable' and categ_obj and categ_obj.repaired_sequence_id:
-            default_code = categ_obj.repaired_sequence_id.next_by_id()
-
-        return default_code
+        categ = self.env['product.category'].browse(categ_id) if categ_id else False
+        if not categ:
+            raise ValidationError(_("Product category is required to generate the reference."))
+        if state == 'new':
+            if not categ.new_sequence_id:
+                raise ValidationError(
+                    _("Category %s does not have a New sequence configured.") % categ.name
+                )
+            return categ.new_sequence_id.next_by_id()
+        if state == 'repairable':
+            if not categ.repaired_sequence_id:
+                raise ValidationError(
+                    _("Category %s does not have a Repair sequence configured.") % categ.name
+                )
+            return categ.repaired_sequence_id.next_by_id()
