@@ -59,6 +59,18 @@ msgstr "Secuencia para productos reparados"
 
 #. module: custom_ivess_product
 #. odoo-python
+#: code:addons/custom_ivess_product/models/product_template.py:0
+msgid "Category %s does not have a New sequence configured."
+msgstr "La categoría %s no tiene configurada una secuencia para productos Nuevos."
+
+#. module: custom_ivess_product
+#. odoo-python
+#: code:addons/custom_ivess_product/models/product_template.py:0
+msgid "Category %s does not have a Repair sequence configured."
+msgstr "La categoría %s no tiene configurada una secuencia para productos Reparados."
+
+#. module: custom_ivess_product
+#. odoo-python
 #: code:addons/custom_ivess_product/models/product_category.py:0
 #: model:ir.model.fields,help:custom_ivess_product.field_product_category__new_sequence_id
 msgid "Sequence to use for new products."
@@ -70,6 +82,12 @@ msgstr "Secuencia que se utiliza cuando se crean productos cuyo estado es 'Nuevo
 #: model:ir.model.fields,help:custom_ivess_product.field_product_category__repaired_sequence_id
 msgid "Sequence to use for repaired products"
 msgstr "Secuencia que se utiliza cuando se crean productos cuyo estado es 'Reparado'"
+
+#. module: custom_ivess_product
+#. odoo-python
+#: code:addons/custom_ivess_product/models/product_template.py:0
+msgid "Product category is required to generate the reference."
+msgstr "La categoría del producto es obligatoria para generar la referencia."
 
 #. module: custom_ivess_product
 #: model:ir.model.fields,field_description:custom_ivess_product.field_product_product__state
