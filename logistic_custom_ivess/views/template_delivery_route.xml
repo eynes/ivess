@@ -8,11 +8,10 @@
                     <group>
                         <group>
                         <field name="day"/>
-                            <field name="delivery_number_id" 
+                            <field name="delivery_number_id"
                                 options="{'no_create': True, 'no_create_edit':True, 'no_open':True}"/>
                             <field name="name"/>
-                            <!--
-                            <field name="truck_id"/>-->
+                            <field name="truck_id"/>
                             <field name="allow_price_editing" invisible="1"/>
                             <field name="allow_reordering" invisible="1"/>
                             <field name="allow_closing_with_rake" invisible="1"/>
@@ -28,7 +27,7 @@
                                     <field name="allowed_client" column_invisible="1" force_save="1"/>
                                     <field name="client_id" widget="many2one_link" optional="show" domain="[('id', 'in', allowed_client)]"/>
                                     <field name="customer_code"/>
-                                    <field name="client_address"/>                                    
+                                    <field name="client_address"/>
                                 </list>
                             </field>
                         </page>
@@ -41,7 +40,7 @@
         <field name="name">template.delivery.route.tree</field>
         <field name="model">template.delivery.route</field>
         <field name="arch" type="xml">
-            <list>                
+            <list>
                 <field name="name"/>
                 <field name="day"/>
                 <field name="delivery_number_id"/>

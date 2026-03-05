@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0+e\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-02-05 14:57+0000\n"
-"PO-Revision-Date: 2026-02-05 14:57+0000\n"
+"POT-Creation-Date: 2026-03-04 14:15+0000\n"
+"PO-Revision-Date: 2026-03-04 14:15+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -16,14 +16,56 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. module: custom_ivess_product
+#. odoo-python
+#: code:addons/custom_ivess_product/models/product_template.py:0
+msgid "Category %s does not have a New sequence configured."
+msgstr ""
+"La categoría %s no tiene configurada una secuencia para productos Nuevos."
+
+#. module: custom_ivess_product
+#. odoo-python
+#: code:addons/custom_ivess_product/models/product_template.py:0
+msgid "Category %s does not have a Repair sequence configured."
+msgstr ""
+"La categoría %s no tiene configurada una secuencia para productos Reparados."
+
+#. module: custom_ivess_product
+#: model:ir.model,name:custom_ivess_product.model_res_config_settings
+msgid "Config Settings"
+msgstr "Ajustes de configuración"
+
+#. module: custom_ivess_product
+#: model_terms:ir.ui.view,arch_db:custom_ivess_product.res_config_settings_view_form
+msgid "Configuración de Rutas"
+msgstr ""
+
+#. module: custom_ivess_product
+#: model:ir.model.fields,field_description:custom_ivess_product.field_res_users__location_id
+msgid "Default Stock Location"
+msgstr ""
+
+#. module: custom_ivess_product
+#: model:ir.model.fields,help:custom_ivess_product.field_res_users__location_id
+msgid "Default stock location for this user."
+msgstr ""
+
+#. module: custom_ivess_product
 #: model:ir.model.fields,field_description:custom_ivess_product.field_product_category__display_name
 #: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__display_name
+#: model:ir.model.fields,field_description:custom_ivess_product.field_res_config_settings__display_name
+#: model:ir.model.fields,field_description:custom_ivess_product.field_res_users__display_name
+#: model:ir.model.fields,field_description:custom_ivess_product.field_stock_request__display_name
+#: model:ir.model.fields,field_description:custom_ivess_product.field_stock_request_order__display_name
 msgid "Display Name"
 msgstr "Nombre en pantalla"
 
 #. module: custom_ivess_product
 #: model:ir.model.fields,field_description:custom_ivess_product.field_product_category__id
 #: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__id
+#: model:ir.model.fields,field_description:custom_ivess_product.field_res_config_settings__id
+#: model:ir.model.fields,field_description:custom_ivess_product.field_res_users__id
+#: model:ir.model.fields,field_description:custom_ivess_product.field_stock_request__id
+#: model:ir.model.fields,field_description:custom_ivess_product.field_stock_request_order__id
 msgid "ID"
 msgstr ""
 
@@ -48,6 +90,17 @@ msgid "Product Category"
 msgstr "Categoría del producto"
 
 #. module: custom_ivess_product
+#. odoo-python
+#: code:addons/custom_ivess_product/models/product_template.py:0
+msgid "Product category is required to generate the reference."
+msgstr "La categoría del producto es obligatoria para generar la referencia."
+
+#. module: custom_ivess_product
+#: model_terms:ir.ui.view,arch_db:custom_ivess_product.res_config_settings_view_form
+msgid "Reabastecimientos"
+msgstr ""
+
+#. module: custom_ivess_product
 #: model:ir.model.fields.selection,name:custom_ivess_product.selection__product_template__state__repairable
 msgid "Repairable"
 msgstr "Reparado"
@@ -58,39 +111,48 @@ msgid "Repaired Sequence"
 msgstr "Secuencia para productos reparados"
 
 #. module: custom_ivess_product
-#. odoo-python
-#: code:addons/custom_ivess_product/models/product_template.py:0
-msgid "Category %s does not have a New sequence configured."
-msgstr "La categoría %s no tiene configurada una secuencia para productos Nuevos."
+#: model:ir.model.fields,field_description:custom_ivess_product.field_res_config_settings__manually_set_route_id
+msgid "Ruta de Reabastecimiento por Defecto"
+msgstr ""
 
 #. module: custom_ivess_product
-#. odoo-python
-#: code:addons/custom_ivess_product/models/product_template.py:0
-msgid "Category %s does not have a Repair sequence configured."
-msgstr "La categoría %s no tiene configurada una secuencia para productos Reparados."
+#: model_terms:ir.ui.view,arch_db:custom_ivess_product.res_config_settings_view_form
+msgid "Selecciona la ruta que se usará por defecto en las solicitudes"
+msgstr ""
 
 #. module: custom_ivess_product
 #. odoo-python
 #: code:addons/custom_ivess_product/models/product_category.py:0
 #: model:ir.model.fields,help:custom_ivess_product.field_product_category__new_sequence_id
 msgid "Sequence to use for new products."
-msgstr "Secuencia que se utiliza cuando se crean productos cuyo estado es 'Nuevo'"
+msgstr ""
+"Secuencia que se utiliza cuando se crean productos cuyo estado es 'Nuevo'"
 
 #. module: custom_ivess_product
 #. odoo-python
 #: code:addons/custom_ivess_product/models/product_category.py:0
 #: model:ir.model.fields,help:custom_ivess_product.field_product_category__repaired_sequence_id
 msgid "Sequence to use for repaired products"
-msgstr "Secuencia que se utiliza cuando se crean productos cuyo estado es 'Reparado'"
-
-#. module: custom_ivess_product
-#. odoo-python
-#: code:addons/custom_ivess_product/models/product_template.py:0
-msgid "Product category is required to generate the reference."
-msgstr "La categoría del producto es obligatoria para generar la referencia."
+msgstr ""
+"Secuencia que se utiliza cuando se crean productos cuyo estado es 'Reparado'"
 
 #. module: custom_ivess_product
 #: model:ir.model.fields,field_description:custom_ivess_product.field_product_product__state
 #: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__state
 msgid "Status"
 msgstr "Estado"
+
+#. module: custom_ivess_product
+#: model:ir.model,name:custom_ivess_product.model_stock_request
+msgid "Stock Request"
+msgstr "Solicitud de existencias"
+
+#. module: custom_ivess_product
+#: model:ir.model,name:custom_ivess_product.model_stock_request_order
+msgid "Stock Request Order"
+msgstr "Pedido de existencias"
+
+#. module: custom_ivess_product
+#: model:ir.model,name:custom_ivess_product.model_res_users
+msgid "Users"
+msgstr "Usuario"

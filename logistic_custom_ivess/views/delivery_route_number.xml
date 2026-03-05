@@ -61,6 +61,7 @@
             </p>
         </field>
     </record>
+
     <menuitem id="menu_delivery_route_number"
             name="Route Numbers"
             parent="sale.menu_sale_config"

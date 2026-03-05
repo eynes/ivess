@@ -16,8 +16,8 @@ class TemplateDeliveryRoute(models.Model):
     _description = 'Template delivery route'
 
     name = fields.Char(
-        string="Name", 
-        compute='_compute_name', 
+        string="Name",
+        compute='_compute_name',
         store=True
     )
     day = fields.Selection(
@@ -34,9 +34,10 @@ class TemplateDeliveryRoute(models.Model):
         string='Visit Day',
         required=True,
     )
+
     #user_assigned_ids = fields.One2many(
-    #    'user.assigned.lines', 
-    #    'template_delivery_route_id', 
+    #    'user.assigned.lines',
+    #    'template_delivery_route_id',
     #    string='Users Assigned'
     #)
     #delivery_route_line_ids = fields.One2many(
@@ -48,12 +49,12 @@ class TemplateDeliveryRoute(models.Model):
         'delivery.route.number',
         string="Delivery Route Number",
     )
-    #truck_id = fields.Many2one(
-    #    'fleet.truck',
-    #    string='Truck License Plate',
-    #    related='delivery_number_id.truck_id',
-    #    store=True,
-    #) 
+    truck_id = fields.Many2one(
+       'fleet.vehicle',
+       string='Truck License Plate',
+       related='delivery_number_id.truck_id',
+       store=True,
+    )
     allow_price_editing = fields.Boolean(
         string="Allow Price Editing",
         related="delivery_number_id.allow_price_editing",
@@ -85,13 +86,14 @@ class TemplateDeliveryRoute(models.Model):
     )
 
     @api.depends(
-        'day', 
-        'delivery_number_id', 
+        'day',
+        'delivery_number_id',
         'delivery_number_id.number'
     )
     def _compute_name(self):
         for rec in self:
             rec.name = '{}{}'.format(rec.delivery_number_id.number, day_mapping.get(rec.day))
+
     #@api.depends('delivery_person_id')
     #def _compute_allowed_truck(self):
     #    for rec in self:

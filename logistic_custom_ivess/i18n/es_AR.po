@@ -1,0 +1,326 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+#   * logistic_custom_ivess
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0+e\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-04 14:10+0000\n"
+"PO-Revision-Date: 2026-03-04 14:10+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_cash_sale
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__allow_cash_sale
+msgid "Allow Cash Sale"
+msgstr "Permitir venta contado"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_free_of_charge
+msgid "Allow Free Of Charge"
+msgstr "Permitir sin cargo"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_manual_address
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__allow_manual_address
+msgid "Allow Manual Address"
+msgstr "Permitir dirección manual"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_previous_price
+msgid "Allow Previous Price"
+msgstr "Permitir precio anterior"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_price_editing
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__allow_price_editing
+msgid "Allow Price Editing"
+msgstr "Permitir editar precio"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__allow_reordering
+msgid "Allow Reordering"
+msgstr "Permitir reordenar"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_closing_with_rake
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__allow_closing_with_rake
+msgid "Allow closing with rake"
+msgstr "Permitir cierre con rastrillo"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_sale_without_stock
+msgid "Allow sale without stock"
+msgstr "Permitir venta sin stock"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__biweekly
+msgid "Biweekly"
+msgstr "Quincenal"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_number_form
+msgid "Configuración"
+msgstr "Configuración"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,website_form_label:logistic_custom_ivess.model_res_partner
+msgid "Create a Customer"
+msgstr "Crear un cliente"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.actions.act_window,help:logistic_custom_ivess.action_delivery_route_number
+msgid "Create your delivery route numbers here."
+msgstr "Cree aquí sus números de ruta de reparto."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__create_uid
+msgid "Created by"
+msgstr "Creado por"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__create_date
+msgid "Created on"
+msgstr "Creado el"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_delivery_route_number
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__delivery_number_id
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_number_form
+msgid "Delivery Route Number"
+msgstr "Número de ruta de reparto"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_delivery_route_number
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_number_tree
+msgid "Delivery Route Numbers"
+msgstr "Números de rutas de reparto"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__display_name
+msgid "Display Name"
+msgstr "Nombre en pantalla"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__distribution
+msgid "Distribution"
+msgstr "Distribución"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_partner_distribution
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__distributions_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__distributions_ids
+msgid "Distributions"
+msgstr "Distribuciones"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_reordering
+msgid "Enable Reordering"
+msgstr "Habilitar reordenamiento"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route_number__allow_reordering
+#: model:ir.model.fields,help:logistic_custom_ivess.field_template_delivery_route__allow_reordering
+msgid "Enables reordering of customers in delivery routes."
+msgstr "Permite reordenar los clientes en las rutas de reparto."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__frequency
+msgid "Frequency"
+msgstr "Frecuencia"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__friday
+msgid "Friday"
+msgstr "Viernes"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__id
+msgid "ID"
+msgstr "ID"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route_number__allow_manual_address
+#: model:ir.model.fields,help:logistic_custom_ivess.field_template_delivery_route__allow_manual_address
+msgid "If checked, customers can enter a manual address for this delivery."
+msgstr "Si se marca, los clientes pueden ingresar una dirección manual para este reparto."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route_number__allow_cash_sale
+msgid "If checked, this delivery number permits sales paid in cash."
+msgstr "Si se marca, este número de reparto permite ventas pagadas en efectivo."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__is_cold_hot_delivery
+msgid "Is cold hot delivery"
+msgstr "Es reparto frío/calor"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__write_uid
+msgid "Last Updated by"
+msgstr "Última actualización por"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__write_date
+msgid "Last Updated on"
+msgstr "Última actualización el"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__monday
+msgid "Monday"
+msgstr "Lunes"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__monthly
+msgid "Monthly"
+msgstr "Mensual"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__name
+msgid "Name"
+msgstr "Nombre"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__number
+msgid "Number"
+msgstr "Número"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_res_partner
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__partner_id
+msgid "Partner"
+msgstr "Contacto"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_template_delivery_route__allow_cash_sale
+msgid "Reflects the cash‑sale setting of the associated delivery number."
+msgstr "Refleja la configuración de venta contado del número de reparto asociado."
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_partner_form_inherit_sales_purchases
+msgid "Reparto"
+msgstr "Reparto"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_template_delivery_route
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_tempalte_delivery_route
+msgid "Repartos"
+msgstr "Repartos"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_role
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__role_id
+msgid "Role"
+msgstr "Rol"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__name
+msgid "Role Name"
+msgstr "Nombre del rol"
+
+#. module: logistic_custom_ivess
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_delivery_route_number
+msgid "Route Numbers"
+msgstr "Números de ruta"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__saturday
+msgid "Saturday"
+msgstr "Sábado"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__sunday
+msgid "Sunday"
+msgstr "Domingo"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_template_delivery_route
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__template_delivery_route_id
+msgid "Template delivery route"
+msgstr "Plantilla de ruta de reparto"
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/delivery_route_number.py:0
+msgid "The delivery route number must be unique."
+msgstr "El número de ruta de reparto debe ser único."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__thursday
+msgid "Thursday"
+msgstr "Jueves"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__truck_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__truck_id
+msgid "Truck License Plate"
+msgstr "Patente del camión"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__tuesday
+msgid "Tuesday"
+msgstr "Martes"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__user_id
+msgid "User"
+msgstr "Usuario"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_user_assigned_lines
+msgid "User Assigned Lines"
+msgstr "Líneas de usuario asignadas"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__visit_day
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__day
+msgid "Visit Day"
+msgstr "Día de visita"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__wednesday
+msgid "Wednesday"
+msgstr "Miércoles"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__weekly
+msgid "Weekly"
+msgstr "Semanal"
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/fleet_truck.py:0
+msgid "Year must be between 1900 and the current year."
+msgstr "El año debe estar entre 1900 y el año actual."

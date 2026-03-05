@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_delivery_route_number_salesman,delivery.route.number.salesman,model_delivery_route_number,sales_team.group_sale_salesman,1,1,1,1
+access_template_delivery_route_salesman,template.delivery.route.salesman,model_template_delivery_route,sales_team.group_sale_salesman,1,1,1,1
+access_user_assigned_lines_salesman,user.assigned.lines.salesman,model_user_assigned_lines,sales_team.group_sale_salesman,1,1,1,1
+access_role_salesman,role.salesman,model_role,sales_team.group_sale_salesman,1,1,1,1

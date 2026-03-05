@@ -1,0 +1,16 @@
+# -*- coding: utf-8 -*-
+from . import account_move
+from . import template_delivery_route
+from . import delivery_route_number
+from . import res_partner_distribution
+from . import delivery_route
+from . import no_purchase_reason
+from . import product_template
+from . import replacement_reason
+from . import res_partner_distribution
+from . import res_partner_water_consumption
+from . import res_partner
+from . import sale_order
+from . import template_delivery_route
+from . import visit_status
+from . import water_contain

@@ -7,6 +7,6 @@ class ResPartner(models.Model):
 
     validated_supplier = fields.Boolean(
         string="Validated Supplier",
-        help=_("Indicates whether the supplier has been validated by the Administration team."),
+        help="Indicates whether the supplier has been validated by the Administration team.",
         tracking=True
     )
