@@ -10,12 +10,33 @@ class StockRequestOrder(models.Model):
     _description = "Stock Request Order"
 
     @api.model
-    def default_get(self, fields):
-        res = super().default_get(fields)
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
         location = None
         if self.env.user.location_id:
             location = self.env.user.location_id
         if location:
             res["warehouse_id"] = False
             res["location_id"] = location.id
+        route_param = self.env['ir.config_parameter'].sudo().get_param('custom_ivess_product.manually_set_route_id')
+        if route_param:
+            try:
+                res["route_id"] = int(route_param)
+            except (ValueError, TypeError):
+                pass
+        return res
+
+
+class StockRequest(models.Model):
+    _inherit = "stock.request"
+
+    def _action_confirm(self):
+        res = super()._action_confirm()
+
+        if self.location_id:
+            pickings = self.picking_ids
+            if pickings:
+                pickings.write({'location_dest_id': self.location_id.id})
+                pickings.move_ids.write({'location_dest_id': self.location_id.id})
+                pickings.move_line_ids.write({'location_dest_id': self.location_id.id})
         return res

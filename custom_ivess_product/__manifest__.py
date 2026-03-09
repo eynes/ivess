@@ -15,6 +15,8 @@
     ],
 
     'data': [
+        'views/res_config_settings.xml',
+        'views/stock_request_order.xml',
         'views/product_category.xml',
         'views/product_template.xml',
         'views/template_delivery_route.xml',
