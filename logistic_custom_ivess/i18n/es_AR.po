@@ -1,13 +1,13 @@
 # Translation of Odoo Server.
 # This file contains the translation of the following modules:
-#   * logistic_custom_ivess
+# 	* logistic_custom_ivess
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0+e\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-04 14:10+0000\n"
-"PO-Revision-Date: 2026-03-04 14:10+0000\n"
+"POT-Creation-Date: 2026-03-06 12:17+0000\n"
+"PO-Revision-Date: 2026-03-06 12:17+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -16,6 +16,56 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/res_partner_water_consumption.py:0
+msgid ""
+"A consumption record for this customer already exists for this month and "
+"year."
+msgstr ""
+"Ya existe un registro de consumo para este cliente en este mes y año."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_needaction
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_needaction
+msgid "Action Needed"
+msgstr "Acción requerida"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__state__active
+msgid "Active"
+msgstr "Activo"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_ids
+msgid "Activities"
+msgstr "Actividades"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_exception_decoration
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_exception_decoration
+msgid "Activity Exception Decoration"
+msgstr "Decoración de Excepción de Actividad"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_state
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_state
+msgid "Activity State"
+msgstr "Estado de la actividad"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_type_icon
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_type_icon
+msgid "Activity Type Icon"
+msgstr "Ícono de tipo de actividad"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__client_address
+msgid "Address"
+msgstr "Dirección"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__allow_cash_sale
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_cash_sale
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__allow_cash_sale
 msgid "Allow Cash Sale"
@@ -23,10 +73,13 @@ msgstr "Permitir venta contado"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_free_of_charge
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_product__allow_free_of_charge
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_template__allow_free_of_charge
 msgid "Allow Free Of Charge"
 msgstr "Permitir sin cargo"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__allow_manual_address
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_manual_address
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__allow_manual_address
 msgid "Allow Manual Address"
@@ -38,6 +91,7 @@ msgid "Allow Previous Price"
 msgstr "Permitir precio anterior"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__allow_price_editing
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_price_editing
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__allow_price_editing
 msgid "Allow Price Editing"
@@ -49,10 +103,16 @@ msgid "Allow Reordering"
 msgstr "Permitir reordenar"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__allow_closing_with_rake
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_closing_with_rake
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__allow_closing_with_rake
 msgid "Allow closing with rake"
 msgstr "Permitir cierre con rastrillo"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__allow_reordering
+msgid "Allow reordering"
+msgstr "Permitir reordenar"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_sale_without_stock
@@ -60,14 +120,106 @@ msgid "Allow sale without stock"
 msgstr "Permitir venta sin stock"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__allowed_client
+msgid "Allowed Client"
+msgstr "Cliente permitido"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__assignment_date
+msgid "Assignment Date"
+msgstr "Fecha de asignación"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_attachment_count
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_attachment_count
+msgid "Attachment Count"
+msgstr "Cantidad de archivos adjuntos"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__biweekly
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__frequency__biweekly
 msgid "Biweekly"
 msgstr "Quincenal"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__water_container__container_type__bottle
+msgid "Bottle"
+msgstr "Botella"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__client_id
+msgid "Client"
+msgstr "Cliente"
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/delivery_route.py:0
+msgid "Clients in 'Rake' state: %s"
+msgstr "Clientes en estado 'Rastrillo': %s"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__delivery_route_line_ids
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
+msgid "Clients to Visit"
+msgstr "Clientes a visitar"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
+msgid "Close"
+msgstr "Cerrar"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__delivery_route__state__closed
+msgid "Closed"
+msgstr "Cerrado"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__code
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_replacement_reason__code
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__code
+msgid "Code"
+msgstr "Código"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__delivery_route__delivery_type__common
+msgid "Common"
+msgstr "Común"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_res_company
+msgid "Companies"
+msgstr "Empresas"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_number_form
 msgid "Configuración"
 msgstr "Configuración"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__consumption_liters
+msgid "Consumption (liters)"
+msgstr "Consumo (litros)"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_res_partner
+msgid "Contact"
+msgstr "Contacto"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__name
+msgid "Container Number"
+msgstr "Número de envase"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__container_type
+msgid "Container Type"
+msgstr "Tipo de envase"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.actions.act_window,help:logistic_custom_ivess.action_water_container_state
+msgid "Crea los estados posibles para los envases."
+msgstr "Crea los estados posibles para los envases."
 
 #. module: logistic_custom_ivess
 #: model:ir.model,website_form_label:logistic_custom_ivess.model_res_partner
@@ -75,27 +227,124 @@ msgid "Create a Customer"
 msgstr "Crear un cliente"
 
 #. module: logistic_custom_ivess
+#: model_terms:ir.actions.act_window,help:logistic_custom_ivess.action_water_container
+msgid "Create a new water container"
+msgstr "Crear un nuevo envase de agua"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.actions.act_window,help:logistic_custom_ivess.action_replacement_reason
+msgid "Create and manage reasons for product replacements."
+msgstr "Crear y gestionar motivos de recambio de productos."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__create_from_wizard
+msgid "Create from wizard"
+msgstr "Crear desde asistente"
+
+#. module: logistic_custom_ivess
 #: model_terms:ir.actions.act_window,help:logistic_custom_ivess.action_delivery_route_number
 msgid "Create your delivery route numbers here."
 msgstr "Cree aquí sus números de ruta de reparto."
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__create_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__create_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_replacement_reason__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__create_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__create_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__create_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_visit_status__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__create_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__create_uid
 msgid "Created by"
 msgstr "Creado por"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__create_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__create_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_replacement_reason__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__create_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__create_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__create_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_visit_status__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__create_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__create_date
 msgid "Created on"
 msgstr "Creado el"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__current_month_water_liters
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__current_month_water_liters
+msgid "Current month water liters"
+msgstr "Litros de agua del mes actual"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__current_year_water_liters
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__current_year_water_liters
+msgid "Current year water liters"
+msgstr "Litros de agua del año actual"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__partner_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__partner_id
+msgid "Customer"
+msgstr "Cliente"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__customer_code
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__customer_code
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__customer_code
+msgid "Customer Code"
+msgstr "Código de cliente"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_company__customer_sequence_id
+msgid "Customer sequence"
+msgstr "Secuencia de cliente"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__date_from
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__date_from
+msgid "Date From"
+msgstr "Fecha desde"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__date_to
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__date_to
+msgid "Date To"
+msgstr "Fecha hasta"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__delivery_date
+msgid "Delivery Date"
+msgstr "Fecha de reparto"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__delivery_person_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__parent_delivery_person
+msgid "Delivery Person"
+msgstr "Repartidor"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_delivery_route
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__route_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_order__delivery_route_id
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
+msgid "Delivery Route"
+msgstr "Ruta de reparto"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_delivery_route_line
+msgid "Delivery Route Line"
+msgstr "Línea de ruta de reparto"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_delivery_route_number
@@ -111,17 +360,54 @@ msgid "Delivery Route Numbers"
 msgstr "Números de rutas de reparto"
 
 #. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_delivery_route
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_delivery_route_root
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_tree
+msgid "Delivery Routes"
+msgstr "Rutas de reparto"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__delivery_number_id
+msgid "Delivery route number"
+msgstr "Número de ruta de reparto"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__name
+msgid "Description"
+msgstr "Descripción"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__state__discharge_review
+msgid "Discharge Review"
+msgstr "Revisión de baja"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_account_move__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__display_name
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__display_name
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_template__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_replacement_reason__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_company__display_name
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__display_name
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_order__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_order_line__display_name
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__display_name
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_visit_status__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__display_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__display_name
 msgid "Display Name"
-msgstr "Nombre en pantalla"
+msgstr "Nombre para mostrar"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__distribution
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__distribution
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__distribution
 msgid "Distribution"
 msgstr "Distribución"
 
@@ -133,18 +419,71 @@ msgid "Distributions"
 msgstr "Distribuciones"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__state__dont_pass
+msgid "Don't pass"
+msgstr "No pasa"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__delivery_route__state__draft
+msgid "Draft"
+msgstr "Borrador"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_reordering
 msgid "Enable Reordering"
 msgstr "Habilitar reordenamiento"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__allow_reordering
 #: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route_number__allow_reordering
 #: model:ir.model.fields,help:logistic_custom_ivess.field_template_delivery_route__allow_reordering
 msgid "Enables reordering of customers in delivery routes."
 msgstr "Permite reordenar los clientes en las rutas de reparto."
 
 #. module: logistic_custom_ivess
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_water_container_main
+msgid "Envases"
+msgstr "Envases"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
+msgid "Esta seguro que desea cerrar la ruta?"
+msgstr "Esta seguro que desea cerrar la ruta?"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_water_container_state_form
+msgid "Estado de Envase"
+msgstr "Estado de Envase"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_water_container_state
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_water_container_state
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_water_container_state_tree
+msgid "Estados de Envases"
+msgstr "Estados de Envases"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_follower_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_follower_ids
+msgid "Followers"
+msgstr "Seguidores"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_partner_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_partner_ids
+msgid "Followers (Partners)"
+msgstr "Seguidores (Contactos)"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__activity_type_icon
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__activity_type_icon
+msgid "Font awesome icon e.g. fa-tasks"
+msgstr "Ícono de Font Awesome ej. fa-tasks"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__frequency
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__frequency
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__frequency
 msgid "Frequency"
 msgstr "Frecuencia"
 
@@ -154,25 +493,103 @@ msgid "Friday"
 msgstr "Viernes"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__has_message
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__has_message
+msgid "Has Message"
+msgstr "Tiene mensaje"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__state__holidays
+msgid "Holidays"
+msgstr "Vacaciones"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_account_move__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_template__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_replacement_reason__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_company__id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_order__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_order_line__id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_visit_status__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__id
 msgid "ID"
 msgstr "ID"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_exception_icon
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_exception_icon
+msgid "Icon"
+msgstr "Ícono"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__activity_exception_icon
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__activity_exception_icon
+msgid "Icon to indicate an exception activity."
+msgstr "Ícono para indicar una actividad de excepción."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__allow_manual_address
 #: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route_number__allow_manual_address
 #: model:ir.model.fields,help:logistic_custom_ivess.field_template_delivery_route__allow_manual_address
 msgid "If checked, customers can enter a manual address for this delivery."
-msgstr "Si se marca, los clientes pueden ingresar una dirección manual para este reparto."
+msgstr ""
+"Si se marca, los clientes pueden ingresar una dirección manual para este "
+"reparto."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__message_needaction
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__message_needaction
+msgid "If checked, new messages require your attention."
+msgstr "Si está marcado, los nuevos mensajes requieren su atención."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__message_has_error
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__message_has_sms_error
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__message_has_error
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__message_has_sms_error
+msgid "If checked, some messages have a delivery error."
+msgstr "Si está marcado, algunos mensajes tienen un error de entrega."
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route_number__allow_cash_sale
 msgid "If checked, this delivery number permits sales paid in cash."
-msgstr "Si se marca, este número de reparto permite ventas pagadas en efectivo."
+msgstr ""
+"Si se marca, este número de reparto permite ventas pagadas en efectivo."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__delivery_route__state__in_progress
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
+msgid "In Progress"
+msgstr "En progreso"
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/visit_status.py:0
+#: model:ir.model.fields,help:logistic_custom_ivess.field_visit_status__requires_reason
+msgid "Indicates if this visit status requires a reason for no purchase."
+msgstr "Indica si este estado de visita requiere un motivo de no compra."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_is_follower
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_is_follower
+msgid "Is Follower"
+msgstr "Es seguidor"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__is_rake
+msgid "Is Rake"
+msgstr "Es Rastrillo"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__is_cold_hot_delivery
@@ -180,22 +597,72 @@ msgid "Is cold hot delivery"
 msgstr "Es reparto frío/calor"
 
 #. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_account_move
+msgid "Journal Entry"
+msgstr "Asiento contable"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__water_container__container_type__jug
+msgid "Jug"
+msgstr "Bidón"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__write_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__write_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_replacement_reason__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__write_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__write_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__write_uid
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_visit_status__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__write_uid
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__write_uid
 msgid "Last Updated by"
 msgstr "Última actualización por"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__write_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__write_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_replacement_reason__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__write_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_role__write_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__write_date
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_visit_status__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__write_date
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__write_date
 msgid "Last Updated on"
 msgstr "Última actualización el"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_product__liter_quantity
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_template__liter_quantity
+msgid "Liter Quantity"
+msgstr "Cantidad de litros"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_product_product__liter_quantity
+#: model:ir.model.fields,help:logistic_custom_ivess.field_product_template__liter_quantity
+msgid "Liters per unit of this product"
+msgstr "Litros por unidad de este producto"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_has_error
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_has_error
+msgid "Message Delivery error"
+msgstr "Error de entrega de mensaje"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_ids
+msgid "Messages"
+msgstr "Mensajes"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__monday
@@ -203,14 +670,93 @@ msgid "Monday"
 msgstr "Lunes"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__month
+msgid "Month"
+msgstr "Mes"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__monthly
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__frequency__monthly
 msgid "Monthly"
 msgstr "Mensual"
 
 #. module: logistic_custom_ivess
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_water_consumption_records
+msgid "Monthly Records"
+msgstr "Registros mensuales"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_res_partner_water_consumption
+msgid "Monthly Water Consumption per Customer"
+msgstr "Consumo de agua mensual por cliente"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_no_purchase_reason
+msgid "Motivo de No Compra"
+msgstr "Motivo de no compra"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__my_activity_date_deadline
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__my_activity_date_deadline
+msgid "My Activity Deadline"
+msgstr "Mi fecha límite de actividad"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__name
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__name
 msgid "Name"
 msgstr "Nombre"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_calendar_event_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_calendar_event_id
+msgid "Next Activity Calendar Event"
+msgstr "Siguiente evento en el calendario de actividades"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_date_deadline
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_date_deadline
+msgid "Next Activity Deadline"
+msgstr "Siguiente fecha límite de actividad"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_summary
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_summary
+msgid "Next Activity Summary"
+msgstr "Resumen de la siguiente actividad"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_type_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_type_id
+msgid "Next Activity Type"
+msgstr "Tipo de la siguiente actividad"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_no_purchase_reason_list
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_no_purchase_reason_root
+msgid "No Purchase Reasons"
+msgstr "Motivos de no compra"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__no_purchase_reason_id
+msgid "No purchase reason"
+msgstr "Motivo de no compra"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.actions.act_window,help:logistic_custom_ivess.action_water_consumption
+msgid "No water consumption records yet."
+msgstr "Aún no hay registros de consumo de agua."
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
+msgid "Nombre"
+msgstr "Nombre"
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/delivery_route.py:0
+msgid "Non-purchase reasons marked as 'Rake' in the following lines: %s"
+msgstr "Motivos de no compra marcados como 'Rastrillo' en las siguientes líneas: %s"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__number
@@ -218,17 +764,108 @@ msgid "Number"
 msgstr "Número"
 
 #. module: logistic_custom_ivess
-#: model:ir.model,name:logistic_custom_ivess.model_res_partner
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_needaction_counter
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_needaction_counter
+msgid "Number of Actions"
+msgstr "Número de acciones"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_has_error_counter
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_has_error_counter
+msgid "Number of errors"
+msgstr "Número de errores"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__message_needaction_counter
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__message_needaction_counter
+msgid "Number of messages requiring action"
+msgstr "Número de mensajes que requieren acción"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__message_has_error_counter
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__message_has_error_counter
+msgid "Number of messages with delivery error"
+msgstr "Número de mensajes con error de entrega"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__order
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_replacement_reason__sequence
+msgid "Order"
+msgstr "Orden"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__partner_id
 msgid "Partner"
 msgstr "Contacto"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__is_pending_return
+msgid "Pending return"
+msgstr "Devolución pendiente"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__possible_customer_withdrawal
+msgid "Possible Withdrawal"
+msgstr "Posible baja"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_product_template
+msgid "Product"
+msgstr "Producto"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__qty_water_consumption
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__qty_water_consumption
+msgid "Qty water consumption"
+msgstr "Cant. consumo de agua"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__qty_water_containers
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__qty_water_containers
+msgid "Qty water containers"
+msgstr "Cant. envases de agua"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__state__rake
+msgid "Rake"
+msgstr "Rastrillo"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__rating_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__rating_ids
+msgid "Ratings"
+msgstr "Calificaciones"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__reason
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_replacement_reason__reason
+msgid "Reason"
+msgstr "Motivo"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_no_purchase_reason_form
+msgid "Reason for Not Purchasing"
+msgstr "Motivo por el cual no compró"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__reason_customer_withdrawal
+msgid "Reason of Withdrawal"
+msgstr "Motivo de baja"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_no_purchase_reason__reason
+msgid "Reason why the visit could not be completed."
+msgstr "Motivo por el cual no se pudo completar la visita."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__allow_cash_sale
 #: model:ir.model.fields,help:logistic_custom_ivess.field_template_delivery_route__allow_cash_sale
 msgid "Reflects the cash‑sale setting of the associated delivery number."
 msgstr "Refleja la configuración de venta contado del número de reparto asociado."
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_account_bank_statement_line__delivery_route_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_account_move__delivery_route_ids
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_partner_form_inherit_sales_purchases
 msgid "Reparto"
 msgstr "Reparto"
@@ -236,12 +873,54 @@ msgstr "Reparto"
 #. module: logistic_custom_ivess
 #: model:ir.actions.act_window,name:logistic_custom_ivess.action_template_delivery_route
 #: model:ir.ui.menu,name:logistic_custom_ivess.menu_tempalte_delivery_route
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_move_form_inherit_add_m2m
 msgid "Repartos"
 msgstr "Repartos"
 
 #. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_replacement_reason
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_order_line__replacement_reason_id
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_replacement_reason_form
+msgid "Replacement Reason"
+msgstr "Motivo de recambio"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_replacement_reason
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_replacement_reason
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_replacement_reason_tree
+msgid "Replacement Reasons"
+msgstr "Motivos de recambio"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_visit_status__requires_reason
+msgid "Requiere Motivo"
+msgstr "Requiere motivo"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__requires_reason
+msgid "Requires Reason"
+msgstr "Requiere motivo"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
+msgid "Reset to Draft"
+msgstr "Volver a borrador"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__activity_user_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__activity_user_id
+msgid "Responsible User"
+msgstr "Usuario responsable"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__return_date
+msgid "Return Date"
+msgstr "Fecha de devolución"
+
+#. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_role
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__role_id
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_roles_form
 msgid "Role"
 msgstr "Rol"
 
@@ -251,9 +930,31 @@ msgid "Role Name"
 msgstr "Nombre del rol"
 
 #. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_roles
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_roles
+msgid "Roles"
+msgstr "Roles"
+
+#. module: logistic_custom_ivess
 #: model:ir.ui.menu,name:logistic_custom_ivess.menu_delivery_route_number
 msgid "Route Numbers"
 msgstr "Números de ruta"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_has_sms_error
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_has_sms_error
+msgid "SMS Delivery error"
+msgstr "Error de entrega de SMS"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_sale_order
+msgid "Sales Order"
+msgstr "Orden de venta"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_sale_order_line
+msgid "Sales Order Line"
+msgstr "Línea de la orden de venta"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__saturday
@@ -261,21 +962,90 @@ msgid "Saturday"
 msgstr "Sábado"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__sequence
+msgid "Sequence"
+msgstr "Secuencia"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__state
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__state
+msgid "State"
+msgstr "Estado"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_visit_status__status_name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__state_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__name
+msgid "Status"
+msgstr "Estado"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__activity_state
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__activity_state
+msgid ""
+"Status based on activities\n"
+"Overdue: Due date is already passed\n"
+"Today: Activity date is today\n"
+"Planned: Future activities."
+msgstr ""
+"Estado basado en actividades\n"
+"Vencida: La fecha de vencimiento ya pasó\n"
+"Hoy: La fecha de actividad es hoy\n"
+"Planificada: Actividades futuras."
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__sunday
 msgid "Sunday"
 msgstr "Domingo"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__template_route_id
+msgid "Template Delivery Route"
+msgstr "Plantilla de ruta de reparto"
+
+#. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_template_delivery_route
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__template_delivery_route_id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__template_delivery_route_id
 msgid "Template delivery route"
 msgstr "Plantilla de ruta de reparto"
 
 #. module: logistic_custom_ivess
 #. odoo-python
-#: code:addons/logistic_custom_ivess/models/delivery_route_number.py:0
-msgid "The delivery route number must be unique."
-msgstr "El número de ruta de reparto debe ser único."
+#: code:addons/logistic_custom_ivess/models/res_partner.py:0
+msgid "The 'Date From' must be before or equal to 'Date To'."
+msgstr "La 'Fecha desde' debe ser anterior o igual a la 'Fecha hasta'."
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/delivery_route.py:0
+msgid "The customer %(customer)s was deleted "
+msgstr "El cliente %(customer)s fue eliminado "
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/no_purchase_reason.py:0
+#: code:addons/logistic_custom_ivess/models/replacement_reason.py:0
+msgid "The order must be unique."
+msgstr "El orden debe ser único."
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/delivery_route.py:0
+msgid "The record cannot be closed due to the following:"
+msgstr "El registro no se puede cerrar debido a lo siguiente:"
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/res_partner.py:0
+msgid "This customer has %s unpaid or partially paid invoice(s)."
+msgstr "Este cliente tiene %s factura(s) impaga(s) o pagada(s) parcialmente."
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/res_partner.py:0
+msgid "This customer has %s water containers pending return."
+msgstr "Este cliente tiene %s envase(s) de agua pendiente(s) de devolución."
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__thursday
@@ -283,6 +1053,13 @@ msgid "Thursday"
 msgstr "Jueves"
 
 #. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/delivery_route.py:0
+msgid "To start a delivery route, you must first set the delivery date."
+msgstr "Para iniciar una ruta de reparto, primero debe establecer la fecha de reparto."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__truck_id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__truck_id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__truck_id
 msgid "Truck License Plate"
@@ -292,6 +1069,23 @@ msgstr "Patente del camión"
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__tuesday
 msgid "Tuesday"
 msgstr "Martes"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__delivery_type
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__parent_delivery_type
+msgid "Type"
+msgstr "Tipo"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__activity_exception_decoration
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__activity_exception_decoration
+msgid "Type of the exception activity on record."
+msgstr "Tipo de actividad de excepción en el registro."
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__delivery_route__delivery_type__universal
+msgid "Universal"
+msgstr "Universal"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__user_id
@@ -305,9 +1099,62 @@ msgstr "Líneas de usuario asignadas"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_partner_distribution__visit_day
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__visit_day
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__visit_day
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__day
 msgid "Visit Day"
 msgstr "Día de visita"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_visit_status
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__visit_status_id
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_visit_status_form
+msgid "Visit Status"
+msgstr "Estado de visita"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_visit_status
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_visit_status_root
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_visit_status_tree
+msgid "Visit Statuses"
+msgstr "Estados de visita"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_water_consumption
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__water_consumption_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__water_consumption_ids
+msgid "Water Consumption"
+msgstr "Consumo de agua"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_water_container
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_water_container_form
+msgid "Water Container"
+msgstr "Envase de agua"
+
+#. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_water_container_state
+msgid "Water Container Status"
+msgstr "Estado del envase de agua"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_water_container
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__water_container_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__water_container_ids
+msgid "Water Containers"
+msgstr "Envases de agua"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__website_message_ids
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__website_message_ids
+msgid "Website Messages"
+msgstr "Mensajes del sitio web"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__website_message_ids
+#: model:ir.model.fields,help:logistic_custom_ivess.field_water_container__website_message_ids
+msgid "Website communication history"
+msgstr "Historial de comunicación del sitio web"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__template_delivery_route__day__wednesday
@@ -316,11 +1163,18 @@ msgstr "Miércoles"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__weekly
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__frequency__weekly
 msgid "Weekly"
 msgstr "Semanal"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__year
+msgid "Year"
+msgstr "Año"
+
+#. module: logistic_custom_ivess
 #. odoo-python
-#: code:addons/logistic_custom_ivess/models/fleet_truck.py:0
-msgid "Year must be between 1900 and the current year."
-msgstr "El año debe estar entre 1900 y el año actual."
+#: code:addons/logistic_custom_ivess/models/res_partner.py:0
+msgid ""
+"because was either archived or flagged as potentially inactive on %(date)s"
+msgstr "porque fue archivado o marcado como potencialmente inactivo el %(date)s"

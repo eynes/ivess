@@ -13,4 +13,5 @@ from . import res_partner
 from . import sale_order
 from . import template_delivery_route
 from . import visit_status
-from . import water_contain
+from . import water_container
+from . import res_company

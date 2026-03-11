@@ -82,7 +82,19 @@ class ResPartner(models.Model):
         string='Distributions',
         tracking=True
     )
+    customer_code = fields.Char(
+        string="Customer Code",
+        readonly=True,
+        copy=False
+    )
 
+    @api.model
+    def create(self, vals):
+        if vals.get('customer_rank', 0) >= 1:
+            sequence = self.env.company.customer_sequence_id
+            if sequence:
+                vals['customer_code'] = sequence.next_by_id()
+        return super(ResPartner, self).create(vals)
 
     @api.constrains('date_from', 'date_to')
     def _check_dates(self):
