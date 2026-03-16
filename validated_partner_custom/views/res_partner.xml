@@ -7,6 +7,9 @@
             <group name="purchase" position="inside">
                 <field name="validated_supplier" groups="validated_partner_custom.group_modify_validated_supplier"/>
             </group>
+            <xpath expr="//field[@name='property_supplier_payment_term_id']" position="attributes">
+                <attribute name="groups" separator="," add="purchase.group_purchase_user"/>
+            </xpath>
         </field>
     </record>
 </odoo>
