@@ -30,17 +30,6 @@ class StockRequestOrder(models.Model):
 class StockRequest(models.Model):
     _inherit = "stock.request"
 
-    # def _action_confirm(self):
-    #     res = super()._action_confirm()
-
-    #     if self.location_id:
-    #         pickings = self.picking_ids
-    #         if pickings:
-    #             pickings.write({'location_dest_id': self.location_id.id})
-    #             pickings.move_ids.write({'location_dest_id': self.location_id.id})
-    #             pickings.move_line_ids.write({'location_dest_id': self.location_id.id})
-    #     return res
-
     def _action_confirm(self):
         res = super()._action_confirm()
         if self.location_id:
