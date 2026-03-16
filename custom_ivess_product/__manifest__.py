@@ -15,6 +15,8 @@
     ],
 
     'data': [
+        'data/paperformat.xml',
+        'data/product_template_report.xml',
         'views/res_config_settings.xml',
         'views/stock_request_order.xml',
         'views/product_category.xml',

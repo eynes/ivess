@@ -5,13 +5,13 @@
         <field name="inherit_id" ref="stock.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                <app data-string="Stock Request" string="Reabastecimientos" name="stock_request">
+                <!--<app data-string="Stock Request" string="Reabastecimientos" name="stock_request">
                     <block title="Configuración de Rutas">
                         <setting help="Selecciona la ruta que se usará por defecto en las solicitudes">
                             <field name="manually_set_route_id"/>
                         </setting>
                     </block>
-                </app>
+                </app>--> <!--Sacar esto-->
             </xpath>
         </field>
     </record>
