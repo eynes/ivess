@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="stock_request_order_form" model="ir.ui.view">
+        <field name="name">stock.request.order.form - stock_request_analytic</field>
+        <field name="model">stock.request.order</field>
+        <field name="inherit_id" ref="stock_request.stock_request_order_form" />
+        <field name="arch" type="xml">
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+                    type="object"
+                    name="action_view_analytic"
+                    class="oe_stat_button"
+                    icon="fa-list"
+                    invisible="analytic_count == 0"
+                    groups="analytic.group_analytic_accounting"
+                >
+                    <field
+                        name="analytic_count"
+                        widget="statinfo"
+                        string="Cuentas Analíticas"
+                    />
+                </button>
+            </xpath>
+
+            <!--<xpath expr="//field[@name='company_id']" position="after">
+                <field
+                    name="analytic_distribution"
+                    widget="analytic_distribution"
+                    groups="analytic.group_analytic_accounting"
+                    options="{'business_domain': 'stock_move'}"
+                />
+            </xpath>-->
+
+            <!--<xpath expr="//field[@name='stock_request_ids']/list//field[@name='route_id']" position="after">
+                <field
+                    name="analytic_distribution"
+                    widget="analytic_distribution"
+                    groups="analytic.group_analytic_accounting"
+                    optional="show"
+                    options="{'business_domain': 'stock_move'}"
+                />
+            </xpath>-->
+
+        </field>
+    </record>
+</odoo>
