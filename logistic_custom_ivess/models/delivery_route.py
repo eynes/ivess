@@ -138,13 +138,17 @@ class DeliveryRoute(models.Model):
             'client_id': line.client_id.id,
         }) for line in template.delivery_route_line_ids]
 
-    @api.model
-    def create(self, vals):
+    @api.model_create_multi
+    def create(self, vals_list):
         context = self.env.context
-        if vals.get('template_delivery_route_id') and not context.get('create_from_wizard'):
-            template = self.env['template.delivery.route'].browse(vals['template_delivery_route_id'])
-            vals['delivery_route_line_ids'] = self._prepare_route_lines_from_template(template)
-        return super().create(vals)
+        for vals in vals_list:
+            if vals.get('template_delivery_route_id') and not context.get('create_from_wizard'):
+                template = self.env['template.delivery.route'].browse(vals['template_delivery_route_id'])
+                if template:
+                    # Asegúrate de que _prepare_route_lines_from_template devuelva
+                    # el formato de comandos de Odoo: [(0, 0, {...}), (0, 0, {...})]
+                    vals['delivery_route_line_ids'] = self._prepare_route_lines_from_template(template)
+        return super().create(vals_list)
 
     def write(self, vals):
         for record in self:
@@ -304,14 +308,19 @@ class DeliveryRouteLine(models.Model):
         string="Reason of Withdrawal", tracking=True
     )
 
-    @api.model
-    def create(self, vals):
-        rec = super().create(vals)
-        if vals.get('reason_customer_withdrawal'):
-            category = rec.reason_customer_withdrawal
-            if category and category not in rec.client_id.category_id:
-                rec.client_id.category_id = [(4, category.id)]
-        return rec
+    @api.model_create_multi
+    def create(self, vals_list):
+        recs = super().create(vals_list)
+
+        for rec, vals in zip(recs, vals_list):
+            reason = vals.get('reason_customer_withdrawal')
+            if reason and rec.client_id:
+                category = self.env['res.partner.category'].browse(reason)
+                if category not in rec.client_id.category_id:
+                    rec.client_id.write({
+                        'category_id': [(4, category.id)]
+                    })
+        return recs
 
     def write(self, vals):
         # save previous reason

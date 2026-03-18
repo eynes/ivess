@@ -25,6 +25,7 @@
         'views/res_partner_water_consumption.xml',
         'views/res_partner.xml',
         'views/role.xml',
+        'views/res_company.xml',
         'views/sale_order.xml',
         'views/template_delivery_route.xml',
         'views/visit_status.xml',

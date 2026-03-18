@@ -7,6 +7,7 @@
             <xpath expr="//page[@name='sales_purchases']" position="inside">
                 <group invisible="not id">
                     <group name="group_route" string="Reparto">
+                        <field name="distribution"/>
                         <field name="distributions_ids">
                             <list>
                                 <field name="distribution"/>

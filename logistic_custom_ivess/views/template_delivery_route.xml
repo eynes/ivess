@@ -17,7 +17,7 @@
                             <field name="allow_closing_with_rake" invisible="1"/>
                         </group>
                     </group>
-                    <!--<notebook>
+                    <notebook>
                         <page string="Usuarios Asignados">
                         </page>
                         <page string="Clientes a Visitar">
@@ -31,7 +31,7 @@
                                 </list>
                             </field>
                         </page>
-                    </notebook>-->
+                    </notebook>
                 </sheet>
             </form>
         </field>

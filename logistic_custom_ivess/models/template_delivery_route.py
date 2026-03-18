@@ -40,11 +40,11 @@ class TemplateDeliveryRoute(models.Model):
     #    'template_delivery_route_id',
     #    string='Users Assigned'
     #)
-    #delivery_route_line_ids = fields.One2many(
-    #    'delivery.route.line',
-    #    'template_route_id',
-    #    string='Clients to Visit'
-    #)
+    delivery_route_line_ids = fields.One2many(
+       'delivery.route.line',
+       'template_route_id',
+       string='Clients to Visit'
+    )
     delivery_number_id = fields.Many2one(
         'delivery.route.number',
         string="Delivery Route Number",
