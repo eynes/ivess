@@ -8,6 +8,7 @@
     'category': 'Product',
     'depends': [
         'base',
+        'mail',
         'product',
         'stock',
         'sale_stock',
@@ -26,6 +27,11 @@
         'views/mail_template.xml',
         'security/ir.model.access.csv',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'custom_ivess_product/static/src/js/chatter_patch.js',
+        ],
+    },
     'demo': [],
     'test': [],
     'installable': True,
