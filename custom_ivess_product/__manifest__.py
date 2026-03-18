@@ -23,6 +23,7 @@
         'views/res_users.xml',
         'views/res_partner.xml',
         'views/delivery_route_number.xml',
+        'views/mail_template.xml',
         'security/ir.model.access.csv',
     ],
     'demo': [],
