@@ -35,11 +35,11 @@ class TemplateDeliveryRoute(models.Model):
         required=True,
     )
 
-    #user_assigned_ids = fields.One2many(
-    #    'user.assigned.lines',
-    #    'template_delivery_route_id',
-    #    string='Users Assigned'
-    #)
+    user_assigned_ids = fields.One2many(
+       'user.assigned.lines',
+       'template_delivery_route_id',
+       string='Users Assigned'
+    )
     delivery_route_line_ids = fields.One2many(
        'delivery.route.line',
        'template_route_id',

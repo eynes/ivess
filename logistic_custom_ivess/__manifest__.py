@@ -16,6 +16,9 @@
     ],
     'data': [
         'security/ir.model.access.csv',
+        'data/ir_cron.xml',
+        'data/ir_data.xml',
+        'data/res_groups.xml',
         'views/delivery_route.xml',
         'views/delivery_route_number.xml',
         'views/account_move.xml',

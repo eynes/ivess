@@ -37,7 +37,7 @@
                                 <list editable="bottom" delete="false" class="tree-view-auto-columns">
                                     <field name="sequence" widget="handle" column_invisible="parent.allow_reordering == False"/>
                                     <field name="client_id" widget="many2one_link" optional="show" domain="[('id', 'in', allowed_client)]"/>
-                                    <field name="customer_code" style="width:5% !important;" optional="show"/>
+                                    <field name="customer_code" style="width:5% !important;" optional="show" force_save="1"/>
                                     <field name="client_address"  optional="show"/>
                                     <field name="possible_customer_withdrawal" optional="show"/>
                                     <field name="reason_customer_withdrawal" required="possible_customer_withdrawal == True"

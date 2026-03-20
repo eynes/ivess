@@ -85,7 +85,9 @@ class ResPartner(models.Model):
     customer_code = fields.Char(
         string="Customer Code",
         readonly=True,
-        copy=False
+        copy=False,
+        compute="_compute_customer_code",
+        store=True
     )
 
     @api.model_create_multi
@@ -140,6 +142,26 @@ class ResPartner(models.Model):
         for rec in self:
             rec.qty_water_consumption = len(rec.water_consumption_ids)
 
+    @api.depends('customer_rank')
+    def _compute_customer_code(self):
+        for record in self:
+            if record.customer_rank >= 1 and not record.customer_code:
+                company = record.company_id or self.env.company
+                # Generamos la secuencia
+                record.customer_code = company.customer_sequence_id.next_by_id()
+
+    def _get_customer_sequence_vals(self):
+        """
+        Retorna un diccionario con el número de secuencia si corresponde.
+        """
+        self.ensure_one() # Nos aseguramos de procesar de a uno
+        if self.customer_rank >= 1 and not self.customer_code:
+            company = self.company_id or self.env.company
+            seq_code = self.env['ir.sequence'].with_company(company).customer_sequence_id.next_by_id()
+            if seq_code:
+                return {'customer_code': seq_code}
+        return {}
+
     def write(self, vals):
         old_distribution = {
             'distribution': self.distribution.id if self.distribution and 'distribution' in vals else None}
@@ -149,6 +171,11 @@ class ResPartner(models.Model):
         if self.should_delete_related_lines(vals):
             self._delete_route_lines()
             self.empty_vals(vals)
+
+        # if 'customer_rank' in vals:
+        #     sequence_vals = self._get_customer_sequence_vals()
+        #     if sequence_vals:
+        #         vals.update(sequence_vals)
 
         res = super().write(vals)
 

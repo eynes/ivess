@@ -19,6 +19,7 @@
                     </group>
                     <notebook>
                         <page string="Usuarios Asignados">
+                            <field name="user_assigned_ids"/>
                         </page>
                         <page string="Clientes a Visitar">
                             <field name="delivery_route_line_ids">
