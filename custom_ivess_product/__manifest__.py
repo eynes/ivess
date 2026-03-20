@@ -8,6 +8,7 @@
     'category': 'Product',
     'depends': [
         'base',
+        'mail',
         'product',
         'stock',
         'sale_stock',
@@ -25,8 +26,14 @@
         'views/res_users.xml',
         'views/res_partner.xml',
         'views/delivery_route_number.xml',
+        'views/mail_template.xml',
         'security/ir.model.access.csv',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'custom_ivess_product/static/src/js/composer_patch.js',
+        ],
+    },
     'demo': [],
     'test': [],
     'installable': True,

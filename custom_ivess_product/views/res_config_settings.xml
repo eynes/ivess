@@ -1,17 +1,15 @@
 <odoo>
     <record id="res_config_settings_view_form" model="ir.ui.view">
-        <field name="name">res.config.settings.view.form.inherit.stock</field>
+        <field name="name">res.config.settings.view.form.inherit.stock.request.routes</field>
         <field name="model">res.config.settings</field>
-        <field name="inherit_id" ref="stock.res_config_settings_view_form"/>
+        <field name="inherit_id" ref="stock.res_config_settings_view_form" />
         <field name="arch" type="xml">
-            <xpath expr="//form" position="inside">
-                <!--<app data-string="Stock Request" string="Reabastecimientos" name="stock_request">
-                    <block title="Configuración de Rutas">
-                        <setting help="Selecciona la ruta que se usará por defecto en las solicitudes">
-                            <field name="manually_set_route_id"/>
-                        </setting>
-                    </block>
-                </app>--> <!--Sacar esto-->
+            <xpath expr="//app[@name='stock_request']" position="inside">
+                <block title="Configuración de Rutas" name="stock_request_route_setting">
+                    <setting help="Selecciona la ruta que se usará por defecto en las solicitudes">
+                        <field name="manually_set_route_id" />
+                    </setting>
+                </block>
             </xpath>
         </field>
     </record>
