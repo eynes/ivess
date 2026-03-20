@@ -1,50 +1,83 @@
 <odoo>
     <template id="report_etiqueta_template">
         <t t-call="web.basic_layout">
-            <t t-foreach="docs" t-as="product">
-                <div class="page"
-                    style="width: 100%; height: 100%; text-align: center; font-family: sans-serif;">
+            <style>
+                .page_full_custom { width: 100%; margin: 0; padding: 0; }
+                .label_container {
+                    display: inline-block;
+                    width: 60mm;
+                    height: 46mm;
+                    border: 0.1mm solid #eee;
+                    margin: 0.5mm;
+                    text-align: center;
+                    font-family: sans-serif;
+                    vertical-align: top;
+                    overflow: hidden;
+                    position: relative;
+                    box-sizing: border-box;
+                    page-break-inside: avoid;
+                }
+                .centered-info {
+                    width: 100%;
+                    display: block;
+                    text-align: center;
+                    padding: 0 2mm;
+                    box-sizing: border-box;
+                }
+            </style>
 
-                    <div
-                        style="font-weight: bold; font-size: 12px; border: 1px solid black; margin-bottom: 2px;">
-                        <span t-field="product.default_code" />
-                    </div>
-
-                    <div
-                        style="font-size: 10px; margin-bottom: 2px; height: 25px; overflow: hidden;">
-                        <span t-field="product.name" />
-                    </div>
-
-                    <!--<div
-                    style="font-size: 10px; margin-bottom: 4px;">
-                        <t t-esc="product.x_pasillo"/> - <t t-esc="product.x_estante"/> - <t t-esc="product.x_cajon"/>
-                    </div> TBD-->
-
-                    <!--Código de barra-->
-                    <div style="margin-bottom: 2px;">
-                        <t t-if="product.default_code">
-                            <div t-out="product.default_code"
-                                style="padding:0;"
-                                t-options="{'widget': 'barcode', 'quiet': 0, 'symbology': 'auto', 'img_style': 'width:100%; height:35px;'}" />
-
-                            <table style="width: 100%; border-collapse: collapse; margin-top: 2px;">
-                                <tr>
-                                    <t t-foreach="product.default_code" t-as="char">
-                                        <td
-                                            style="padding: 0; text-align: center; font-size: 10px; font-weight: bold;">
-                                            <span t-out="char" />
-                                        </td>
-                                    </t>
-                                </tr>
-                            </table>
-                        </t>
-                    </div>
-                    <div style="font-weight: bold; font-size: 11px;">
-                        <span t-field="product.categ_id.name" />
-                    </div>
-
-                </div>
+            <t t-if="not docs and quantity_by_product">
+                <t t-set="docs" t-value="env['product.product'].browse([int(p) for p in quantity_by_product.keys()])"/>
             </t>
+
+            <div class="page page_full_custom">
+                <t t-foreach="docs" t-as="product">
+                    <t t-set="qty" t-value="1"/>
+                    <t t-if="quantity_by_product">
+                        <t t-set="qty" t-value="quantity_by_product.get(product.id) or quantity_by_product.get(str(product.id)) or 1"/>
+                    </t>
+
+                    <t t-foreach="range(int(qty))" t-as="i">
+                        <div class="label_container">
+                            <div style="font-weight: bold; font-size: 13px; border-bottom: 1px solid black; margin-bottom: 2px;">
+                                <span t-field="product.default_code"/>
+                            </div>
+
+                            <div style="font-size: 10px; height: 22px; overflow: hidden; font-weight: bold; padding: 0 2px; line-height: 1;">
+                                <span t-field="product.display_name"/>
+                            </div>
+
+                            <t t-if="custom_picking_id">
+                                <t t-set="picking" t-value="env['stock.picking'].browse(custom_picking_id)"/>
+                                <div class="centered-info" style="font-size: 10px; margin: 2px 0; font-weight: normal;">
+                                    <span t-field="picking.location_dest_id.display_name"/>
+                                </div>
+                            </t>
+
+                            <div style="margin-top: 2px; width: 100%; padding: 0 5mm; box-sizing: border-box;">
+                                <t t-set="barcode_val" t-value="product.barcode or product.default_code"/>
+                                <t t-if="barcode_val">
+                                    <div t-out="barcode_val"
+                                        t-options="{'widget': 'barcode', 'symbology': 'auto', 'img_style': 'width:100%;height:14mm;margin: 0 auto; display: block;'}"/>
+
+                                    <div style="font-size: 10px; font-weight: bold; margin-top: 1px; text-align: center;">
+                                        <span t-out="barcode_val"/>
+                                    </div>
+                                </t>
+                            </div>
+
+                            <div style="width: 100%; font-size: 9px; color: black; font-weight: bold; margin-top: 2px;">
+                                <t t-if="'product_tmpl_id' in product">
+                                    <span t-field="product.product_tmpl_id.categ_id.name"/>
+                                </t>
+                                <t t-else="">
+                                    <span t-field="product.categ_id.name"/>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
+                </t>
+            </div>
         </t>
     </template>
 </odoo>

@@ -22,6 +22,7 @@
         'views/stock_request_order.xml',
         'views/product_category.xml',
         'views/product_template.xml',
+        'views/product_product.xml',
         'views/template_delivery_route.xml',
         'views/res_users.xml',
         'views/res_partner.xml',
