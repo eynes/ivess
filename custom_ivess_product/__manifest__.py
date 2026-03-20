@@ -29,7 +29,7 @@
     ],
     'assets': {
         'web.assets_backend': [
-            'custom_ivess_product/static/src/js/chatter_patch.js',
+            'custom_ivess_product/static/src/js/composer_patch.js',
         ],
     },
     'demo': [],
