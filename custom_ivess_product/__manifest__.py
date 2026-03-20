@@ -21,7 +21,6 @@
         'views/product_template.xml',
         #'views/template_delivery_route.xml',
         'views/res_users.xml',
-        'views/res_partner.xml',
         'views/mail_template.xml',
         'security/ir.model.access.csv',
     ],
