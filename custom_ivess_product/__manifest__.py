@@ -16,10 +16,13 @@
     ],
 
     'data': [
+        'data/paperformat.xml',
+        'data/product_template_report.xml',
         'views/res_config_settings.xml',
         'views/stock_request_order.xml',
         'views/product_category.xml',
         'views/product_template.xml',
+        'views/product_product.xml',
         'views/template_delivery_route.xml',
         'views/res_users.xml',
         'views/res_partner.xml',

@@ -27,7 +27,6 @@ class StockRequestOrder(models.Model):
         return res
 
     def action_open_note_wizard(self):
-        import wdb; wdb.set_trace()
         self.ensure_one()
 
         template = self.env['mail.template'].search([
