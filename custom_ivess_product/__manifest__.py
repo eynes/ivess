@@ -8,6 +8,7 @@
     'category': 'Product',
     'depends': [
         'base',
+        'mail',
         'product',
         'stock',
         'sale_stock',
@@ -15,10 +16,13 @@
     ],
 
     'data': [
+        'data/paperformat.xml',
+        'data/product_template_report.xml',
         'views/res_config_settings.xml',
         'views/stock_request_order.xml',
         'views/product_category.xml',
         'views/product_template.xml',
+        'views/product_product.xml',
         'views/template_delivery_route.xml',
         'views/res_users.xml',
         'views/res_partner.xml',
@@ -26,6 +30,11 @@
         'views/mail_template.xml',
         'security/ir.model.access.csv',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'custom_ivess_product/static/src/js/composer_patch.js',
+        ],
+    },
     'demo': [],
     'test': [],
     'installable': True,
