@@ -1,13 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
 
-class ResPartner(models.Model):
-    _inherit = 'res.partner'
-    _description = 'Partner'
 
-    distributions_ids = fields.One2many('partner.distribution', 'partner_id', string='Distributions', tracking=True)
-
-    
 class PartnerDistributions(models.Model):
     _name = 'partner.distribution'
     _description = 'Distributions'
