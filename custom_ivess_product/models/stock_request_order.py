@@ -26,6 +26,32 @@ class StockRequestOrder(models.Model):
                 pass
         return res
 
+    def action_open_note_wizard(self):
+        self.ensure_one()
+
+        template = self.env['mail.template'].search([
+            ('is_default_for_stock_request', '=', True),
+            ('model', '=', 'stock.request.order')
+        ], limit=1)
+
+        ctx = {
+            'default_model': 'stock.request.order',
+            'default_res_ids': self.ids,
+            'default_composition_mode': 'comment',
+            'default_subtype_xmlid': 'mail.mt_note',
+        }
+
+        if template:
+            ctx['default_use_template'] = True
+            ctx['default_template_id'] = template.id
+        return {
+            'name': 'Registrar una nota',
+            'type': 'ir.actions.act_window',
+            'view_mode': 'form',
+            'res_model': 'mail.compose.message',
+            'target': 'new',
+            'context': ctx,
+        }
 
 class StockRequest(models.Model):
     _inherit = "stock.request"
