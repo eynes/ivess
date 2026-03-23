@@ -6,13 +6,16 @@ class ProductCategory(models.Model):
 
     new_sequence_id = fields.Many2one(
         comodel_name='ir.sequence',
-        help=_('Sequence to use for new products.'),
+        string='New Product Sequence', # Es buena práctica agregar el string
+        help='Sequence to use for new products.', # Texto plano, sin _()
         copy=False,
         required=True,
     )
+
     repaired_sequence_id = fields.Many2one(
         comodel_name='ir.sequence',
-        help=_('Sequence to use for repaired products'),
+        string='Repaired Product Sequence',
+        help='Sequence to use for repaired products', # Texto plano, sin _()
         copy=False,
         required=True,
     )

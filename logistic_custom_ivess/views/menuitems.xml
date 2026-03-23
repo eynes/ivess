@@ -1,0 +1,55 @@
+<odoo>
+      <menuitem id="menu_delivery_route_root"
+            name="Delivery Routes"
+            parent="sale.sale_menu_root"
+            sequence="10"
+            action="action_delivery_route" />
+
+      <!--<menuitem id="menu_fleet_truck_root"
+            name="Fleet Trucks"
+            parent="sale.menu_sale_config"
+            sequence="21"
+            action="action_fleet_truck" />-->
+
+      <menuitem id="menu_visit_status_root"
+            name="Visit Statuses"
+            parent="sale.menu_sale_config"
+            sequence="22"
+            action="action_visit_status" />
+
+      <menuitem id="menu_tempalte_delivery_route"
+            name="Repartos"
+            parent="sale.menu_sale_config"
+            sequence="23"
+            action="action_template_delivery_route" />
+
+      <menuitem id="menu_roles"
+            name="Roles"
+            parent="sale.menu_sale_config"
+            sequence="24"
+            action="action_roles"
+            groups="base.group_system" />
+
+      <menuitem id="menu_replacement_reason"
+              name="Replacement Reasons"
+              parent="sale.menu_sale_config"
+              action="action_replacement_reason"
+              sequence="25"/>
+
+      <menuitem id="menu_no_purchase_reason_root"
+            name="No Purchase Reasons"
+            sequence="23"
+            parent="sale.menu_sale_config"
+            action="action_no_purchase_reason_list" />
+
+      <menuitem id="menu_delivery_route_number"
+            name="Route Numbers"
+            parent="sale.menu_sale_config"
+            action="action_delivery_route_number" />
+
+      <menuitem id="menu_water_consumption_records"
+            name="Monthly Records"
+            parent="sale.menu_sale_config"
+            action="action_water_consumption"
+            sequence="10" />
+</odoo>

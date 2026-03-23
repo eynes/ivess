@@ -1,0 +1,12 @@
+<odoo>
+    <record id="action_report_etiqueta_personalizada" model="ir.actions.report">
+        <field name="name">Etiqueta Personalizada</field>
+        <field name="model">product.product</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_ivess_product.report_etiqueta_template</field>
+        <field name="report_file">custom_ivess_product.report_etiqueta_template</field>
+        <field name="paperformat_id" ref="custom_ivess_product.paperformat_etiqueta_producto_a4"/>
+        <field name="binding_model_id" ref="product.model_product_product"/>
+        <field name="binding_type">report</field>
+    </record>
+</odoo>

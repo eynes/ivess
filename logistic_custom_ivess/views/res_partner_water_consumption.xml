@@ -1,0 +1,42 @@
+<odoo>
+    <record id="view_water_consumption_tree" model="ir.ui.view">
+        <field name="name">res.partner.water.consumption.tree</field>
+        <field name="model">res.partner.water.consumption</field>
+        <field name="arch" type="xml">
+            <list create="false" delete="false" edit="false">
+                <field name="partner_id"/>
+                <field name="month"/>
+                <field name="year" widget="char"/>
+                <field name="consumption_liters"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_water_consumption_form" model="ir.ui.view">
+        <field name="name">res.partner.water.consumption.form</field>
+        <field name="model">res.partner.water.consumption</field>
+        <field name="arch" type="xml">
+            <form edit="false" create="false" delete="false">
+                <sheet>
+                    <group>
+                        <field name="partner_id"/>
+                        <field name="month"/>
+                        <field name="year" widget="char"/>
+                        <field name="consumption_liters"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_water_consumption" model="ir.actions.act_window">
+        <field name="name">Water Consumption</field>
+        <field name="res_model">res.partner.water.consumption</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No water consumption records yet.
+            </p>
+        </field>
+    </record>
+</odoo>
