@@ -23,7 +23,6 @@
         'views/product_category.xml',
         'views/product_template.xml',
         'views/product_product.xml',
-        'views/template_delivery_route.xml',
         'views/res_users.xml',
         'views/mail_template.xml',
         'security/ir.model.access.csv',

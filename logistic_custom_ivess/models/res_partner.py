@@ -145,10 +145,15 @@ class ResPartner(models.Model):
     @api.depends('customer_rank')
     def _compute_customer_code(self):
         for record in self:
-            if record.customer_rank >= 1 and not record.customer_code:
-                company = record.company_id or self.env.company
-                # Generamos la secuencia
-                record.customer_code = company.customer_sequence_id.next_by_id()
+            company_id = record.company_id.id or self.env.company.id
+            sequence = self.env['ir.sequence'].search([
+                ('code', '=', 'res.partner.ivess'),
+                ('company_id', '=', company_id)
+            ], limit=1)
+            if sequence:
+                record.customer_code = sequence.next_by_id()
+            else:
+                record.customer_code = "PENDIENTE"
 
     def _get_customer_sequence_vals(self):
         """

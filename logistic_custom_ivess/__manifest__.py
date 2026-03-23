@@ -18,6 +18,7 @@
         'security/ir.model.access.csv',
         'data/ir_cron.xml',
         'data/ir_data.xml',
+        'data/ir_sequence.xml',
         'data/res_groups.xml',
         'views/delivery_route.xml',
         'views/delivery_route_number.xml',
