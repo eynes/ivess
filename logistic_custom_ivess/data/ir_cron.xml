@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="0">
+
+    <record id="ir_cron_check_partner_state" model="ir.cron">
+        <field name="name">Check Partner states</field>
+        <field name="model_id" ref="model_res_partner"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_check_partner_state()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="nextcall" eval="(datetime.now().replace(hour=2, minute=0, second=0)).strftime('%Y-%m-%d %H:%M:%S')" />
+    </record>
+
+    <record id="ir_cron_generate_monthly_routes" model="ir.cron">
+        <field name="name">Generar Rutas Mensuales</field>
+        <field name="model_id" ref="model_delivery_route"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_generate_routes_from_templates()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">months</field>
+        <field name="nextcall" eval="(datetime.now().replace(day=1, hour=4, minute=30, second=0, microsecond=0)).strftime('%Y-%m-%d %H:%M:%S')"/>
+    </record>
+
+</odoo>
