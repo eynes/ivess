@@ -33,11 +33,13 @@ class StockRequest(models.Model):
             if req.order_id and req.order_id.default_analytic_account_id:
                 req.analytic_account_id = req.order_id.default_analytic_account_id
 
-    def _prepare_procurement_values(self, group_id=False):
+    def _prepare_procurement_values(self, **kwargs):
         """
         Add analytic account to procurement values
         """
-        res = super()._prepare_procurement_values(group_id=group_id)
+        res = super()._prepare_procurement_values(**kwargs)
         if self.analytic_account_id:
-            res.update({"analytic_account_id": self.analytic_account_id.id})
+            res.update({
+                "analytic_account_id": self.analytic_account_id.id
+            })
         return res
