@@ -250,6 +250,7 @@ class StockRequest(models.Model):
                 raise ValidationError(_("Expected date must be equal to the order"))
 
     @api.constrains("order_id", "picking_policy")
+
     def check_order_picking_policy(self):
         for stock_request in self:
             if (
