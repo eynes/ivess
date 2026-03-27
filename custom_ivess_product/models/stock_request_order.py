@@ -73,15 +73,3 @@ class StockRequest(models.Model):
                         {'location_dest_id': self.location_id.id}
                     )
         return res
-
-class StockPicking(models.Model):
-    _inherit = 'stock.picking'
-
-    manual_location = fields.Boolean(readonly=True)
-
-    @api.depends('picking_type_id', 'partner_id', 'manual_location')
-    def _compute_location_id(self):
-        manual_pickings = self.filtered(lambda p: p.manual_location)
-        standard_pickings = self - manual_pickings
-        if standard_pickings:
-            super(StockPicking, standard_pickings)._compute_location_id()

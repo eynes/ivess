@@ -19,6 +19,10 @@ class StockMove(models.Model):
         string="Stock Requests",
         compute="_compute_stock_request_ids",
     )
+    analytic_account_id = fields.Many2one(
+        comodel_name='account.analytic.account',
+        string="Account analytic"
+    )
 
     @api.depends("allocation_ids")
     def _compute_stock_request_ids(self):

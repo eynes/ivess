@@ -16,6 +16,15 @@ class StockPicking(models.Model):
         "Stock Request #", compute="_compute_stock_request_ids"
     )
 
+    manual_location = fields.Boolean(readonly=True)
+
+    @api.depends('picking_type_id', 'partner_id', 'manual_location')
+    def _compute_location_id(self):
+        manual_pickings = self.filtered(lambda p: p.manual_location)
+        standard_pickings = self - manual_pickings
+        if standard_pickings:
+            super(StockPicking, standard_pickings)._compute_location_id()
+
     @api.depends("move_ids")
     def _compute_stock_request_ids(self):
         for rec in self:

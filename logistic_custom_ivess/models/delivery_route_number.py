@@ -7,9 +7,9 @@ class DeliveryRouteNumber(models.Model):
     _rec_name = 'number'
     _sql_constraints = [
         (
-            'unique_delivery_route_number',  
-            'UNIQUE(number)',               
-            _('The delivery route number must be unique.')
+            'unique_delivery_route_number',
+            'UNIQUE(number)',
+            'The delivery route number must be unique.'
         )
     ]
 
@@ -21,10 +21,10 @@ class DeliveryRouteNumber(models.Model):
         string="Number",
         default=_get_default_number
     )
-    #truck_id = fields.Many2one(
-    #    'fleet.truck',
-    #    string='Truck License Plate',
-    #)
+    truck_id = fields.Many2one(
+       'fleet.vehicle',
+       string='Truck License Plate',
+    )
     allow_price_editing = fields.Boolean(string="Allow Price Editing")
     allow_free_of_charge = fields.Boolean(string="Allow Free Of Charge")
     allow_reordering = fields.Boolean(
