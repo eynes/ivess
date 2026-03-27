@@ -22,6 +22,10 @@
                     <field name="stock_request_ids" invisible="1" />
                 </button>
             </div>
+             <xpath expr="//field[@name='origin']" position="after">
+                <field name="manual_location" invisible="1"/>
+            </xpath>
+
         </field>
     </record>
 </odoo>
