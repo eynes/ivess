@@ -487,6 +487,12 @@ msgid "Name"
 msgstr "Nombre"
 
 #. module: stock_request
+#: model:ir.model.fields,field_description:stock_request.field_stock_move__need_qc
+#: model:ir.model.fields,field_description:stock_request.field_stock_request__need_qc
+msgid "Need Control Quality"
+msgstr "Lleva control de calidad"
+
+#. module: stock_request
 #: model:ir.model.constraint,message:stock_request.constraint_stock_request_abstract_name_uniq
 #: model:ir.model.constraint,message:stock_request.constraint_stock_request_kanban_name_uniq
 msgid "Name must be unique"
