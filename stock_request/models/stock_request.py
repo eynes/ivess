@@ -106,6 +106,7 @@ class StockRequest(models.Model):
     stock_reference_id = fields.Many2one()
     company_id = fields.Many2one()
     route_id = fields.Many2one()
+    need_qc = fields.Boolean(string="Need Control Quality")
 
     _sql_constraints = [
         ("name_uniq", "unique(name, company_id)", "Stock Request name must be unique")
@@ -263,7 +264,8 @@ class StockRequest(models.Model):
                 )
 
     def _action_confirm(self):
-        self._action_launch_procurement_rule()
+        for rec in self:
+            rec.with_context(is_qc_requested=rec.need_qc)._action_launch_procurement_rule()
         self.filtered(lambda x: x.state != "done").write({"state": "open"})
 
     def action_confirm(self):

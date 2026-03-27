@@ -15,7 +15,6 @@ class StockPicking(models.Model):
     stock_request_count = fields.Integer(
         "Stock Request #", compute="_compute_stock_request_ids"
     )
-
     manual_location = fields.Boolean(readonly=True)
 
     @api.depends('picking_type_id', 'partner_id', 'manual_location')
