@@ -23,7 +23,7 @@ class StockMove(models.Model):
         comodel_name='account.analytic.account',
         string="Account analytic"
     )
-    need_qc = fields.Boolean(string="Need Control Quality")
+    need_qc = fields.Boolean(string="Necesita control de calidad")
 
     @api.depends("allocation_ids")
     def _compute_stock_request_ids(self):
