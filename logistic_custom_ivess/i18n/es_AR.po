@@ -581,6 +581,11 @@ msgid "Indicates if this visit status requires a reason for no purchase."
 msgstr "Indica si este estado de visita requiere un motivo de no compra."
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_purchase_order_line__internal_notes
+msgid "Internal notes"
+msgstr "Descripción interna"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_is_follower
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__message_is_follower
 msgid "Is Follower"
