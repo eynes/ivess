@@ -106,7 +106,7 @@ class StockRequest(models.Model):
     stock_reference_id = fields.Many2one()
     company_id = fields.Many2one()
     route_id = fields.Many2one()
-    need_qc = fields.Boolean(string="Need Control Quality")
+    need_qc = fields.Boolean(string="Necesita control de calidad")
 
     _sql_constraints = [
         ("name_uniq", "unique(name, company_id)", "Stock Request name must be unique")

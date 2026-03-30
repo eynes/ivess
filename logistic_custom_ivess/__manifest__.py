@@ -34,6 +34,7 @@
         'views/template_delivery_route.xml',
         'views/visit_status.xml',
         'views/water_container.xml',
+        'views/purchase_order.xml',
         'views/menuitems.xml',
     ],
     'demo': [],
