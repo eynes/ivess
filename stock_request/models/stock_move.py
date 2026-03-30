@@ -23,6 +23,7 @@ class StockMove(models.Model):
         comodel_name='account.analytic.account',
         string="Account analytic"
     )
+    need_qc = fields.Boolean(string="Necesita control de calidad")
 
     @api.depends("allocation_ids")
     def _compute_stock_request_ids(self):
@@ -84,3 +85,11 @@ class StockMove(models.Model):
         res = super()._action_done(cancel_backorder=cancel_backorder)
         self.mapped("allocation_ids.stock_request_id").sudo().check_done()
         return res
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        qc_value = self.env.context.get('is_qc_requested')
+        if qc_value:
+            for vals in vals_list:
+                vals['need_qc'] = qc_value
+        return super(StockMove, self).create(vals_list)
