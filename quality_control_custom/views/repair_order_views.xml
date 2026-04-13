@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_repair_order_form_inherit_qcc" model="ir.ui.view">
+        <field name="name">repair.order.form.inherit.quality_control_custom</field>
+        <field name="model">repair.order</field>
+        <field name="inherit_id" ref="repair.view_repair_order_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Campos invisibles auxiliares -->
+            <xpath expr="//field[@name='unreserve_visible']" position="after">
+                <field name="repair_equipment_type" invisible="1"/>
+                <field name="requires_painting" invisible="1"/>
+                <field name="frio_calor_stage" invisible="1"/>
+            </xpath>
+
+
+            <!-- Botones en el header (terciarizar/recibir) -->
+            <xpath expr="//button[@name='action_validate']" position="before">
+                <button name="action_outsource"
+                        type="object"
+                        string="Terciarizar"
+                        invisible="repair_equipment_type != 'frio_calor' or is_outsourced"/>
+                <button name="action_receive_from_third_party"
+                        type="object"
+                        string="Recibir de tercero"
+                        invisible="not is_outsourced"/>
+            </xpath>
+
+            <!-- Selection badge Frío/Calor con botones de navegación -->
+            <xpath expr="//field[@name='name']" position="after">
+                <div class="d-flex align-items-center gap-2 mb-3 ms-3"
+                     invisible="repair_equipment_type != 'frio_calor'">
+                    <button name="%(quality_control_custom.action_repair_order_revert_stage_wizard)d"
+                            type="action"
+                            class="btn btn-link btn-sm text-muted px-1"
+                            title="Revertir Etapa"
+                            invisible="frio_calor_stage == 'hidrolavadora' or is_outsourced">
+                        <i class="fa fa-chevron-left"/>
+                    </button>
+                    <field name="frio_calor_stage" widget="selection_badge" readonly="1"/>
+                    <button name="action_next_frio_calor_stage"
+                            type="object"
+                            class="btn btn-link btn-sm text-primary px-1"
+                            title="Avanzar Etapa"
+                            invisible="frio_calor_stage == 'armado' or is_outsourced">
+                        <i class="fa fa-chevron-right"/>
+                    </button>
+                </div>
+            </xpath>
+
+            <!-- Campo requires_painting debajo de product_id -->
+            <xpath expr="//field[@name='product_id']" position="after">
+                <field name="is_outsourced" invisible="repair_equipment_type != 'frio_calor'" readonly="1"/>
+                <field name="requires_painting"
+                       invisible="repair_equipment_type != 'frio_calor'"
+                       readonly="is_outsourced"/>
+            </xpath>
+
+            <!-- Campo quality_check_id en el grupo derecho -->
+            <xpath expr="//field[@name='tag_ids']" position="after">
+                <field name="quality_check_id" readonly="1" invisible="not quality_check_id"/>
+            </xpath>
+
+            <!-- Readonly en campos críticos cuando está terciarizado -->
+            <xpath expr="//field[@name='product_id']" position="attributes">
+                <attribute name="readonly">state in ['cancel', 'done'] or is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='partner_id']" position="attributes">
+                <attribute name="readonly">sale_order_id or is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='under_warranty']" position="attributes">
+                <attribute name="readonly">state in ['cancel', 'done'] or is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='schedule_date']" position="attributes">
+                <attribute name="readonly">state in ['done', 'cancel'] or is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='user_id']" position="attributes">
+                <attribute name="readonly">is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='internal_notes']" position="attributes">
+                <attribute name="readonly">is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='tag_ids']" position="attributes">
+                <attribute name="readonly">is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='picking_type_id']" position="attributes">
+                <attribute name="readonly">is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='product_qty']" position="attributes">
+                <attribute name="readonly">is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='move_ids']" position="attributes">
+                <attribute name="readonly">is_outsourced</attribute>
+            </xpath>
+            <xpath expr="//field[@name='product_uom']" position="attributes">
+                <attribute name="readonly">is_outsourced</attribute>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
