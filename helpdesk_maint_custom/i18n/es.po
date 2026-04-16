@@ -1,0 +1,81 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+#   * helpdesk_maint_custom
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: 2026-04-16 00:00+0000\n"
+"Last-Translator: Eynes <info@eynes.com.ar>\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__ticket_source
+msgid "Ticket Source"
+msgstr "Fuente del Ticket"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__topic
+msgid "Topic"
+msgstr "Tema"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__department_id
+msgid "Department"
+msgstr "Departamento"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__due_date
+msgid "Due Date"
+msgstr "Fecha de Vencimiento"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__require_signature
+msgid "Requires Signature"
+msgstr "Requiere Firma"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__signature
+msgid "Signature"
+msgstr "Firma"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__internal_note
+msgid "Internal Note"
+msgstr "Nota Interna"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__line
+msgid "Line"
+msgstr "Línea"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__maintenance_type
+msgid "Maintenance Type"
+msgstr "Tipo de Mantenimiento"
+
+#. module: helpdesk_maint_custom
+#: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.helpdesk_ticket_view_form_inherit_maint
+msgid "Additional Information"
+msgstr "Información Adicional"
+
+#. module: helpdesk_maint_custom
+#: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.helpdesk_ticket_view_form_inherit_maint
+msgid "Classification"
+msgstr "Clasificación"
+
+#. module: helpdesk_maint_custom
+#: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.helpdesk_ticket_view_form_inherit_maint
+msgid "Dates and Signature"
+msgstr "Fechas y Firma"
+
+#. module: helpdesk_maint_custom
+#: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.helpdesk_ticket_view_form_inherit_maint
+msgid "Internal Note"
+msgstr "Nota Interna"

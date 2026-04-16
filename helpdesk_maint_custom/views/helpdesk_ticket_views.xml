@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="helpdesk_ticket_view_form_inherit_maint" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.form.inherit.maint</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <!-- Additional fields tab: always visible regardless of team type -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Additional Information" name="maint_additional_info">
+                    <group col="2">
+                        <group string="Classification">
+                            <field name="ticket_source"/>
+                            <field name="topic"/>
+                            <field name="department_id"/>
+                            <field name="line"/>
+                            <field name="maintenance_type"/>
+                        </group>
+                        <group string="Dates and Signature">
+                            <field name="due_date"/>
+                            <field name="require_signature"/>
+                            <field
+                                name="signature"
+                                widget="signature"
+                                invisible="not require_signature"
+                            />
+                        </group>
+                    </group>
+                    <group string="Internal Note">
+                        <field name="internal_note" nolabel="1"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
