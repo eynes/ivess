@@ -8,14 +8,26 @@ class HelpdeskTicket(models.Model):
     _inherit = "helpdesk.ticket"
 
     ticket_source = fields.Selection(
-        selection=[('ticket_source', 'Ticket Source')],
+        selection=[
+            ('phone', 'Teléfono'),
+            ('email', 'Email'),
+            ('web', 'Web'),
+            ('other', 'Otro')
+        ],
         string="Ticket Source",
-        default="ticket_source"
+        default="web"
     )
     topic = fields.Selection(
-        selection=[('topic', 'Topic')],
-        string="Topic",
-        default='topic'
+        selection=[
+            ('general_inquiry', 'Consulta general'),
+            ('report_problem', 'Informar un problema'),
+            ('building_problem', 'Informar un problema / Edilicio'),
+            ('industrial_problem', 'Informar un problema / Industrial'),
+            ('order', 'Pedido'),
+            ('suggestions', 'Sugerencias')
+        ],
+        string="Ticket",
+        default='general_inquiry'
     )
     department_id = fields.Many2one(
         comodel_name="hr.department",
@@ -26,12 +38,20 @@ class HelpdeskTicket(models.Model):
     signature = fields.Binary(string="Signature", attachment=True)
     internal_note = fields.Text(string="Internal Note")
     line = fields.Selection(
-        selection=[('line', 'Line')],
+        selection=[
+            ('line', 'Línea'),
+            ('siphons_line', 'Línea Sifones'),
+            ('cold_heat', 'Frío/Calor'),
+            ('lavazza', 'Lavazza')
+        ],
         string="Line",
         default='line'
     )
     maintenance_type = fields.Selection(
-        selection=[('maintenance_type', 'Maintenance Type')],
+        selection=[
+            ('corrective', 'Correctivo'),
+            ('preventive', 'Preventivo')
+        ],
         string="Maintenance Type",
-        default='maintenance_type'
+        default='corrective'
     )
