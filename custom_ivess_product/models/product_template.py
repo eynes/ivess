@@ -5,6 +5,8 @@ from odoo.exceptions import ValidationError
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
+    abbreviation = fields.Char(string="Abbreviation")
+
     state = fields.Selection(
         selection=[
             ('new', 'New'),

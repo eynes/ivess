@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_repair_order_revert_stage_wizard,repair.order.revert.stage.wizard,model_repair_order_revert_stage_wizard,stock.group_stock_user,1,1,1,1
