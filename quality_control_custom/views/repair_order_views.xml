@@ -31,8 +31,8 @@
             <xpath expr="//field[@name='name']" position="after">
                 <div class="d-flex align-items-center gap-2 mb-3 ms-3"
                      invisible="repair_equipment_type != 'frio_calor'">
-                    <button name="%(quality_control_custom.action_repair_order_revert_stage_wizard)d"
-                            type="action"
+                    <button name="action_prev_frio_calor_stage"
+                            type="object"
                             class="btn btn-link btn-sm text-muted px-1"
                             title="Revertir Etapa"
                             invisible="frio_calor_stage == 'hidrolavadora' or is_outsourced">

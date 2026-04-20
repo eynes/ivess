@@ -79,13 +79,34 @@ class RepairOrder(models.Model):
                        dict(FRIO_CALOR_STAGES).get(next_stage, next_stage)),
             )
 
+    def action_prev_frio_calor_stage(self):
+        for order in self:
+            if order.repair_equipment_type != 'frio_calor':
+                raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
+            if order.is_outsourced:
+                raise UserError(_("No se puede revertir la etapa de una orden terciarizada."))
+            stages = order._get_stage_sequence()
+            current = order.frio_calor_stage
+            if current not in stages:
+                raise UserError(_("Etapa actual '%s' no es válida en la secuencia.", current))
+            current_idx = stages.index(current)
+            if current_idx == 0:
+                raise UserError(_("La orden ya se encuentra en la primera etapa."))
+            prev_stage = stages[current_idx - 1]
+            order.with_context(_revert_stage=True).frio_calor_stage = prev_stage
+            order.message_post(
+                body=_("Etapa revertida de '%s' a '%s'.",
+                       dict(FRIO_CALOR_STAGES).get(current, current),
+                       dict(FRIO_CALOR_STAGES).get(prev_stage, prev_stage)),
+            )
+
     def action_outsource(self):
         for order in self:
             order.with_context(_outsource_action=True).is_outsourced = True
             order.message_post(body=_("La orden fue marcada como terciarizada."))
 
     def action_receive_from_third_party(self):
-        for order in self.repair_equipment_type:
+        for order in self:
             order.with_context(
                 _outsource_action=True,
                 _frio_calor_stage_advance=True,

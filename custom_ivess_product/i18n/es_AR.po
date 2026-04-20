@@ -16,6 +16,11 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. module: custom_ivess_product
+#: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__abbreviation
+msgid "Abbreviation"
+msgstr "Abreviatura"
+
+#. module: custom_ivess_product
 #. odoo-python
 #: code:addons/custom_ivess_product/models/product_template.py:0
 msgid "Category %s does not have a New sequence configured."
