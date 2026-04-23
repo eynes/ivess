@@ -21,10 +21,12 @@
     'data': [
         'security/ir.model.access.csv',
         'wizard/repair_order_revert_stage_wizard_views.xml',
+        'wizard/repair_order_advance_stage_wizard_views.xml',
         'views/stock_picking_type_views.xml',
         'views/product_template_views.xml',
         'views/quality_check_views.xml',
         'views/repair_order_views.xml',
+        'views/res_company_views.xml',
     ],
     'installable': True,
     'auto_install': False,

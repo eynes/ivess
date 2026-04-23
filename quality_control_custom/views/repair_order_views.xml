@@ -31,7 +31,7 @@
             <xpath expr="//field[@name='name']" position="after">
                 <div class="d-flex align-items-center gap-2 mb-3 ms-3"
                      invisible="repair_equipment_type != 'frio_calor'">
-                    <button name="action_prev_frio_calor_stage"
+                    <button name="action_open_revert_stage_wizard"
                             type="object"
                             class="btn btn-link btn-sm text-muted px-1"
                             title="Revertir Etapa"
@@ -39,7 +39,7 @@
                         <i class="fa fa-chevron-left"/>
                     </button>
                     <field name="frio_calor_stage" widget="selection_badge" readonly="1"/>
-                    <button name="action_next_frio_calor_stage"
+                    <button name="action_open_advance_stage_wizard"
                             type="object"
                             class="btn btn-link btn-sm text-primary px-1"
                             title="Avanzar Etapa"
@@ -57,9 +57,10 @@
                        readonly="is_outsourced"/>
             </xpath>
 
-            <!-- Campo quality_check_id en el grupo derecho -->
+            <!-- Campo quality_check_id y traslado de terciarización en el grupo derecho -->
             <xpath expr="//field[@name='tag_ids']" position="after">
                 <field name="quality_check_id" readonly="1" invisible="not quality_check_id"/>
+                <field name="outsource_transfer_id" readonly="1" invisible="not outsource_transfer_id"/>
             </xpath>
 
             <!-- Readonly en campos críticos cuando está terciarizado -->

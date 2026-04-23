@@ -9,7 +9,7 @@
                 <group>
                     <field name="repair_id" readonly="1"/>
                     <field name="current_stage" readonly="1"/>
-                    <field name="target_stage"/>
+                    <field name="target_stage_id" required="1"/>
                 </group>
                 <footer>
                     <button name="action_revert_stage"

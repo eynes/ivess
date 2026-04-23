@@ -63,7 +63,7 @@ msgstr "Tipo de Mantenimiento"
 #. module: helpdesk_maint_custom
 #: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.helpdesk_ticket_view_form_inherit_maint
 msgid "Additional Information"
-msgstr "Información Adicional"
+msgstr "Información del ticket"
 
 #. module: helpdesk_maint_custom
 #: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.helpdesk_ticket_view_form_inherit_maint

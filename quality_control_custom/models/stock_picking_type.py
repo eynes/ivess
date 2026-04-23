@@ -9,3 +9,4 @@ class StockPickingType(models.Model):
         string="Es operación Frío/Calor",
         default=False,
     )
+

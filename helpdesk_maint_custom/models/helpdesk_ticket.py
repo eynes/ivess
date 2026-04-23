@@ -39,13 +39,19 @@ class HelpdeskTicket(models.Model):
     internal_note = fields.Text(string="Internal Note")
     line = fields.Selection(
         selection=[
-            ('line', 'Línea'),
             ('siphons_line', 'Línea Sifones'),
             ('cold_heat', 'Frío/Calor'),
-            ('lavazza', 'Lavazza')
+            ('lavazza', 'Lavazza'),
+            ('building_plant', 'Edificio Planta'),
+            ('positive_impact', 'Impacto positivo'),
+            ('la_plata', 'La Plata'),
+            ('bottled_line', 'Línea Botellones'),
+            ('nafa', 'Nafa'),
+            ('auxiliary_services', 'Servicios Auxiliares'),
+            ('mechanical_workshop', 'Taller mecánico'),
+            ('water_treatment', 'Tratamiento de agua'),
         ],
         string="Line",
-        default='line'
     )
     maintenance_type = fields.Selection(
         selection=[

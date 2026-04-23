@@ -51,6 +51,13 @@ class RepairOrder(models.Model):
         copy=False,
     )
 
+    outsource_transfer_id = fields.Many2one(
+        comodel_name='stock.picking',
+        string="Traslado de Terciarización",
+        readonly=True,
+        copy=False,
+    )
+
     def _get_stage_sequence(self):
         """Retorna la secuencia de etapas según requires_painting."""
         self.ensure_one()
@@ -100,10 +107,100 @@ class RepairOrder(models.Model):
                        dict(FRIO_CALOR_STAGES).get(prev_stage, prev_stage)),
             )
 
+    def action_open_advance_stage_wizard(self):
+        self.ensure_one()
+        if self.repair_equipment_type != 'frio_calor':
+            raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
+        if self.is_outsourced:
+            raise UserError(_("No se puede avanzar la etapa de una orden terciarizada."))
+        stages = self._get_stage_sequence()
+        current_idx = stages.index(self.frio_calor_stage) if self.frio_calor_stage in stages else -1
+        stage_dict = dict(FRIO_CALOR_STAGES)
+        wizard = self.env['repair.order.advance.stage.wizard'].create({
+            'repair_id': self.id,
+            'current_stage': self.frio_calor_stage,
+            'valid_stage_ids': [
+                (0, 0, {'key': k, 'name': stage_dict[k], 'sequence': i})
+                for i, k in enumerate(stages[current_idx + 1:])
+            ],
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Avanzar Etapa'),
+            'res_model': 'repair.order.advance.stage.wizard',
+            'view_mode': 'form',
+            'res_id': wizard.id,
+            'target': 'new',
+        }
+
+    def action_open_revert_stage_wizard(self):
+        self.ensure_one()
+        if self.repair_equipment_type != 'frio_calor':
+            raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
+        if self.is_outsourced:
+            raise UserError(_("No se puede revertir la etapa de una orden terciarizada."))
+        stages = self._get_stage_sequence()
+        current_idx = stages.index(self.frio_calor_stage) if self.frio_calor_stage in stages else 0
+        stage_dict = dict(FRIO_CALOR_STAGES)
+        wizard = self.env['repair.order.revert.stage.wizard'].create({
+            'repair_id': self.id,
+            'current_stage': self.frio_calor_stage,
+            'valid_stage_ids': [
+                (0, 0, {'key': k, 'name': stage_dict[k], 'sequence': i})
+                for i, k in enumerate(stages[:current_idx])
+            ],
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Revertir Etapa'),
+            'res_model': 'repair.order.revert.stage.wizard',
+            'view_mode': 'form',
+            'res_id': wizard.id,
+            'target': 'new',
+        }
+
     def action_outsource(self):
         for order in self:
-            order.with_context(_outsource_action=True).is_outsourced = True
-            order.message_post(body=_("La orden fue marcada como terciarizada."))
+            stage_label = dict(FRIO_CALOR_STAGES).get(order.frio_calor_stage, order.frio_calor_stage)
+
+            internal_picking_type = self.env['stock.picking.type'].search([
+                ('code', '=', 'internal'),
+                ('company_id', 'in', [order.company_id.id, False]),
+            ], limit=1)
+            if not internal_picking_type:
+                raise UserError(_("No se encontró un tipo de operación de traslado interno."))
+
+            dest_location = order.company_id.terciarizacion_location_id
+            if not dest_location:
+                raise UserError(_(
+                    "No se configuró la ubicación de terciarización para la empresa '%s'. "
+                    "Configúrela en la ficha de la empresa."
+                ) % order.company_id.name)
+
+            source_location = order.location_id or internal_picking_type.default_location_src_id
+            move_vals = {
+                'product_id': order.product_id.id,
+                'product_uom_qty': order.product_qty,
+                'product_uom': order.product_uom.id,
+                'location_id': source_location.id,
+                'location_dest_id': dest_location.id,
+            }
+            picking = self.env['stock.picking'].create({
+                'picking_type_id': internal_picking_type.id,
+                'location_id': source_location.id,
+                'location_dest_id': dest_location.id,
+                'origin': _("Terciarización etapa: %s - %s - %s") % (stage_label, order.name, dest_location.display_name),
+                'move_ids': [(0, 0, move_vals)],
+            })
+            picking.action_confirm()
+
+            order.with_context(_outsource_action=True).write({
+                'is_outsourced': True,
+                'outsource_transfer_id': picking.id,
+            })
+            order.message_post(
+                body=_("La orden fue terciarizada desde la etapa '%s'. Se generó el traslado %s hacia %s.", stage_label, picking.name, dest_location.display_name),
+            )
 
     def action_receive_from_third_party(self):
         for order in self:
