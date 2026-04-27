@@ -152,6 +152,18 @@ msgid "Client"
 msgstr "Cliente"
 
 #. module: logistic_custom_ivess
+#: model:ir.model,name:logistic_custom_ivess.model_client_type
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_client_type_form
+msgid "Client Type"
+msgstr "Tipo de cliente"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_client_type
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_client_type
+msgid "Client Types"
+msgstr "Tipos de cliente"
+
+#. module: logistic_custom_ivess
 #. odoo-python
 #: code:addons/logistic_custom_ivess/models/delivery_route.py:0
 msgid "Clients in 'Rake' state: %s"
@@ -804,6 +816,11 @@ msgid "Partner"
 msgstr "Contacto"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__partner_type_id
+msgid "Partner Type"
+msgstr "Tipo de cliente"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__is_pending_return
 msgid "Pending return"
 msgstr "Devolución pendiente"
@@ -1176,6 +1193,22 @@ msgstr "Semanal"
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__year
 msgid "Year"
 msgstr "Año"
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/client_type.py:0
+msgid "The code must be unique"
+msgstr "El código debe ser único"
+
+#. module: logistic_custom_ivess
+#. odoo-python
+#: code:addons/logistic_custom_ivess/models/client_type.py:0
+msgid ""
+"You cannot delete the client type '%s' because it is assigned to %s "
+"partner(s)."
+msgstr ""
+"No se puede eliminar el tipo de cliente '%s' porque está asignado a %s "
+"contacto(s)."
 
 #. module: logistic_custom_ivess
 #. odoo-python
