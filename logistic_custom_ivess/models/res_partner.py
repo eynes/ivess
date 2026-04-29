@@ -93,6 +93,11 @@ class ResPartner(models.Model):
         comodel_name="client.type",
         string="Partner Type",
     )
+    registration_channel_id = fields.Many2one(
+        comodel_name="registration.channel",
+        string="Canal de Alta",
+        tracking=True,
+    )
 
     @api.model_create_multi
     def create(self, vals_list):

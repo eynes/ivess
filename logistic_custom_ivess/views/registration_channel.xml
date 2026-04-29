@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <record id="view_registration_channel_list" model="ir.ui.view">
+        <field name="name">registration.channel.list</field>
+        <field name="model">registration.channel</field>
+        <field name="arch" type="xml">
+            <list string="Registration Channels">
+                <field name="name"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_registration_channel_form" model="ir.ui.view">
+        <field name="name">registration.channel.form</field>
+        <field name="model">registration.channel</field>
+        <field name="arch" type="xml">
+            <form string="Registration Channel">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_registration_channel" model="ir.actions.act_window">
+        <field name="name">Registration Channels</field>
+        <field name="res_model">registration.channel</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Registration Channel
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_registration_channel" name="Registration Channels"
+              parent="contacts.res_partner_menu_config" action="action_registration_channel"
+              sequence="2"/>
+
+</odoo>
