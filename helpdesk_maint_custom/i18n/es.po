@@ -79,3 +79,78 @@ msgstr "Fechas y Firma"
 #: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.helpdesk_ticket_view_form_inherit_maint
 msgid "Internal Note"
 msgstr "Nota Interna"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model,name:helpdesk_maint_custom.model_maintenance_request_material
+msgid "Maintenance Request Material"
+msgstr "Material de Orden de Mantenimiento"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_team__use_maintenance_orders
+msgid "Maintenance Orders"
+msgstr "Órdenes de Mantenimiento"
+
+#. module: helpdesk_maint_custom
+#: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.helpdesk_team_view_form_inherit_maint
+msgid "Create maintenance orders from tickets"
+msgstr "Crear órdenes de mantenimiento desde tickets"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request__material_ids
+msgid "Materials"
+msgstr "Materiales"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request__ticket_id
+msgid "Helpdesk Ticket"
+msgstr "Ticket de Soporte"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__maintenance_order_ids
+msgid "Maintenance Orders"
+msgstr "Órdenes de Mantenimiento"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_helpdesk_ticket__maintenance_orders_count
+msgid "Maintenance Orders Count"
+msgstr "Cantidad de Órdenes de Mantenimiento"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request_material__product_id
+msgid "Product"
+msgstr "Producto"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request_material__description
+msgid "Description"
+msgstr "Descripción"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request_material__product_uom_qty
+msgid "Demand"
+msgstr "Demanda"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request_material__quantity
+msgid "Quantity"
+msgstr "Cantidad"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request_material__product_uom
+msgid "Unit of Measure"
+msgstr "Unidad de Medida"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request_material__lot_id
+msgid "Lot/Serial Number"
+msgstr "Lote/Nº de Serie"
+
+#. module: helpdesk_maint_custom
+#: code:addons/helpdesk_maint_custom/models/helpdesk_ticket.py:0
+msgid "Maintenance Order"
+msgstr "Orden de Mantenimiento"
+
+#. module: helpdesk_maint_custom
+#: code:addons/helpdesk_maint_custom/models/helpdesk_ticket.py:0
+msgid "Maintenance Orders"
+msgstr "Órdenes de Mantenimiento"
