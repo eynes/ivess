@@ -20,6 +20,8 @@
         'data/ir_data.xml',
         'data/ir_sequence.xml',
         'data/res_groups.xml',
+        'views/client_type.xml',
+        'views/registration_channel.xml',
         'views/delivery_route.xml',
         'views/delivery_route_number.xml',
         'views/account_move.xml',

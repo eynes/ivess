@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_inherit_vendor_custom" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.vendor.custom</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Email requerido cuando el contacto es proveedor -->
+            <xpath expr="//field[@name='email']" position="attributes">
+                <attribute name="required">supplier_rank > 0</attribute>
+            </xpath>
+
+            <!-- CBU y CVU en la pestaña Contabilidad, junto a cuentas bancarias -->
+            <xpath expr="//page[@name='accounting']//group[@name='general']//field[@name='bank_ids']" position="after">
+                <field name="cbu" placeholder="22 dígitos numéricos"/>
+                <field name="cvu"/>
+                <field name="is_admin" invisible="1"/>
+            </xpath>
+
+            <!--
+                Posición fiscal: readonly para todos en el XML.
+                get_view() en el modelo remueve el readonly para base.group_system.
+            -->
+            <xpath expr="//group[@name='fiscal_information']//field[@name='property_account_position_id']" position="attributes">
+                <attribute name="readonly">not is_admin</attribute>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

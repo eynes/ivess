@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Stat button: "Maintenance Orders" -->
+    <record id="helpdesk_ticket_view_form_inherit_maint_stat_btn" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.form.inherit.maint.stat.btn</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <button name="action_open_helpdesk_ticket" position="before">
+                <button class="oe_stat_button" name="action_view_maintenance_orders"
+                    icon="fa-wrench" type="object"
+                    invisible="maintenance_orders_count == 0">
+                    <field name="maintenance_orders_count" string="Órdenes de Mantenimiento" widget="statinfo"/>
+                </button>
+            </button>
+        </field>
+    </record>
+
+    <!-- Action button: "Crear orden de mantenimiento" -->
+    <record id="helpdesk_ticket_view_form_inherit_maint_create_btn" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.form.inherit.maint.create.btn</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+        <field name="model">helpdesk.ticket</field>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <field name="stage_id" position="before">
+                <field name="use_maintenance_orders" invisible="1"/>
+                <button name="action_create_maintenance_order" type="object"
+                    string="Crear orden de mantenimiento"
+                    invisible="not use_maintenance_orders"
+                    data-hotkey="m"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Additional Information tab -->
+    <record id="helpdesk_ticket_view_form_inherit_maint" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.form.inherit.maint</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Additional Information" name="maint_additional_info">
+                    <group col="2">
+                        <group string="Classification">
+                            <field name="ticket_source"/>
+                            <field name="topic"/>
+                            <field name="department_id"/>
+                            <field name="line"/>
+                            <field name="maintenance_type"/>
+                        </group>
+                        <group string="Dates and Signature">
+                            <field name="due_date"/>
+                            <field name="require_signature"/>
+                            <field
+                                name="signature"
+                                widget="signature"
+                                invisible="not require_signature"
+                            />
+                        </group>
+                    </group>
+                    <group string="Internal Note">
+                        <field name="internal_note" nolabel="1"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

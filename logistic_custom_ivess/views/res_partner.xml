@@ -4,9 +4,26 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <div name="button_box" position="inside">
+                <button class="oe_stat_button" type="object" name="action_open_water_containers" icon="fa-cube">
+                    <field string="Envases" name="qty_water_containers" widget="statinfo"/>
+                </button>
+                <button class="oe_stat_button" type="object" name="action_open_water_consumption" icon="fa-list">
+                    <field string="Consumo de agua historico" name="qty_water_consumption" widget="statinfo"/>
+                </button>
+            </div>
+            <xpath expr="//field[@name='express_id']" position="before">
+                <field name="state" />
+                <field name="date_from" invisible="state not in ['holidays','dont_pass']"/>
+                <field name="date_to" invisible="state not in ['holidays','dont_pass']"/>
+                <field name="current_month_water_liters"/>
+                <field name="current_year_water_liters"/>
+                <field name="registration_channel_id"/>
+            </xpath>
             <xpath expr="//page[@name='sales_purchases']" position="inside">
                 <group invisible="not id">
                     <group name="group_route" string="Reparto">
+                        <field name="partner_type_id"/>
                         <field name="distribution"/>
                         <field name="distributions_ids">
                             <list>

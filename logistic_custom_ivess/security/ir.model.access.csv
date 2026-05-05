@@ -14,6 +14,10 @@ access_delivery_route_number_user,delivery.route.user,model_delivery_route_numbe
 access_res_partner_water_consumption_user,res.partner.water.consumtion.user,model_res_partner_water_consumption,sales_team.group_sale_salesman_all_leads,1,1,1,1
 access_res_partner_distribution_user,res.partner.distribution.user,model_partner_distribution,sales_team.group_sale_salesman_all_leads,1,1,1,1
 access_replacement_reason,res.partner.replacement.reason.user,model_replacement_reason,sales_team.group_sale_salesman_all_leads,1,1,1,1
+access_client_type_manager,client.type.manager,model_client_type,sales_team.group_sale_manager,1,1,1,1
+access_client_type_user,client.type.user,model_client_type,sales_team.group_sale_salesman_all_leads,1,0,0,0
+access_registration_channel_manager,registration.channel.manager,model_registration_channel,sales_team.group_sale_manager,1,1,1,1
+access_registration_channel_user,registration.channel.user,model_registration_channel,sales_team.group_sale_salesman_all_leads,1,0,0,0
 
 
 

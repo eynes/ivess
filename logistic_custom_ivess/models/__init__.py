@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from . import account_move
+from . import client_type
 from . import template_delivery_route
 from . import delivery_route_number
 from . import res_partner_distribution
@@ -16,3 +17,4 @@ from . import visit_status
 from . import water_container
 from . import res_company
 from . import purchase_order_line
+from . import registration_channel

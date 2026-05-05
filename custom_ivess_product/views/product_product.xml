@@ -1,4 +1,15 @@
 <odoo>
+    <!--<record id="product_normal_form_view_ivess_inherit" model="ir.ui.view">
+        <field name="name">product.product.normal.form.view.ivess.inherit</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_normal_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='codes']/field[@name='default_code']" position="after">
+                <field name="abbreviation"/>
+            </xpath>
+        </field>
+    </record>-->
+
     <record id="action_report_etiqueta_personalizada" model="ir.actions.report">
         <field name="name">Etiqueta Personalizada</field>
         <field name="model">product.product</field>
