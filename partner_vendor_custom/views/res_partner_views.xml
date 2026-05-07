@@ -22,9 +22,9 @@
                 Posición fiscal: readonly para todos en el XML.
                 get_view() en el modelo remueve el readonly para base.group_system.
             -->
-            <xpath expr="//group[@name='fiscal_information']//field[@name='property_account_position_id']" position="attributes">
+            <!--<xpath expr="//group[@name='fiscal_information']//field[@name='property_account_position_id']" position="attributes">
                 <attribute name="readonly">not is_admin</attribute>
-            </xpath>
+            </xpath>-->
 
         </field>
     </record>
