@@ -19,6 +19,7 @@
                 <field name="current_month_water_liters"/>
                 <field name="current_year_water_liters"/>
                 <field name="registration_channel_id"/>
+                <field name="customer_code"/>
             </xpath>
             <xpath expr="//page[@name='sales_purchases']" position="inside">
                 <group invisible="not id">
