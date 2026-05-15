@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <odoo>
+    <!-- Agregar campo in_progress al listado de etapas de mantenimiento -->
+    <record id="maintenance_stage_view_list_inherit_in_progress" model="ir.ui.view">
+        <field name="name">maintenance.stage.list.inherit.in.progress</field>
+        <field name="inherit_id" ref="maintenance.hr_equipment_stage_view_tree"/>
+        <field name="model">maintenance.stage</field>
+        <field name="arch" type="xml">
+            <field name="done" position="after">
+                <field name="in_progress"/>
+            </field>
+        </field>
+    </record>
+
     <record id="maintenance_request_view_form_inherit_equipment_not_required" model="ir.ui.view">
         <field name="name">maintenance.request.form.inherit.equipment.not.required</field>
         <field name="inherit_id" ref="mrp_maintenance.maintenance_request_view_form_inherit_mrp"/>
@@ -16,6 +28,10 @@
         <field name="inherit_id" ref="maintenance.hr_equipment_request_view_form"/>
         <field name="model">maintenance.request</field>
         <field name="arch" type="xml">
+            <!-- Origen field after equipment_id -->
+            <field name="equipment_id" position="after">
+                <field name="request_origin"/>
+            </field>
             <!-- Materials tab -->
             <xpath expr="//notebook" position="inside">
                 <page string="Materiales" name="maint_materials">
@@ -26,6 +42,8 @@
                             </control>
                             <field name="product_id" required="1"/>
                             <field name="description" optional="show"/>
+                            <field name="supply_location_id" optional="show" readonly="1"/>
+                            <field name="qty_available_location" optional="show" readonly="1"/>
                             <field name="product_uom_qty" string="Demanda"/>
                             <field name="quantity" string="Cantidad"/>
                             <field name="product_uom" options="{'no_open': True, 'no_create': True}" widget="many2one_uom"/>
@@ -33,6 +51,7 @@
                                 groups="stock.group_production_lot"
                                 domain="[('product_id', '=', product_id)]"
                                 optional="show"/>
+                            <field name="stock_move_id" optional="hide" readonly="1"/>
                         </list>
                     </field>
                 </page>

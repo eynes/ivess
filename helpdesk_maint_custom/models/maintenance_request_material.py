@@ -37,6 +37,22 @@ class MaintenanceRequestMaterial(models.Model):
         domain="[('product_id', '=', product_id)]",
     )
     company_id = fields.Many2one(related='request_id.company_id', store=True)
+    stock_move_id = fields.Many2one(
+        'stock.move',
+        string='Stock Move',
+        readonly=True,
+        copy=False,
+    )
+    supply_location_id = fields.Many2one(
+        'stock.location',
+        string='Supply Location',
+        compute='_compute_supply_location',
+    )
+    qty_available_location = fields.Float(
+        string='Available Qty',
+        compute='_compute_qty_available_location',
+        digits='Product Unit of Measure',
+    )
 
     @api.depends('product_id')
     def _compute_description(self):
@@ -48,3 +64,19 @@ class MaintenanceRequestMaterial(models.Model):
         for line in self:
             if not line.product_uom:
                 line.product_uom = line.product_id.uom_id
+
+    @api.depends('request_id.equipment_id.supply_location_id')
+    def _compute_supply_location(self):
+        for line in self:
+            line.supply_location_id = line.request_id.equipment_id.supply_location_id
+
+    @api.depends('product_id', 'request_id.equipment_id.supply_location_id')
+    def _compute_qty_available_location(self):
+        for line in self:
+            location = line.request_id.equipment_id.supply_location_id
+            if line.product_id and location:
+                line.qty_available_location = line.product_id.with_context(
+                    location=location.id
+                ).qty_available
+            else:
+                line.qty_available_location = 0.0
