@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="maintenance_equipment_view_form_inherit_custom" model="ir.ui.view">
+        <field name="name">maintenance.equipment.form.inherit.custom</field>
+        <field name="inherit_id" ref="maintenance.hr_equipment_view_form"/>
+        <field name="model">maintenance.equipment</field>
+        <field name="arch" type="xml">
+            <!-- is_vehicle and supply_location_id in main form -->
+            <xpath expr="//group[@name='service_info_group']/group[1]" position="inside">
+                <field name="is_vehicle"/>
+                <field name="supply_location_id" invisible="not is_vehicle"/>
+            </xpath>
+            <!-- Infracciones tab -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Infracciones" name="infractions" invisible="not is_vehicle">
+                    <field name="infraction_ids" widget="one2many">
+                        <list string="Infracciones" editable="bottom">
+                            <control>
+                                <create string="Agregar infracción"/>
+                            </control>
+                            <field name="employee_id"/>
+                            <field name="photo" widget="image" optional="show"/>
+                            <field name="amount"/>
+                            <field name="infraction_date"/>
+                            <field name="infraction_reason"/>
+                            <field name="infraction_location"/>
+                            <field name="internal_note"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

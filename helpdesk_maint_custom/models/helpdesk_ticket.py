@@ -8,6 +8,7 @@ class HelpdeskTicket(models.Model):
     _inherit = "helpdesk.ticket"
 
     use_maintenance_orders = fields.Boolean(related='team_id.use_maintenance_orders')
+    team_type = fields.Selection(related='team_id.team_type')
     maintenance_order_ids = fields.One2many('maintenance.request', 'ticket_id', copy=False)
     maintenance_orders_count = fields.Integer(
         string='Maintenance Orders Count',
@@ -116,3 +117,12 @@ class HelpdeskTicket(models.Model):
         string="Maintenance Type",
         default='corrective'
     )
+
+    # Workshop (Taller Mecánico) fields
+    dispatch = fields.Char(string="Reparto")
+    driver_name = fields.Char(string="Nombre")
+    vehicle_model = fields.Char(string="Modelo")
+    license_plate = fields.Char(string="Patente")
+    vehicle_location = fields.Char(string="Ubicación")
+    breakdown_reason = fields.Char(string="Motivo de auxilio")
+    maps_location = fields.Char(string="Ubicación Maps")

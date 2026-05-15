@@ -146,6 +146,31 @@ msgid "Lot/Serial Number"
 msgstr "Lote/Nº de Serie"
 
 #. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request_material__supply_location_id
+msgid "Supply Location"
+msgstr "Ubicación de Suministro"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request_material__qty_available_location
+msgid "Available Qty"
+msgstr "Cantidad Disponible"
+
+#. module: helpdesk_maint_custom
+#: model:ir.model.fields,field_description:helpdesk_maint_custom.field_maintenance_request_material__stock_move_id
+msgid "Stock Move"
+msgstr "Movimiento de Stock"
+
+#. module: helpdesk_maint_custom
+#: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.maintenance_request_view_form_inherit_maint_custom
+msgid "Materiales"
+msgstr "Materiales"
+
+#. module: helpdesk_maint_custom
+#: model_terms:ir.ui.view,arch_db:helpdesk_maint_custom.maintenance_request_view_form_inherit_maint_custom
+msgid "Agregar un insumo"
+msgstr "Agregar un insumo"
+
+#. module: helpdesk_maint_custom
 #: code:addons/helpdesk_maint_custom/models/helpdesk_ticket.py:0
 msgid "Maintenance Order"
 msgstr "Orden de Mantenimiento"

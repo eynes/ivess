@@ -40,8 +40,10 @@
         <field name="model">helpdesk.ticket</field>
         <field name="arch" type="xml">
             <xpath expr="//notebook" position="inside">
-                <page string="Additional Information" name="maint_additional_info">
-                    <group col="2">
+                <field name="team_type" invisible="1"/>
+                <page string="Additional Information" name="maint_additional_info"
+                    invisible="team_type not in ('maintenance', 'workshop')">
+                    <group col="2" invisible="team_type != 'maintenance'">
                         <group string="Classification">
                             <field name="ticket_source"/>
                             <field name="topic"/>
@@ -59,8 +61,21 @@
                             />
                         </group>
                     </group>
-                    <group string="Internal Note">
+                    <group string="Internal Note" invisible="team_type != 'maintenance'">
                         <field name="internal_note" nolabel="1"/>
+                    </group>
+                    <group col="2" invisible="team_type != 'workshop'">
+                        <group string="Datos del Vehículo">
+                            <field name="dispatch"/>
+                            <field name="driver_name"/>
+                            <field name="vehicle_model"/>
+                            <field name="license_plate"/>
+                        </group>
+                        <group string="Ubicación y Auxilio">
+                            <field name="vehicle_location"/>
+                            <field name="breakdown_reason"/>
+                            <field name="maps_location"/>
+                        </group>
                     </group>
                 </page>
             </xpath>
