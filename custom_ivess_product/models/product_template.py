@@ -5,7 +5,25 @@ from odoo.exceptions import ValidationError
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
-    abbreviation = fields.Char(string="Abbreviation")
+    abbreviation = fields.Char(
+        string='Abbreviation',
+        size=10,
+        help=_('Short reference name (max 10 characters)'),
+    )
+    order = fields.Integer(string="Order")
+    is_returnable = fields.Boolean(
+        string="Is returnable",
+        required=True,
+        tracking=True,
+    )
+
+    _sql_constraints = [
+        (
+            'unique_abbreviation',
+            'unique(abbreviation)',
+            _('The abbreviation must be unique.')
+        )
+    ]
 
     state = fields.Selection(
         selection=[
@@ -18,6 +36,12 @@ class ProductTemplate(models.Model):
         tracking=True,
         default='new',
     )
+
+    @api.constrains('abbreviation')
+    def _check_abbreviation_length(self):
+        for rec in self:
+            if rec.abbreviation and len(rec.abbreviation) > 10:
+                raise ValidationError(_("The abbreviation cannot exceed 10 characters."))
 
     def create(self, vals):
         """
