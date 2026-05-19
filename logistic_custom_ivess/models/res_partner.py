@@ -176,6 +176,13 @@ class ResPartner(models.Model):
                 return {'customer_code': seq_code}
         return {}
 
+    def _set_multicompany_account_fiscal_position(self, property_account_position_id):
+        if self.env.context.get('_setting_multicompany_fiscal_pos'):
+            return
+        return super().with_context(_setting_multicompany_fiscal_pos=True)._set_multicompany_account_fiscal_position(
+            property_account_position_id
+        )
+
     def write(self, vals):
         old_distribution = {
             'distribution': self.distribution.id if self.distribution and 'distribution' in vals else None}

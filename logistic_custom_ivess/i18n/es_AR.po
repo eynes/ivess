@@ -832,6 +832,7 @@ msgstr "Posible baja"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_product_template
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__product_id
 msgid "Product"
 msgstr "Producto"
 

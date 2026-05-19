@@ -21,6 +21,7 @@
         "views/helpdesk_team_views.xml",
         "views/helpdesk_ticket_views.xml",
         "views/maintenance_request_views.xml",
+        "views/maintenance_equipment_views.xml",
     ],
     "installable": True,
     "auto_install": False,

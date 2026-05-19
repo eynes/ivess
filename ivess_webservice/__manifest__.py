@@ -13,6 +13,7 @@
     "depends": [
         "base",
         "l10n_ar_eynes",
+        "helpdesk_maint_custom",
     ],
     "data": [
         "security/ir.model.access.csv",
