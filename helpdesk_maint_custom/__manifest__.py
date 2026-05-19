@@ -18,6 +18,7 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "security/groups.xml",
         "views/helpdesk_team_views.xml",
         "views/helpdesk_ticket_views.xml",
         "views/maintenance_request_views.xml",

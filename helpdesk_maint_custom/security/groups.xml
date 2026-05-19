@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="group_helpdesk_maintenance" model="res.groups">
+        <field name="name">Acceso a ticketera de mantenimiento</field>
+    </record>
+
+    <record id="group_helpdesk_workshop" model="res.groups">
+        <field name="name">Acceso a ticketera de taller mecánico</field>
+    </record>
+
+    <!-- Regla: grupo mantenimiento sólo ve tickets de tipo 'maintenance' -->
+    <record id="rule_helpdesk_ticket_maintenance" model="ir.rule">
+        <field name="name">Helpdesk Ticket: sólo equipo mantenimiento</field>
+        <field name="model_id" ref="helpdesk.model_helpdesk_ticket"/>
+        <field name="domain_force">[('team_id.team_type', '=', 'maintenance')]</field>
+        <field name="groups" eval="[(4, ref('helpdesk_maint_custom.group_helpdesk_maintenance'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- Regla: grupo taller mecánico sólo ve tickets de tipo 'workshop' -->
+    <record id="rule_helpdesk_ticket_workshop" model="ir.rule">
+        <field name="name">Helpdesk Ticket: sólo equipo taller mecánico</field>
+        <field name="model_id" ref="helpdesk.model_helpdesk_ticket"/>
+        <field name="domain_force">[('team_id.team_type', '=', 'workshop')]</field>
+        <field name="groups" eval="[(4, ref('helpdesk_maint_custom.group_helpdesk_workshop'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+</odoo>
