@@ -27,6 +27,11 @@ class IvessPerceptionReport(models.Model):
                         SELECT pta.tax_minimum
                         FROM perception_tax_application pta
                         WHERE pta.perception_tax_id = rpp.perception_id
+                            AND pta.concept_id IS NULL
+                            AND (
+                                (rpp.activity_id IS NULL AND pta.activity_id IS NULL)
+                                OR pta.activity_id = rpp.activity_id
+                            )
                         LIMIT 1
                     ) AS tax_minimum,
                     rpp.percent AS percent,
