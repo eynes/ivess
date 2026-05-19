@@ -74,7 +74,7 @@
                             <field name="dispatch"/>
                             <field name="driver_name"/>
                             <field name="vehicle_model"/>
-                            <field name="license_plate"/>
+                            <field name="equipment_id"/>
                         </group>
                         <group string="Ubicación y Auxilio">
                             <field name="vehicle_location"/>
@@ -82,6 +82,13 @@
                             <field name="maps_location"/>
                         </group>
                     </group>
+                    <field name="item_ids" string="Ítems" invisible="team_type != 'workshop'"
+                        nolabel="1">
+                        <list editable="bottom">
+                            <field name="name"/>
+                            <field name="value"/>
+                        </list>
+                    </field>
                 </page>
             </xpath>
         </field>
