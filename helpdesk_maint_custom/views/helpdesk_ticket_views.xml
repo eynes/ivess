@@ -61,6 +61,11 @@
                             />
                         </group>
                     </group>
+                    <group>
+                        <group>
+                            <field name="warehouse_id"/>
+                        </group>
+                    </group>
                     <group string="Internal Note" invisible="team_type != 'maintenance'">
                         <field name="internal_note" nolabel="1"/>
                     </group>
