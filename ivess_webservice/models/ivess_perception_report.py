@@ -38,8 +38,8 @@ class IvessPerceptionReport(models.Model):
         )
 
     @api.model
-    def get_perceptions(self, customer_code, date=None, limit=None):
-        target_date = fields.Date.to_date(date) if date else fields.Date.today()
+    def get_perceptions(self, customer_code, limit=None):
+        today = fields.Date.today()
         lines = self.search([("customer_code", "=", customer_code)])
 
         result = []
@@ -49,7 +49,7 @@ class IvessPerceptionReport(models.Model):
             )
             match = perception_lines.filtered(
                 lambda l: not l.period or (
-                    l.period <= target_date
+                    l.period <= today
                     <= (l.period + relativedelta(months=1)) - relativedelta(days=1)
                 )
             )
