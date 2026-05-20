@@ -4,6 +4,8 @@ from odoo.exceptions import UserError, ValidationError
 
 
 FRIO_CALOR_STAGES = [
+    ('repair', 'Reparación'),
+    ('calidad', 'Control de Calidad'),
     ('hidrolavadora', 'Limpieza con hidrolavadora'),
     ('pileta', 'Lavado en pileta'),
     ('prueba', 'Prueba y sanitización'),
@@ -30,8 +32,15 @@ class RepairOrder(models.Model):
     frio_calor_stage = fields.Selection(
         selection=FRIO_CALOR_STAGES,
         string="Etapa Frío/Calor",
-        default='hidrolavadora',
+        default='calidad',
         tracking=True,
+    )
+
+    prev_frio_calor_stage = fields.Selection(
+        selection=FRIO_CALOR_STAGES,
+        string="Etapa Frío/Calor Anterior",
+        readonly=True,
+        copy=False
     )
 
     requires_painting = fields.Boolean(
@@ -212,6 +221,17 @@ class RepairOrder(models.Model):
                 'frio_calor_stage': 'hidrolavadora',
             })
             order.message_post(body=_("La orden fue recibida del tercero. Etapa reiniciada a 'Limpieza con hidrolavadora'."))
+
+    def action_init_repair(self):
+        for order in self:
+            order.prev_frio_calor_stage = order.frio_calor_stage
+            order.with_context(_frio_calor_stage_advance=True).frio_calor_stage = 'repair'
+            order.message_post(body=_("La orden fue enviada a reparación."))
+
+    def action_back_from_repair(self):
+        for order in self:
+            order.with_context(_frio_calor_stage_advance=True).frio_calor_stage = order.prev_frio_calor_stage or 'calidad'
+            order.message_post(body=_("La orden volvió de reparación a su estado anterior."))
 
     def write(self, vals):
         for order in self:

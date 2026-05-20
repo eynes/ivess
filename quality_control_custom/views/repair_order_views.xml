@@ -21,10 +21,14 @@
                         type="object"
                         string="Terciarizar"
                         invisible="repair_equipment_type != 'frio_calor' or is_outsourced"/>
-                <button name="action_receive_from_third_party"
+                <button name="action_back_from_repair"
                         type="object"
-                        string="Recibir de tercero"
-                        invisible="not is_outsourced"/>
+                        string="Volver de reparación"
+                        invisible="frio_calor_stage != 'repair'"/>
+                <button name="action_init_repair"
+                        type="object"
+                        string="Enviar a reparación"
+                        invisible="frio_calor_stage == 'repair' or is_outsourced"/>
             </xpath>
 
             <!-- Selection badge Frío/Calor con botones de navegación -->
@@ -55,6 +59,11 @@
                 <field name="requires_painting"
                        invisible="repair_equipment_type != 'frio_calor'"
                        readonly="is_outsourced"/>
+            </xpath>
+
+            <!-- Pestaña Partes se oculta si el equipo no esta en estado 'Reparación'-->
+            <xpath expr="//notebook/page[@name='parts']" position="attributes">
+                <attribute name="invisible">frio_calor_stage != 'repair'</attribute>
             </xpath>
 
             <!-- Campo quality_check_id y traslado de terciarización en el grupo derecho -->
