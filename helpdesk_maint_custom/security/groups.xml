@@ -8,9 +8,41 @@
         <field name="name">Acceso a ticketera de taller mecánico</field>
     </record>
 
-    <!-- Regla: grupo mantenimiento sólo ve tickets de tipo 'maintenance' -->
+    <!--
+        Regla GLOBAL (sin campo groups = aplica a todos con AND).
+        Las group rules se combinan con OR entre sí, por eso no restringen solos.
+        Esta regla global se evalúa dinámicamente por usuario:
+          - usuario con grupo mantenimiento → solo ve tickets de tipo 'maintenance'
+          - usuario con grupo taller         → solo ve tickets de tipo 'workshop'
+          - usuario con ambos grupos         → ve ambos tipos
+          - usuario sin ninguno de los dos   → sin restricción extra (pasa todo)
+    -->
+    <record id="rule_helpdesk_ticket_team_type" model="ir.rule">
+        <field name="name">Helpdesk Ticket: restricción global por tipo de equipo</field>
+        <field name="model_id" ref="helpdesk.model_helpdesk_ticket"/>
+        <field name="domain_force">
+            [('team_id.team_type', 'in',
+                (['maintenance'] if user.has_group('helpdesk_maint_custom.group_helpdesk_maintenance') else []) +
+                (['workshop'] if user.has_group('helpdesk_maint_custom.group_helpdesk_workshop') else [])
+            )] if (
+                user.has_group('helpdesk_maint_custom.group_helpdesk_maintenance') or
+                user.has_group('helpdesk_maint_custom.group_helpdesk_workshop')
+            ) else [(1, '=', 1)]
+        </field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!--
+        Group rules: garantizan acceso a los tickets de su tipo aunque el equipo
+        tenga privacy_visibility = 'invited_internal'. Sin estas reglas, la regla
+        global restringiría el team_type pero helpdesk_ticket_user_rule filtraría
+        además por visibilidad del equipo.
+    -->
     <record id="rule_helpdesk_ticket_maintenance" model="ir.rule">
-        <field name="name">Helpdesk Ticket: sólo equipo mantenimiento</field>
+        <field name="name">Helpdesk Ticket: acceso grupo mantenimiento</field>
         <field name="model_id" ref="helpdesk.model_helpdesk_ticket"/>
         <field name="domain_force">[('team_id.team_type', '=', 'maintenance')]</field>
         <field name="groups" eval="[(4, ref('helpdesk_maint_custom.group_helpdesk_maintenance'))]"/>
@@ -20,9 +52,8 @@
         <field name="perm_unlink" eval="True"/>
     </record>
 
-    <!-- Regla: grupo taller mecánico sólo ve tickets de tipo 'workshop' -->
     <record id="rule_helpdesk_ticket_workshop" model="ir.rule">
-        <field name="name">Helpdesk Ticket: sólo equipo taller mecánico</field>
+        <field name="name">Helpdesk Ticket: acceso grupo taller mecánico</field>
         <field name="model_id" ref="helpdesk.model_helpdesk_ticket"/>
         <field name="domain_force">[('team_id.team_type', '=', 'workshop')]</field>
         <field name="groups" eval="[(4, ref('helpdesk_maint_custom.group_helpdesk_workshop'))]"/>
