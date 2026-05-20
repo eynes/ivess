@@ -38,14 +38,15 @@ class IvessPerceptionReport(models.Model):
         )
 
     @api.model
-    def get_perceptions(self, customer_code, limit=None):
+    def get_perceptions(self, customer_code=None, limit=None):
         today = fields.Date.today()
-        lines = self.search([("customer_code", "=", customer_code)])
+        domain = [("customer_code", "=", customer_code)] if customer_code else []
+        lines = self.search(domain)
 
         result = []
-        for perception in lines.mapped("perception_id"):
+        for customer, perception in set(lines.mapped(lambda l: (l.customer_code, l.perception_id))):
             perception_lines = lines.filtered(
-                lambda l: l.perception_id == perception
+                lambda l: l.customer_code == customer and l.perception_id == perception
             )
             match = perception_lines.filtered(
                 lambda l: not l.period or (
@@ -55,11 +56,14 @@ class IvessPerceptionReport(models.Model):
             )
             if match:
                 line = match[:1]
-                result.append({
+                entry = {
                     "perception_id": (perception.id, perception.display_name),
                     "tax_minimum": line.tax_minimum,
                     "percent": line.percent,
-                })
+                }
+                if not customer_code:
+                    entry["customer_code"] = customer
+                result.append(entry)
 
         if limit:
             result = result[:limit]
