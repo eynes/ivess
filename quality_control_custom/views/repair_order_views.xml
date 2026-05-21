@@ -37,18 +37,25 @@
                      invisible="repair_equipment_type != 'frio_calor'">
                     <button name="action_open_revert_stage_wizard"
                             type="object"
-                            class="btn btn-link btn-sm text-muted px-1"
+                            class="btn btn-link btn-sm px-1"
                             title="Revertir Etapa"
-                            invisible="frio_calor_stage == 'hidrolavadora' or is_outsourced">
-                        <i class="fa fa-chevron-left"/>
+                            invisible="frio_calor_stage in ('hidrolavadora', 'calidad', 'repair') or is_outsourced">
+                        <i class="fa fa-chevron-left"/> Revertir Etapa
                     </button>
                     <field name="frio_calor_stage" widget="selection_badge" readonly="1"/>
-                    <button name="action_open_advance_stage_wizard"
+                    <!--<button name="action_open_advance_stage_wizard"
                             type="object"
                             class="btn btn-link btn-sm text-primary px-1"
                             title="Avanzar Etapa"
                             invisible="frio_calor_stage == 'armado' or is_outsourced">
                         <i class="fa fa-chevron-right"/>
+                    </button>-->
+                    <button name="action_open_advance_next_stage"
+                            type="object"
+                            class="btn btn-link btn-sm px-1"
+                            title="Avanzar Etapa"
+                            invisible="frio_calor_stage in ('armado', 'calidad', 'repair') or is_outsourced">
+                        <i class="fa fa-chevron-right"/><br/>Siguiente Etapa
                     </button>
                 </div>
             </xpath>
@@ -59,6 +66,22 @@
                 <field name="requires_painting"
                        invisible="repair_equipment_type != 'frio_calor'"
                        readonly="is_outsourced"/>
+            </xpath>
+
+            <!-- Pestaña Historial de Etapas -->
+            <xpath expr="//notebook" position="inside">
+                <page name="stage_history" string="Historial de Etapas"
+                      invisible="repair_equipment_type != 'frio_calor'">
+                    <field name="stage_log_ids" readonly="1">
+                        <list>
+                            <field name="stage"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="duration_display" string="Duración"/>
+                            <field name="user_id"/>
+                        </list>
+                    </field>
+                </page>
             </xpath>
 
             <!-- Pestaña Partes se oculta si el equipo no esta en estado 'Reparación'-->
