@@ -7,37 +7,41 @@ class WaterContainer(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
     name = fields.Char(
-        string='Container Number', 
-        required=True, 
-        copy=False, 
-        readonly=True, 
+        string='Container Number',
+        required=True,
+        copy=False,
+        readonly=True,
         default='Nuevo'
     )
     partner_id = fields.Many2one(
-        'res.partner', 
-        string='Customer', 
-        invisible=True
+        'res.partner',
+        string='Customer',
     )
     container_type = fields.Selection(
         [
             ('bottle', 'Bottle'),
             ('jug', 'Jug'),
-        ], 
-        string='Container Type', 
+        ],
+        string='Container Type',
         required=True
     )
     assignment_date = fields.Date(
-        string='Assignment Date', 
+        string='Assignment Date',
         required=True
     )
     return_date = fields.Date(
         string='Return Date'
     )
     state_id = fields.Many2one(
-        'water.container.state', 
-        string='Status', 
-        required=True, 
+        'water.container.state',
+        string='Status',
+        required=True,
         tracking=True
+    )
+    product_id = fields.Many2one(
+        'product.template',
+        string="Product",
+        domain=[('is_returnable', '=', True)],
     )
 
     @api.model

@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ivess_fiscal_position_report_user,ivess.fiscal.position.report.user,model_ivess_fiscal_position_report,base.group_user,1,0,0,0
