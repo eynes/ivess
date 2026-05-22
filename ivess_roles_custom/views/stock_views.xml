@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             STOCK PICKING — restricciones de botones por grupo (form)
+             Referencia CSV: filas 6, 17, 18
+             ══════════════════════════════════════════════════════════════════
+             • Usuario Compras (purchase_user): ❌ NO puede validar (fila 6)
+             • Usuario Inventario: ✅ puede validar recepciones y entregas (filas 17, 18)
+             • Administrador Inventario: ✅ CRUD total
+             • Administrador Compras: ✅ puede validar recepciones (fila 6)
+        -->
+        <record id="view_stock_picking_form_cabr" model="ir.ui.view">
+            <field name="name">stock.picking.form.cabr</field>
+            <field name="model">stock.picking</field>
+            <field name="inherit_id" ref="stock.view_picking_form"/>
+            <field name="arch" type="xml">
+
+                <!-- Botón "Validar" — visible a inventory_user+, purchase_manager y system -->
+                <button name="button_validate" position="attributes">
+                    <attribute name="groups">stock.group_stock_user,stock.group_stock_manager,purchase.group_purchase_manager,base.group_system</attribute>
+                </button>
+
+            </field>
+        </record>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             STOCK QUANT — Ajustes de Inventario
+             Referencia CSV: fila 19 — Usuario Inventario ❌ No
+             El menu/acción de ajustes queda restringido a inventory_admin y system.
+        ══════════════════════════════════════════════════════════════════════ -->
+        <record id="view_stock_quant_tree_cabr" model="ir.ui.view">
+            <field name="name">stock.quant.tree.cabr</field>
+            <field name="model">stock.quant</field>
+            <field name="inherit_id" ref="stock.view_stock_quant_tree_inventory_editable"/>
+            <field name="arch" type="xml">
+
+                <!-- Botón inline de ajuste — solo admins -->
+                <button name="action_apply_inventory" position="attributes">
+                    <attribute name="groups">stock.group_stock_manager,base.group_system</attribute>
+                </button>
+
+            </field>
+        </record>
+
+    </data>
+</odoo>
