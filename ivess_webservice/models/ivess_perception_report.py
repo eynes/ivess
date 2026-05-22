@@ -38,9 +38,21 @@ class IvessPerceptionReport(models.Model):
         )
 
     @api.model
-    def get_perceptions(self, customer_code=None, limit=None):
+    def get_perceptions(self, customer_code=None, distribution=None, limit=None):
         today = fields.Date.today()
-        domain = [("customer_code", "=", customer_code)] if customer_code else []
+
+        if customer_code:
+            domain = [("customer_code", "=", customer_code)]
+        elif distribution:
+            template_routes = self.env["template.delivery.route"].search([("name", "=", distribution)])
+            partner_distrs = self.env["partner.distribution"].search([
+                ("distribution", "in", template_routes.ids)
+            ])
+            customer_codes = [c for c in partner_distrs.mapped("partner_id.customer_code") if c]
+            domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
+        else:
+            return []
+
         lines = self.search(domain)
 
         result = []
