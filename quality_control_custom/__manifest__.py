@@ -17,6 +17,7 @@
         'quality_control',
         'quality_repair',
         'stock',
+        'barcodes',
     ],
     'data': [
         'security/ir.model.access.csv',
@@ -27,7 +28,14 @@
         'views/quality_check_views.xml',
         'views/repair_order_views.xml',
         'views/res_company_views.xml',
+        'views/repair_barcode_scanner_views.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'quality_control_custom/static/src/xml/repair_barcode_scanner.xml',
+            'quality_control_custom/static/src/js/repair_barcode_scanner.js',
+        ],
+    },
     'installable': True,
     'auto_install': False,
     'license': 'LGPL-3',

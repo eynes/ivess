@@ -67,6 +67,12 @@ class RepairOrder(models.Model):
         copy=False,
     )
 
+    stage_log_ids = fields.One2many(
+        'repair.order.stage.log',
+        'repair_id',
+        string='Historial de Etapas',
+    )
+
     def _get_stage_sequence(self):
         """Retorna la secuencia de etapas según requires_painting."""
         self.ensure_one()
@@ -115,6 +121,16 @@ class RepairOrder(models.Model):
                        dict(FRIO_CALOR_STAGES).get(current, current),
                        dict(FRIO_CALOR_STAGES).get(prev_stage, prev_stage)),
             )
+
+    def action_open_advance_next_stage(self):
+        self.ensure_one()
+        if self.repair_equipment_type != 'frio_calor':
+            raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
+        if self.is_outsourced:
+            raise UserError(_("No se puede avanzar la etapa de una orden terciarizada."))
+        stages = self._get_stage_sequence()
+        current_idx = stages.index(self.frio_calor_stage) if self.frio_calor_stage in stages else -1
+        self.with_context(_frio_calor_stage_advance=True).write({'frio_calor_stage': stages[current_idx + 1]})
 
     def action_open_advance_stage_wizard(self):
         self.ensure_one()
@@ -233,7 +249,29 @@ class RepairOrder(models.Model):
             order.with_context(_frio_calor_stage_advance=True).frio_calor_stage = order.prev_frio_calor_stage or 'calidad'
             order.message_post(body=_("La orden volvió de reparación a su estado anterior."))
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        now = fields.Datetime.now()
+        for record in records:
+            if record.repair_equipment_type == 'frio_calor':
+                self.env['repair.order.stage.log'].create({
+                    'repair_id': record.id,
+                    'stage': record.frio_calor_stage,
+                    'date_start': now,
+                    'user_id': self.env.context.get('_portal_user_id', self.env.user.id),
+                })
+        return records
+
     def write(self, vals):
+        old_stages = {}
+        if 'frio_calor_stage' in vals:
+            old_stages = {
+                order.id: order.frio_calor_stage
+                for order in self
+                if order.repair_equipment_type == 'frio_calor'
+            }
+
         for order in self:
             # Bloqueo por terciarización
             if order.is_outsourced and not self.env.context.get('_outsource_action'):
@@ -253,10 +291,65 @@ class RepairOrder(models.Model):
                         _("No se puede desmarcar 'Requiere pintura' cuando la etapa ya está en ejecución o fue superada.")
                     )
 
-        return super().write(vals)
+        result = super().write(vals)
+
+        if old_stages:
+            now = fields.Datetime.now()
+            for order in self:
+                old_stage = old_stages.get(order.id)
+                if old_stage and old_stage != order.frio_calor_stage:
+                    open_log = self.env['repair.order.stage.log'].search([
+                        ('repair_id', '=', order.id),
+                        ('date_end', '=', False),
+                    ], limit=1)
+                    if open_log:
+                        open_log.write({'date_end': now})
+                    self.env['repair.order.stage.log'].create({
+                        'repair_id': order.id,
+                        'stage': order.frio_calor_stage,
+                        'date_start': now,
+                        'user_id': self.env.context.get('_portal_user_id', self.env.user.id),
+                    })
+
+        return result
 
     def unlink(self):
         for order in self:
             if order.is_outsourced:
                 raise UserError(_("No se puede eliminar una orden terciarizada."))
         return super().unlink()
+
+    @api.model
+    def find_repair_by_serial(self, barcode):
+        lot = self.env['stock.lot'].search([('name', '=', barcode)], limit=1)
+        if not lot:
+            return {
+                'error': 'not_found',
+                'message': _("No se encontró el número de serie '%s'.") % barcode,
+            }
+
+        repair = self.search(
+            [('lot_id', '=', lot.id), ('state', 'not in', ['cancel', 'done'])],
+            order='create_date desc',
+            limit=1,
+        )
+        if not repair:
+            repair = self.search(
+                [('lot_id', '=', lot.id)],
+                order='create_date desc',
+                limit=1,
+            )
+        if not repair:
+            return {
+                'error': 'no_repair',
+                'message': _("No se encontró una orden de reparación para el número de serie '%s'.") % barcode,
+            }
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': repair.name,
+            'res_model': 'repair.order',
+            'res_id': repair.id,
+            'view_mode': 'form',
+            'views': [(False, 'form')],
+        }
