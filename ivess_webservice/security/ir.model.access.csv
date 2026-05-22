@@ -4,3 +4,5 @@ access_ivess_perception_report_user,ivess.perception.report.user,model_ivess_per
 access_ivess_helpdesk_intake_user,ivess.helpdesk.intake.user,model_ivess_helpdesk_intake,base.group_user,1,0,1,0
 access_ivess_customer_category_user,ivess.customer.category.user,model_ivess_customer_category,base.group_user,1,0,0,0
 access_ivess_container_loan_report_user,ivess.container.loan.report.user,model_ivess_container_loan_report,base.group_user,1,0,0,0
+access_ivess_no_purchase_reason_report_user,ivess.no.purchase.reason.report.user,model_ivess_no_purchase_reason_report,base.group_user,1,0,0,0
+access_ivess_replacement_reason_report_user,ivess.replacement.reason.report.user,model_ivess_replacement_reason_report,base.group_user,1,0,0,0
