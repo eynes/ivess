@@ -38,21 +38,51 @@ class IvessPerceptionReport(models.Model):
         )
 
     @api.model
-    def get_perceptions(self, customer_code=None, distribution=None, limit=None):
+    def get_perceptions(self, **kwargs):
+        allowed_params = {"customer_code", "distribution"}
+        unknown_params = set(kwargs) - allowed_params
+        if unknown_params:
+            return {
+                "error": "Parámetros no reconocidos: %s. "
+                        "Los parámetros aceptados son: customer_code, distribution."
+                        % ", ".join(sorted(unknown_params))
+            }
+
+        customer_code = kwargs.get("customer_code")
+        distribution = kwargs.get("distribution")
+
+        if not customer_code and not distribution:
+            return {
+                "error": "Se requiere al menos uno de los siguientes parámetros: customer_code, distribution."
+            }
+        if customer_code and distribution:
+            return {
+                "error": "Los parámetros customer_code y distribution son mutuamente excluyentes. "
+                        "Envíe solo uno de ellos."
+            }
+
+        for param_name, param_value in [("customer_code", customer_code), ("distribution", distribution)]:
+            if param_value is not None and not isinstance(param_value, str):
+                return {
+                    "error": "El parámetro '%s' debe ser una cadena de texto. "
+                            "Tipo recibido: %s." % (param_name, type(param_value).__name__)
+                }
+
         today = fields.Date.today()
 
         if customer_code:
+            if not self.env["res.partner"].search([("customer_code", "=", customer_code)], limit=1):
+                return {"error": "No existe ningún cliente con el código '%s'." % customer_code}
             domain = [("customer_code", "=", customer_code)]
         elif distribution:
             template_routes = self.env["template.delivery.route"].search([("name", "=", distribution)])
+            if not template_routes:
+                return {"error": "No existe ninguna distribución con el código '%s'." % distribution}
             partner_distrs = self.env["partner.distribution"].search([
                 ("distribution", "in", template_routes.ids)
             ])
             customer_codes = [c for c in partner_distrs.mapped("partner_id.customer_code") if c]
             domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
-        else:
-            return []
-
         lines = self.search(domain)
 
         result = []
@@ -76,7 +106,5 @@ class IvessPerceptionReport(models.Model):
                 if not customer_code:
                     entry["customer_code"] = customer
                 result.append(entry)
-
-        if limit:
-            result = result[:limit]
+                
         return result
