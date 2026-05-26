@@ -5,6 +5,7 @@ class IvessReplacementReasonReport(models.Model):
     _description = "Vista SQL de motivos de recambio expuesta al middleware Ivess"
     _auto = False
 
+    reason = fields.Char(readonly=True)
     code = fields.Char(readonly=True)
     sequence = fields.Integer(readonly=True)
 
@@ -15,6 +16,7 @@ class IvessReplacementReasonReport(models.Model):
             CREATE OR REPLACE VIEW {table} AS (
                 SELECT
                     id,
+                    reason,
                     code,
                     sequence
                 FROM replacement_reason
@@ -27,4 +29,4 @@ class IvessReplacementReasonReport(models.Model):
         if kwargs:
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
         records = self.search([])
-        return records.read(["code", "sequence"])
+        return records.read(["reason", "code", "sequence"])
