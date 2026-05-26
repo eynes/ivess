@@ -1196,6 +1196,26 @@ msgid "Year"
 msgstr "Año"
 
 #. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_number_form
+msgid "Booklets"
+msgstr "Talonarios"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__collection_journal_id
+msgid "Collection Booklet"
+msgstr "Talonario de Cobranza"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__remittance_sequence_id
+msgid "Remittance Booklet"
+msgstr "Talonario de Remitos"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__repair_order_sequence_id
+msgid "Repair Orders Booklet"
+msgstr "Talonario de Ordenes de Reparaciones"
+
+#. module: logistic_custom_ivess
 #. odoo-python
 #: code:addons/logistic_custom_ivess/models/client_type.py:0
 msgid "The code must be unique"
