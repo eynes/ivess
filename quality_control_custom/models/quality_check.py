@@ -22,7 +22,7 @@ class QualityCheck(models.Model):
                 check.picking_id.picking_type_id
                 or check.point_id.picking_type_ids[:1]
             )
-            if picking_type.is_frio_calor:
+            if check.point_id and check.point_id.is_frio_calor:
                 check._create_auto_repair_order(picking_type)
         return res
 
@@ -35,7 +35,7 @@ class QualityCheck(models.Model):
                 check.picking_id.picking_type_id
                 or check.point_id.picking_type_ids[:1]
             )
-            if picking_type.is_frio_calor:
+            if check.point_id and check.point_id.is_frio_calor:
                 check._create_auto_repair_order(picking_type)
         return res
 

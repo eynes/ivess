@@ -30,7 +30,7 @@ class RepairOrderRevertStageWizard(models.TransientModel):
     target_stage_id = fields.Many2one(
         comodel_name='repair.order.wizard.stage',
         string="Etapa destino",
-        domain="[('revert_wizard_id', '=', id)]",
+        domain="[('revert_wizard_id', '=', id), ('key', 'not in', ('repair', 'calidad'))]",
     )
 
     def action_revert_stage(self):
