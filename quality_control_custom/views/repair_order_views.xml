@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <record id="view_repair_order_tree_inherit_qcc" model="ir.ui.view">
+        <field name="name">repair.order.tree.inherit.quality_control_custom</field>
+        <field name="model">repair.order</field>
+        <field name="inherit_id" ref="repair.view_repair_order_tree"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//field[@name='state']" position="before">
+                <field name="frio_calor_stage" optional="show" widget="badge" 
+                decoration-success="frio_calor_stage == 'armado'" 
+                decoration-info="frio_calor_stage == 'calidad'" 
+                decoration-primary="frio_calor_stage in ('hidrolavadora','pileta')" 
+                decoration-muted="frio_calor_stage == 'pintura'"
+                decoration-warning="frio_calor_stage in ('prueba','secado')" 
+                decoration-danger="frio_calor_stage == 'repair'"/>
+            </xpath>
+
+        </field>
+    </record>
+
     <record id="view_repair_order_form_inherit_qcc" model="ir.ui.view">
         <field name="name">repair.order.form.inherit.quality_control_custom</field>
         <field name="model">repair.order</field>
@@ -21,6 +40,10 @@
                         type="object"
                         string="Terciarizar"
                         invisible="repair_equipment_type != 'frio_calor' or is_outsourced"/>
+                <button name="action_receive_from_third_party"
+                        type="object"
+                        string="Recibir de tercero"
+                        invisible="not is_outsourced"/>
                 <button name="action_back_from_repair"
                         type="object"
                         string="Volver de reparación"
