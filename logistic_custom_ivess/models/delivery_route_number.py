@@ -54,7 +54,7 @@ class DeliveryRouteNumber(models.Model):
     collection_journal_id = fields.Many2one(
         'account.journal',
         string='Collection Booklet',
-        domain=[('type', 'in', ['cash', 'bank'])],
+        domain=[('type', 'in', ['receipt'])],
     )
     repair_order_sequence_id = fields.Many2one(
         'ir.sequence',
