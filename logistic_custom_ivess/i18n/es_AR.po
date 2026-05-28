@@ -136,13 +136,18 @@ msgid "Attachment Count"
 msgstr "Cantidad de archivos adjuntos"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_stock_move__container_state_id
+msgid "Container State"
+msgstr "Estado del Envase"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__biweekly
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__frequency__biweekly
 msgid "Biweekly"
 msgstr "Quincenal"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__water_container__container_type__bottle
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__product_template__container_type__bottle
 msgid "Bottle"
 msgstr "Botella"
 
@@ -224,7 +229,8 @@ msgid "Container Number"
 msgstr "Número de envase"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__container_type
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_product__container_type
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_template__container_type
 msgid "Container Type"
 msgstr "Tipo de envase"
 
@@ -458,6 +464,11 @@ msgid "Envases"
 msgstr "Envases"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__is_nonproductive
+msgid "Envase Improductivo"
+msgstr "Envase Improductivo"
+
+#. module: logistic_custom_ivess
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
 msgid "Esta seguro que desea cerrar la ruta?"
 msgstr "Esta seguro que desea cerrar la ruta?"
@@ -604,6 +615,11 @@ msgid "Is Follower"
 msgstr "Es seguidor"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_stock_move__is_returnable
+msgid "Is Returnable"
+msgstr "Es Retornable"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_no_purchase_reason__is_rake
 msgid "Is Rake"
 msgstr "Es Rastrillo"
@@ -619,7 +635,7 @@ msgid "Journal Entry"
 msgstr "Asiento contable"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__water_container__container_type__jug
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__product_template__container_type__jug
 msgid "Jug"
 msgstr "Bidón"
 
@@ -837,6 +853,11 @@ msgid "Product"
 msgstr "Producto"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__quantity
+msgid "Quantity"
+msgstr "Cantidad"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__qty_water_consumption
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__qty_water_consumption
 msgid "Qty water consumption"
@@ -939,6 +960,11 @@ msgstr "Usuario responsable"
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__return_date
 msgid "Return Date"
 msgstr "Fecha de devolución"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_stock_move__water_container_id
+msgid "Water Container"
+msgstr "Envase"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_role
