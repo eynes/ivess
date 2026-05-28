@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         Entrada en la página principal del portal (/my/home)
+    ============================================================ -->
+    <template id="portal_my_home_maintenance"
+              name="Portal My Home: Mantenimiento"
+              inherit_id="portal.portal_my_home"
+              customize_show="True">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/maintenance_portal_ivess/static/src/img/maintenance.svg'"/>
+                <t t-set="title">Órdenes de Mantenimiento</t>
+                <t t-set="text">Ver solicitudes de mantenimiento</t>
+                <t t-set="url">/my/maintenance</t>
+                <t t-set="placeholder_count">maintenance_count</t>
+            </t>
+        </xpath>
+    </template>
+
+
+    <!-- ============================================================
+         Vista lista: /my/maintenance
+    ============================================================ -->
+    <template id="portal_my_maintenance" name="Mis Órdenes de Mantenimiento">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Órdenes de Mantenimiento</t>
+            </t>
+
+            <t t-if="not maintenance_requests">
+                <div class="alert alert-warning mt-3">
+                    No hay órdenes de mantenimiento disponibles.
+                </div>
+            </t>
+
+            <t t-if="maintenance_requests">
+                <div class="card mt-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Asunto</th>
+                                    <th>Equipo</th>
+                                    <th>Tipo</th>
+                                    <th>Prioridad</th>
+                                    <th>Etapa</th>
+                                    <th>Fecha solicitud</th>
+                                    <th>Responsable</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="maintenance_requests" t-as="req">
+                                    <tr>
+                                        <td>
+                                            <a t-attf-href="/my/maintenance/#{req.id}">
+                                                <t t-esc="req.name"/>
+                                            </a>
+                                        </td>
+                                        <td><t t-esc="req.equipment_id.name or '—'"/></td>
+                                        <td>
+                                            <span class="badge rounded-pill text-bg-secondary">
+                                                <t t-esc="maintenance_type_labels.get(req.maintenance_type, req.maintenance_type)"/>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(req.priority, 'secondary')}">
+                                                <t t-esc="priority_labels.get(req.priority, req.priority)"/>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span t-attf-class="badge rounded-pill text-bg-#{
+                                                'success' if req.stage_id.done else
+                                                'secondary' if req.stage_id.fold else
+                                                'primary'}">
+                                                <t t-esc="req.stage_id.name or '—'"/>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <t t-if="req.request_date">
+                                                <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
+                                            </t>
+                                            <t t-else="">—</t>
+                                        </td>
+                                        <td><t t-esc="req.user_id.name or '—'"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div t-if="pager" class="o_portal_pager text-center mt-3">
+                    <t t-call="portal.pager"/>
+                </div>
+            </t>
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Vista detalle: /my/maintenance/<id>
+    ============================================================ -->
+    <template id="portal_maintenance_detail" name="Detalle de Orden de Mantenimiento">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/maintenance">Órdenes de Mantenimiento</a>
+                            </li>
+                            <li class="breadcrumb-item active" aria-current="page">
+                                <t t-esc="maint_request.name"/>
+                            </li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Tarjeta principal -->
+            <div class="card mt-2">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0">
+                        <i class="fa fa-cog me-2"/>
+                        <t t-esc="maint_request.name"/>
+                    </h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <!-- Prioridad -->
+                        <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(maint_request.priority, 'secondary')}">
+                            <i class="fa fa-flag me-1"/>
+                            <t t-esc="priority_labels.get(maint_request.priority, maint_request.priority)"/>
+                        </span>
+                        <!-- Etapa -->
+                        <span t-attf-class="badge rounded-pill text-bg-#{
+                            'success' if maint_request.stage_id.done else
+                            'secondary' if maint_request.stage_id.fold else
+                            'primary'} fs-6 px-3 py-2">
+                            <t t-esc="maint_request.stage_id.name or '—'"/>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="row g-3">
+
+                        <!-- Columna izquierda -->
+                        <div class="col-md-6">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5 text-muted">Equipo</dt>
+                                <dd class="col-sm-7">
+                                    <t t-esc="maint_request.equipment_id.name or '—'"/>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Categoría</dt>
+                                <dd class="col-sm-7">
+                                    <t t-esc="maint_request.category_id.name or '—'"/>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Tipo</dt>
+                                <dd class="col-sm-7">
+                                    <span class="badge rounded-pill text-bg-secondary">
+                                        <t t-esc="maintenance_type_labels.get(maint_request.maintenance_type, maint_request.maintenance_type)"/>
+                                    </span>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Estado Kanban</dt>
+                                <dd class="col-sm-7">
+                                    <span t-attf-class="badge rounded-pill text-bg-#{kanban_state_badge.get(maint_request.kanban_state, 'secondary')}">
+                                        <t t-esc="kanban_state_labels.get(maint_request.kanban_state, maint_request.kanban_state)"/>
+                                    </span>
+                                </dd>
+                            </dl>
+                        </div>
+
+                        <!-- Columna derecha -->
+                        <div class="col-md-6">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5 text-muted">Técnico</dt>
+                                <dd class="col-sm-7">
+                                    <t t-esc="maint_request.user_id.name or '—'"/>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Equipo mant.</dt>
+                                <dd class="col-sm-7">
+                                    <t t-esc="maint_request.maintenance_team_id.name or '—'"/>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Fecha solicitud</dt>
+                                <dd class="col-sm-7">
+                                    <t t-if="maint_request.request_date">
+                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date"}'/>
+                                    </t>
+                                    <t t-else="">—</t>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Fecha programada</dt>
+                                <dd class="col-sm-7">
+                                    <t t-if="maint_request.schedule_date">
+                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime"}'/>
+                                    </t>
+                                    <t t-else="">—</t>
+                                </dd>
+
+                                <t t-if="maint_request.close_date">
+                                    <dt class="col-sm-5 text-muted">Fecha cierre</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date"}'/>
+                                    </dd>
+                                </t>
+                            </dl>
+                        </div>
+
+                    </div>
+
+                    <!-- Descripción -->
+                    <t t-if="maint_request.description">
+                        <hr/>
+                        <h6 class="text-muted mb-2">Descripción</h6>
+                        <div class="border rounded p-3 bg-light">
+                            <t t-out="maint_request.description"/>
+                        </div>
+                    </t>
+                </div>
+            </div>
+
+        </t>
+    </template>
+
+</odoo>
