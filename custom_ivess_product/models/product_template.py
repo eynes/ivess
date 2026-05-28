@@ -14,10 +14,12 @@ class ProductTemplate(models.Model):
     is_returnable = fields.Boolean(
         string="Is returnable",
         required=True,
+        default=False,
         tracking=True,
     )
     allows_replacement = fields.Boolean(string="Allows Replacement")
     is_regular_app = fields.Boolean(string="Is Regular (APP)")
+    show_in_app = fields.Boolean(string="Mostrar en App")
 
     _sql_constraints = [
         (
