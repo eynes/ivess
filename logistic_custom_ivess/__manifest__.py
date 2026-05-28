@@ -12,6 +12,7 @@
         'sale',
         'fleet',
         'mail',
+        'stock',
         'l10n_ar_eynes',
     ],
     'data': [
@@ -36,6 +37,7 @@
         'views/template_delivery_route.xml',
         'views/visit_status.xml',
         'views/water_container.xml',
+        'views/stock_move.xml',
         'views/purchase_order.xml',
         'views/menuitems.xml',
     ],
