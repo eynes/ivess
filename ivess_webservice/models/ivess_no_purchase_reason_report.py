@@ -5,6 +5,7 @@ class IvessNoPurchaseReasonReport(models.Model):
     _description = "Vista SQL de motivos de no compra expuesta al middleware Ivess"
     _auto = False
 
+    reason = fields.Char(readonly=True)
     code = fields.Char(readonly=True)
     order = fields.Integer(readonly=True)
 
@@ -15,6 +16,7 @@ class IvessNoPurchaseReasonReport(models.Model):
             CREATE OR REPLACE VIEW {table} AS (
                 SELECT
                     id,
+                    reason,
                     code,
                     "order"
                 FROM no_purchase_reason
@@ -27,4 +29,4 @@ class IvessNoPurchaseReasonReport(models.Model):
         if kwargs:
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
         records = self.search([])
-        return records.read(["code", "order"])
+        return records.read(["reason", "code", "order"])
