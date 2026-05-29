@@ -141,6 +141,7 @@ class HelpdeskTicket(models.Model):
     item_ids = fields.One2many("helpdesk.ticket.item", "ticket_id", string="Ítems")
 
     # Workshop (Taller Mecánico) fields
+    intake_user = fields.Char(string="Usuario JMobile")
     dispatch = fields.Char(string="Reparto")
     driver_name = fields.Char(string="Nombre")
     vehicle_model = fields.Char(string="Modelo")

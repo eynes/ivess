@@ -16,6 +16,7 @@
         "helpdesk_maint_custom",
     ],
     "data": [
+        "data/ir_sequence.xml",
         "security/ir.model.access.csv",
     ],
     "demo": [],
