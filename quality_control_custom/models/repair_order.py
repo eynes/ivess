@@ -18,20 +18,6 @@ FRIO_CALOR_STAGE_ORDER = [s[0] for s in FRIO_CALOR_STAGES]
 # Orden sin pintura
 FRIO_CALOR_STAGE_ORDER_NO_PAINT = [s for s in FRIO_CALOR_STAGE_ORDER if s != 'pintura']
 
-# Etapas para el flujo Taller — mismos valores que Frío/Calor como punto de partida.
-# Modificar esta constante (y el campo frio_calor_stage / un campo propio futuro)
-# cuando el flujo de taller diverja del de frío/calor.
-TALLER_STAGES = [
-    ('recepcion', 'Recepción'),
-    ('diagnostico', 'Diagnóstico'),
-    ('reparacion', 'Reparación'),
-    ('control_calidad', 'Control de Calidad'),
-    ('despacho', 'Despacho'),
-]
-
-TALLER_STAGE_ORDER = [s[0] for s in TALLER_STAGES]
-TALLER_STAGE_ORDER_NO_PAINT = [s for s in TALLER_STAGE_ORDER if s != 'pintura']
-
 
 class RepairOrder(models.Model):
     _inherit = 'repair.order'
