@@ -8,7 +8,8 @@ class IvessContainerLoanReport(models.Model):
 
     customer_code = fields.Char(readonly=True)
     default_code  = fields.Char(readonly=True)
-    state_name    = fields.Char(readonly=True)
+    quantity      = fields.Float(readonly=True)
+    state_id      = fields.Many2one("water.container.state", readonly=True)
     return_date   = fields.Date(readonly=True)
 
     def init(self):
@@ -20,18 +21,62 @@ class IvessContainerLoanReport(models.Model):
                     wc.id            AS id,
                     rp.customer_code AS customer_code,
                     pt.default_code  AS default_code,
-                    wcs.name         AS state_name,
+                    wc.quantity      AS quantity,
+                    wc.state_id      AS state_id,
                     wc.return_date   AS return_date
                 FROM water_container wc
-                JOIN res_partner           rp  ON wc.partner_id = rp.id
-                JOIN product_template      pt  ON wc.product_id = pt.id
-                JOIN water_container_state wcs ON wc.state_id   = wcs.id
+                JOIN res_partner      rp ON wc.partner_id = rp.id
+                JOIN product_template pt ON wc.product_id = pt.id
             )
             """.format(table=self._table)
         )
 
     @api.model
-    def get_container_loans(self, customer_code=None):
-        domain = [("customer_code", "=", customer_code)] if customer_code else []
-        records = self.search(domain)
-        return records.read(["default_code", "state_name", "return_date"])
+    def get_container_loans(self, **kwargs):
+        allowed_params = {"customer_code", "distribution"}
+        unknown_params = set(kwargs) - allowed_params
+        if unknown_params:
+            return {
+                "error": "Parámetros no reconocidos: %s. "
+                        "Los parámetros aceptados son: customer_code, distribution."
+                        % ", ".join(sorted(unknown_params))
+            }
+
+        customer_code = kwargs.get("customer_code")
+        distribution = kwargs.get("distribution")
+
+        if not customer_code and not distribution:
+            return {
+                "error": "Se requiere al menos uno de los siguientes parámetros: customer_code, distribution."
+            }
+        if customer_code and distribution:
+            return {
+                "error": "Los parámetros customer_code y distribution son mutuamente excluyentes. "
+                        "Envíe solo uno de ellos."
+            }
+
+        for param_name, param_value in [("customer_code", customer_code), ("distribution", distribution)]:
+            if param_value is not None and not isinstance(param_value, str):
+                return {
+                    "error": "El parámetro '%s' debe ser una cadena de texto. "
+                            "Tipo recibido: %s." % (param_name, type(param_value).__name__)
+                }
+
+        if customer_code:
+            if not self.env["res.partner"].search([("customer_code", "=", customer_code)], limit=1):
+                return {"error": "No existe ningún cliente con el código '%s'." % customer_code}
+            domain = [("customer_code", "=", customer_code)]
+        else:
+            template_routes = self.env["template.delivery.route"].search([("name", "=", distribution)])
+            if not template_routes:
+                return {"error": "No existe ninguna distribución con el código '%s'." % distribution}
+            partner_distrs = self.env["partner.distribution"].search([
+                ("distribution", "in", template_routes.ids)
+            ])
+            customer_codes = [c for c in partner_distrs.mapped("partner_id.customer_code") if c]
+            domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
+
+        fields_to_read = ["default_code", "quantity", "state_id", "return_date"]
+        if distribution:
+            fields_to_read.append("customer_code")
+        return self.search(domain).read(fields_to_read)
