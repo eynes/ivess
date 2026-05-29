@@ -112,7 +112,7 @@
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb">
                             <li class="breadcrumb-item">
-                                <a href="/my/maintenance">Órdenes de Mantenimiento</a>
+                                <a t-att-href="back_url"><t t-esc="back_label"/></a>
                             </li>
                             <li class="breadcrumb-item active" aria-current="page">
                                 <t t-esc="maint_request.name"/>
@@ -129,19 +129,20 @@
                         <i class="fa fa-cog me-2"/>
                         <t t-esc="maint_request.name"/>
                     </h5>
-                    <div class="d-flex gap-2 align-items-center">
-                        <!-- Prioridad -->
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
                         <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(maint_request.priority, 'secondary')}">
                             <i class="fa fa-flag me-1"/>
                             <t t-esc="priority_labels.get(maint_request.priority, maint_request.priority)"/>
                         </span>
-                        <!-- Etapa -->
                         <span t-attf-class="badge rounded-pill text-bg-#{
                             'success' if maint_request.stage_id.done else
                             'secondary' if maint_request.stage_id.fold else
                             'primary'} fs-6 px-3 py-2">
                             <t t-esc="maint_request.stage_id.name or '—'"/>
                         </span>
+                        <a t-att-href="edit_url" class="btn btn-sm btn-outline-primary ms-2">
+                            <i class="fa fa-edit me-1"/> Editar
+                        </a>
                     </div>
                 </div>
 
@@ -174,6 +175,41 @@
                                         <t t-esc="kanban_state_labels.get(maint_request.kanban_state, maint_request.kanban_state)"/>
                                     </span>
                                 </dd>
+
+                                <t t-if="maint_request.request_origin">
+                                    <dt class="col-sm-5 text-muted">Origen</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.request_origin"/>
+                                    </dd>
+                                </t>
+
+                                <t t-if="maint_request.ticket_id">
+                                    <dt class="col-sm-5 text-muted">Ticket</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.ticket_id.name or maint_request.ticket_id.display_name"/>
+                                    </dd>
+                                </t>
+
+                                <t t-if="maint_request.maintenance_for">
+                                    <dt class="col-sm-5 text-muted">Para</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="'Centro de trabajo' if maint_request.maintenance_for == 'workcenter' else 'Equipo'"/>
+                                    </dd>
+                                </t>
+
+                                <t t-if="maint_request.workcenter_id">
+                                    <dt class="col-sm-5 text-muted">Centro de trabajo</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.workcenter_id.name"/>
+                                    </dd>
+                                </t>
+
+                                <t t-if="maint_request.production_id">
+                                    <dt class="col-sm-5 text-muted">Orden fabricación</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.production_id.display_name"/>
+                                    </dd>
+                                </t>
                             </dl>
                         </div>
 
@@ -206,6 +242,13 @@
                                     <t t-else="">—</t>
                                 </dd>
 
+                                <t t-if="maint_request.schedule_end">
+                                    <dt class="col-sm-5 text-muted">Fin programado</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime"}'/>
+                                    </dd>
+                                </t>
+
                                 <t t-if="maint_request.close_date">
                                     <dt class="col-sm-5 text-muted">Fecha cierre</dt>
                                     <dd class="col-sm-7">
@@ -217,6 +260,35 @@
 
                     </div>
 
+                    <!-- Recurrencia -->
+                    <t t-if="maint_request.recurring_maintenance">
+                        <hr/>
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <small class="text-muted fw-semibold text-uppercase">Mantenimiento recurrente</small>
+                            </div>
+                            <div class="col-md-6">
+                                <dl class="row mb-0">
+                                    <dt class="col-sm-5 text-muted">Repetir cada</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.repeat_interval"/>
+                                        <t t-esc="' ' + maint_request.repeat_unit"/>
+                                    </dd>
+                                </dl>
+                            </div>
+                            <t t-if="maint_request.repeat_type == 'until' and maint_request.repeat_until">
+                                <div class="col-md-6">
+                                    <dl class="row mb-0">
+                                        <dt class="col-sm-5 text-muted">Hasta</dt>
+                                        <dd class="col-sm-7">
+                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date"}'/>
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+
                     <!-- Descripción -->
                     <t t-if="maint_request.description">
                         <hr/>
@@ -227,6 +299,1157 @@
                     </t>
                 </div>
             </div>
+
+            <!-- Materiales -->
+            <div class="card mt-3" style="overflow: visible">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa fa-cubes me-2"/>Materiales</h6>
+                </div>
+                <div class="card-body p-0">
+                    <t t-if="maint_request.material_ids">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Descripción</th>
+                                        <th class="text-end">Demanda</th>
+                                        <th class="text-end">Cantidad</th>
+                                        <th>UdM</th>
+                                        <th>Estado</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="maint_request.material_ids" t-as="mat">
+                                        <tr>
+                                            <td><t t-esc="mat.product_id.display_name or '—'"/></td>
+                                            <td><t t-esc="mat.description or '—'"/></td>
+                                            <td class="text-end"><t t-esc="'%.2f' % mat.product_uom_qty"/></td>
+                                            <td class="text-end"><t t-esc="'%.2f' % mat.quantity"/></td>
+                                            <td><t t-esc="mat.product_uom.name or '—'"/></td>
+                                            <td>
+                                                <t t-if="mat.stock_move_id">
+                                                    <span t-attf-class="badge rounded-pill text-bg-#{
+                                                        'success' if mat.stock_move_id.state == 'done' else
+                                                        'warning' if mat.stock_move_id.state == 'assigned' else
+                                                        'secondary'}">
+                                                        <t t-esc="mat.stock_move_id.state"/>
+                                                    </span>
+                                                </t>
+                                                <t t-else="">—</t>
+                                            </td>
+                                            <td class="text-end">
+                                                <t t-if="not (mat.stock_move_id and mat.stock_move_id.state == 'done')">
+                                                    <form t-attf-action="#{del_material_base}/#{mat.id}" method="post" class="d-inline">
+                                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"
+                                                                onclick="return confirm('¿Eliminar este material?')">
+                                                            <i class="fa fa-trash"/>
+                                                        </button>
+                                                    </form>
+                                                </t>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <p class="text-muted px-3 py-2 mb-0">Sin materiales registrados.</p>
+                    </t>
+                </div>
+
+                <!-- Agregar material -->
+                <div class="card-footer" style="overflow: visible">
+                    <p class="mb-2 fw-semibold small">Agregar material</p>
+                    <form t-att-action="add_material_url" method="post" id="add_material_form">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <input type="hidden" name="product_id" id="mat_product_id"/>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label small mb-1">Producto</label>
+                                <div class="position-relative">
+                                    <input type="text" id="mat_product_name" class="form-control form-control-sm"
+                                           placeholder="Buscar producto..." autocomplete="off"/>
+                                    <div id="mat_product_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
+                                <small id="mat_product_uom" class="text-muted"></small>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">Descripción</label>
+                                <input type="text" name="description" id="mat_description"
+                                       class="form-control form-control-sm" placeholder="Opcional"/>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Cantidad</label>
+                                <input type="number" name="product_uom_qty" class="form-control form-control-sm"
+                                       value="1" min="0.01" step="0.01"/>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" id="mat_submit_btn" class="btn btn-sm btn-primary w-100" disabled="disabled">
+                                    <i class="fa fa-plus me-1"/> Agregar
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <script t-att-data-search-url="product_search_url">
+            (function () {
+                const searchUrl = document.currentScript.dataset.searchUrl;
+                const nameInput = document.getElementById('mat_product_name');
+                const idInput = document.getElementById('mat_product_id');
+                const uomLabel = document.getElementById('mat_product_uom');
+                const descInput = document.getElementById('mat_description');
+                const submitBtn = document.getElementById('mat_submit_btn');
+                const suggestions = document.getElementById('mat_product_suggestions');
+
+                let debounceTimer;
+
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(debounceTimer);
+                    idInput.value = '';
+                    submitBtn.disabled = true;
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) {
+                        suggestions.style.display = 'none';
+                        suggestions.innerHTML = '';
+                        return;
+                    }
+                    debounceTimer = setTimeout(function () {
+                        fetch(searchUrl, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) {
+                                suggestions.style.display = 'none';
+                                return;
+                            }
+                            results.forEach(p => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = p.name + (p.uom ? ' [' + p.uom + ']' : '');
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = p.name;
+                                    idInput.value = p.id;
+                                    uomLabel.textContent = p.uom || '';
+                                    if (!descInput.value) descInput.value = p.name;
+                                    suggestions.style.display = 'none';
+                                    submitBtn.disabled = false;
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+
+                document.addEventListener('click', function (e) {
+                    if (!suggestions.contains(e.target) &amp;&amp; e.target !== nameInput) {
+                        suggestions.style.display = 'none';
+                    }
+                });
+            })();
+            </script>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Editar: /my/maintenance/<id>/edit
+    ============================================================ -->
+    <template id="portal_maintenance_edit" name="Editar Orden de Mantenimiento">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/maintenance"><t t-esc="back_label"/></a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                <a t-att-href="back_url"><t t-esc="maint_request.name"/></a>
+                            </li>
+                            <li class="breadcrumb-item active">Editar</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="card mt-2">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa fa-edit me-2"/>Editar: <t t-esc="maint_request.name"/></h5>
+                </div>
+                <div class="card-body">
+                    <form t-att-action="action_url" method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                        <!-- Asunto -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Asunto</label>
+                                <input type="text" name="name" class="form-control"
+                                       t-att-value="maint_request.name" required="required"/>
+                            </div>
+                        </div>
+
+                        <!-- Tipo, Prioridad, Estado Kanban -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Tipo de mantenimiento</label>
+                                <select name="maintenance_type" class="form-select">
+                                    <t t-foreach="maintenance_type_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if maint_request.maintenance_type == opt[0] else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Prioridad</label>
+                                <select name="priority" class="form-select">
+                                    <t t-foreach="priority_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if maint_request.priority == opt[0] else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <!--<div class="col-md-4">
+                                <label class="form-label fw-semibold">Estado Kanban</label>
+                                <select name="kanban_state" class="form-select">
+                                    <t t-foreach="kanban_state_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if maint_request.kanban_state == opt[0] else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>-->
+                        </div>
+
+                        <!-- Etapa, Equipo de mantenimiento, Técnico -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Etapa</label>
+                                <select name="stage_id" class="form-select">
+                                    <option value="">— Sin etapa —</option>
+                                    <t t-foreach="stages" t-as="stage">
+                                        <option t-att-value="stage.id"
+                                                t-att-selected="'selected' if maint_request.stage_id.id == stage.id else None">
+                                            <t t-esc="stage.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <!--<div class="col-md-4">
+                                <label class="form-label fw-semibold">Equipo de mantenimiento</label>
+                                <select name="maintenance_team_id" class="form-select">
+                                    <t t-foreach="teams" t-as="team">
+                                        <option t-att-value="team.id"
+                                                t-att-selected="'selected' if maint_request.maintenance_team_id.id == team.id else None">
+                                            <t t-esc="team.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>-->
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Responsable</label>
+                                <select name="user_id" class="form-select">
+                                    <option value="">— Sin responsable —</option>
+                                    <t t-foreach="users" t-as="usr">
+                                        <option t-att-value="usr.id"
+                                                t-att-selected="'selected' if maint_request.user_id.id == usr.id else None">
+                                            <t t-esc="usr.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Equipo -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Equipo</label>
+                                <select name="equipment_id" class="form-select">
+                                    <option value="">— Sin equipo —</option>
+                                    <t t-foreach="equipment_list" t-as="eq">
+                                        <option t-att-value="eq.id"
+                                                t-att-selected="'selected' if maint_request.equipment_id.id == eq.id else None">
+                                            <t t-esc="eq.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                                <t t-if="maint_request.category_id">
+                                    <small class="text-muted">
+                                        Categoría actual: <t t-esc="maint_request.category_id.name"/>
+                                    </small>
+                                </t>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Fecha programada</label>
+                                <input type="datetime-local" name="schedule_date" class="form-control"
+                                       t-att-value="maint_request.schedule_date.strftime('%Y-%m-%dT%H:%M') if maint_request.schedule_date else ''"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Finalización programada</label>
+                                <input type="datetime-local" name="schedule_end" class="form-control"
+                                       t-att-value="maint_request.schedule_end.strftime('%Y-%m-%dT%H:%M') if maint_request.schedule_end else ''"/>
+                            </div>
+                        </div>
+
+                        <!-- Origen -->
+                        <!-- Para / Centro de trabajo / Orden de fabricación -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Para</label>
+                                <select name="maintenance_for" class="form-select">
+                                    <t t-foreach="maintenance_for_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if maint_request.maintenance_for == opt[0] else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Centro de trabajo</label>
+                                <select name="workcenter_id" class="form-select">
+                                    <option value="">— Sin centro —</option>
+                                    <t t-foreach="workcenters" t-as="wc">
+                                        <option t-att-value="wc.id"
+                                                t-att-selected="'selected' if maint_request.workcenter_id.id == wc.id else None">
+                                            <t t-esc="wc.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Orden de fabricación</label>
+                                <div class="position-relative">
+                                    <input type="text" id="maint_prod_name" class="form-control"
+                                           t-att-value="maint_request.production_id.display_name or ''"
+                                           autocomplete="off" placeholder="Buscar OF..."/>
+                                    <input type="hidden" name="production_id" id="maint_prod_id"
+                                           t-att-value="maint_request.production_id.id or ''"/>
+                                    <div id="maint_prod_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Origen</label>
+                                <input type="text" name="request_origin" class="form-control"
+                                       t-att-value="maint_request.request_origin or ''"
+                                       placeholder="Origen de la solicitud"/>
+                            </div>
+                        </div>
+
+                        <!-- Descripción -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Descripción</label>
+                                <textarea name="description" class="form-control" rows="5"
+                                          placeholder="Descripción de la tarea..."><t t-esc="description_text"/></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a t-att-href="back_url" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-save me-1"/> Guardar
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
+            <script>
+            (function () {
+                const nameInput = document.getElementById('maint_prod_name');
+                const idInput = document.getElementById('maint_prod_id');
+                const suggestions = document.getElementById('maint_prod_suggestions');
+                if (!nameInput) return;
+                let timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/productions/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(p => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = p.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = p.name;
+                                    idInput.value = p.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(() => { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Entrada Workshop en la página principal del portal (/my/home)
+    ============================================================ -->
+    <template id="portal_my_home_workshop"
+              name="Portal My Home: Servicios de Taller"
+              inherit_id="portal.portal_my_home"
+              customize_show="True">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/maintenance_portal_ivess/static/src/img/maintenance.svg'"/>
+                <t t-set="title">Servicios de Taller</t>
+                <t t-set="text">Ver servicios de taller</t>
+                <t t-set="url">/my/workshop</t>
+                <t t-set="placeholder_count">workshop_count</t>
+            </t>
+        </xpath>
+    </template>
+
+
+    <!-- ============================================================
+         Vista lista Workshop: /my/workshop
+    ============================================================ -->
+    <template id="portal_my_workshops" name="Servicios de Taller">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Servicios de Taller</t>
+            </t>
+
+            <t t-if="not maintenance_requests">
+                <div class="alert alert-warning mt-3">
+                    No hay servicios de taller disponibles.
+                </div>
+            </t>
+
+            <t t-if="maintenance_requests">
+                <div class="card mt-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Asunto</th>
+                                    <th>Equipo</th>
+                                    <th>Tipo</th>
+                                    <th>Prioridad</th>
+                                    <th>Etapa</th>
+                                    <th>Fecha solicitud</th>
+                                    <th>Responsable</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="maintenance_requests" t-as="req">
+                                    <tr>
+                                        <td>
+                                            <a t-attf-href="/my/workshop/#{req.id}">
+                                                <t t-esc="req.name"/>
+                                            </a>
+                                        </td>
+                                        <td><t t-esc="req.equipment_id.name or '—'"/></td>
+                                        <td>
+                                            <span class="badge rounded-pill text-bg-secondary">
+                                                <t t-esc="maintenance_type_labels.get(req.maintenance_type, req.maintenance_type)"/>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(req.priority, 'secondary')}">
+                                                <t t-esc="priority_labels.get(req.priority, req.priority)"/>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span t-attf-class="badge rounded-pill text-bg-#{
+                                                'success' if req.stage_id.done else
+                                                'secondary' if req.stage_id.fold else
+                                                'primary'}">
+                                                <t t-esc="req.stage_id.name or '—'"/>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <t t-if="req.request_date">
+                                                <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
+                                            </t>
+                                            <t t-else="">—</t>
+                                        </td>
+                                        <td><t t-esc="req.user_id.name or '—'"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div t-if="pager" class="o_portal_pager text-center mt-3">
+                    <t t-call="portal.pager"/>
+                </div>
+            </t>
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Vista detalle Workshop: /my/workshop/<id>
+    ============================================================ -->
+    <template id="portal_workshop_detail" name="Taller: Detalle de Solicitud">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a t-att-href="back_url"><t t-esc="back_label"/></a>
+                            </li>
+                            <li class="breadcrumb-item active" aria-current="page">
+                                <t t-esc="maint_request.name"/>
+                            </li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="card mt-2">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0">
+                        <i class="fa fa-cog me-2"/>
+                        <t t-esc="maint_request.name"/>
+                    </h5>
+                    <div class="d-flex gap-2 align-items-center flex-wrap">
+                        <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(maint_request.priority, 'secondary')}">
+                            <i class="fa fa-flag me-1"/>
+                            <t t-esc="priority_labels.get(maint_request.priority, maint_request.priority)"/>
+                        </span>
+                        <span t-attf-class="badge rounded-pill text-bg-#{
+                            'success' if maint_request.stage_id.done else
+                            'secondary' if maint_request.stage_id.fold else
+                            'primary'} fs-6 px-3 py-2">
+                            <t t-esc="maint_request.stage_id.name or '—'"/>
+                        </span>
+                        <a t-att-href="edit_url" class="btn btn-sm btn-outline-primary ms-2">
+                            <i class="fa fa-edit me-1"/> Editar
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5 text-muted">Equipo</dt>
+                                <dd class="col-sm-7">
+                                    <t t-esc="maint_request.equipment_id.name or '—'"/>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Categoría</dt>
+                                <dd class="col-sm-7">
+                                    <t t-esc="maint_request.category_id.name or '—'"/>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Tipo</dt>
+                                <dd class="col-sm-7">
+                                    <span class="badge rounded-pill text-bg-secondary">
+                                        <t t-esc="maintenance_type_labels.get(maint_request.maintenance_type, maint_request.maintenance_type)"/>
+                                    </span>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Estado Kanban</dt>
+                                <dd class="col-sm-7">
+                                    <span t-attf-class="badge rounded-pill text-bg-#{kanban_state_badge.get(maint_request.kanban_state, 'secondary')}">
+                                        <t t-esc="kanban_state_labels.get(maint_request.kanban_state, maint_request.kanban_state)"/>
+                                    </span>
+                                </dd>
+
+                                <t t-if="maint_request.request_origin">
+                                    <dt class="col-sm-5 text-muted">Origen</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.request_origin"/>
+                                    </dd>
+                                </t>
+
+                                <t t-if="maint_request.ticket_id">
+                                    <dt class="col-sm-5 text-muted">Ticket</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.ticket_id.name or maint_request.ticket_id.display_name"/>
+                                    </dd>
+                                </t>
+
+                                <t t-if="maint_request.maintenance_for">
+                                    <dt class="col-sm-5 text-muted">Para</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="'Centro de trabajo' if maint_request.maintenance_for == 'workcenter' else 'Equipo'"/>
+                                    </dd>
+                                </t>
+
+                                <t t-if="maint_request.workcenter_id">
+                                    <dt class="col-sm-5 text-muted">Centro de trabajo</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.workcenter_id.name"/>
+                                    </dd>
+                                </t>
+
+                                <t t-if="maint_request.production_id">
+                                    <dt class="col-sm-5 text-muted">Orden fabricación</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.production_id.display_name"/>
+                                    </dd>
+                                </t>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5 text-muted">Técnico</dt>
+                                <dd class="col-sm-7">
+                                    <t t-esc="maint_request.user_id.name or '—'"/>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Equipo mant.</dt>
+                                <dd class="col-sm-7">
+                                    <t t-esc="maint_request.maintenance_team_id.name or '—'"/>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Fecha solicitud</dt>
+                                <dd class="col-sm-7">
+                                    <t t-if="maint_request.request_date">
+                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date"}'/>
+                                    </t>
+                                    <t t-else="">—</t>
+                                </dd>
+
+                                <dt class="col-sm-5 text-muted">Fecha programada</dt>
+                                <dd class="col-sm-7">
+                                    <t t-if="maint_request.schedule_date">
+                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime"}'/>
+                                    </t>
+                                    <t t-else="">—</t>
+                                </dd>
+
+                                <t t-if="maint_request.schedule_end">
+                                    <dt class="col-sm-5 text-muted">Fin programado</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime"}'/>
+                                    </dd>
+                                </t>
+
+                                <t t-if="maint_request.close_date">
+                                    <dt class="col-sm-5 text-muted">Fecha cierre</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date"}'/>
+                                    </dd>
+                                </t>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <t t-if="maint_request.recurring_maintenance">
+                        <hr/>
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <small class="text-muted fw-semibold text-uppercase">Mantenimiento recurrente</small>
+                            </div>
+                            <div class="col-md-6">
+                                <dl class="row mb-0">
+                                    <dt class="col-sm-5 text-muted">Repetir cada</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="maint_request.repeat_interval"/>
+                                        <t t-esc="' ' + maint_request.repeat_unit"/>
+                                    </dd>
+                                </dl>
+                            </div>
+                            <t t-if="maint_request.repeat_type == 'until' and maint_request.repeat_until">
+                                <div class="col-md-6">
+                                    <dl class="row mb-0">
+                                        <dt class="col-sm-5 text-muted">Hasta</dt>
+                                        <dd class="col-sm-7">
+                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date"}'/>
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+
+                    <t t-if="maint_request.description">
+                        <hr/>
+                        <h6 class="text-muted mb-2">Descripción</h6>
+                        <div class="border rounded p-3 bg-light">
+                            <t t-out="maint_request.description"/>
+                        </div>
+                    </t>
+                </div>
+            </div>
+
+            <!-- Materiales -->
+            <div class="card mt-3" style="overflow: visible">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fa fa-cubes me-2"/>Materiales</h6>
+                </div>
+                <div class="card-body p-0">
+                    <t t-if="maint_request.material_ids">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Descripción</th>
+                                        <th class="text-end">Demanda</th>
+                                        <th class="text-end">Cantidad</th>
+                                        <th>UdM</th>
+                                        <th>Estado</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="maint_request.material_ids" t-as="mat">
+                                        <tr>
+                                            <td><t t-esc="mat.product_id.display_name or '—'"/></td>
+                                            <td><t t-esc="mat.description or '—'"/></td>
+                                            <td class="text-end"><t t-esc="'%.2f' % mat.product_uom_qty"/></td>
+                                            <td class="text-end"><t t-esc="'%.2f' % mat.quantity"/></td>
+                                            <td><t t-esc="mat.product_uom.name or '—'"/></td>
+                                            <td>
+                                                <t t-if="mat.stock_move_id">
+                                                    <span t-attf-class="badge rounded-pill text-bg-#{
+                                                        'success' if mat.stock_move_id.state == 'done' else
+                                                        'warning' if mat.stock_move_id.state == 'assigned' else
+                                                        'secondary'}">
+                                                        <t t-esc="mat.stock_move_id.state"/>
+                                                    </span>
+                                                </t>
+                                                <t t-else="">—</t>
+                                            </td>
+                                            <td class="text-end">
+                                                <t t-if="not (mat.stock_move_id and mat.stock_move_id.state == 'done')">
+                                                    <form t-attf-action="#{del_material_base}/#{mat.id}" method="post" class="d-inline">
+                                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1"
+                                                                onclick="return confirm('¿Eliminar este material?')">
+                                                            <i class="fa fa-trash"/>
+                                                        </button>
+                                                    </form>
+                                                </t>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <p class="text-muted px-3 py-2 mb-0">Sin materiales registrados.</p>
+                    </t>
+                </div>
+
+                <div class="card-footer" style="overflow: visible">
+                    <p class="mb-2 fw-semibold small">Agregar material</p>
+                    <form t-att-action="add_material_url" method="post" id="ws_add_material_form">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <input type="hidden" name="product_id" id="ws_mat_product_id"/>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label small mb-1">Producto</label>
+                                <div class="position-relative">
+                                    <input type="text" id="ws_mat_product_name" class="form-control form-control-sm"
+                                           placeholder="Buscar producto..." autocomplete="off"/>
+                                    <div id="ws_mat_product_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
+                                <small id="ws_mat_product_uom" class="text-muted"></small>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">Descripción</label>
+                                <input type="text" name="description" id="ws_mat_description"
+                                       class="form-control form-control-sm" placeholder="Opcional"/>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Cantidad</label>
+                                <input type="number" name="product_uom_qty" class="form-control form-control-sm"
+                                       value="1" min="0.01" step="0.01"/>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" id="ws_mat_submit_btn" class="btn btn-sm btn-primary w-100" disabled="disabled">
+                                    <i class="fa fa-plus me-1"/> Agregar
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <script t-att-data-search-url="product_search_url">
+            (function () {
+                const searchUrl = document.currentScript.dataset.searchUrl;
+                const nameInput = document.getElementById('ws_mat_product_name');
+                const idInput = document.getElementById('ws_mat_product_id');
+                const uomLabel = document.getElementById('ws_mat_product_uom');
+                const descInput = document.getElementById('ws_mat_description');
+                const submitBtn = document.getElementById('ws_mat_submit_btn');
+                const suggestions = document.getElementById('ws_mat_product_suggestions');
+
+                let debounceTimer;
+
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(debounceTimer);
+                    idInput.value = '';
+                    submitBtn.disabled = true;
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) {
+                        suggestions.style.display = 'none';
+                        suggestions.innerHTML = '';
+                        return;
+                    }
+                    debounceTimer = setTimeout(function () {
+                        fetch(searchUrl, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) {
+                                suggestions.style.display = 'none';
+                                return;
+                            }
+                            results.forEach(p => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = p.name + (p.uom ? ' [' + p.uom + ']' : '');
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = p.name;
+                                    idInput.value = p.id;
+                                    uomLabel.textContent = p.uom || '';
+                                    if (!descInput.value) descInput.value = p.name;
+                                    suggestions.style.display = 'none';
+                                    submitBtn.disabled = false;
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+
+                document.addEventListener('click', function (e) {
+                    if (!suggestions.contains(e.target) &amp;&amp; e.target !== nameInput) {
+                        suggestions.style.display = 'none';
+                    }
+                });
+            })();
+            </script>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Editar Workshop: /my/workshop/<id>/edit
+    ============================================================ -->
+    <template id="portal_workshop_edit" name="Editar Servicio de Taller">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/workshop"><t t-esc="back_label"/></a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                <a t-att-href="back_url"><t t-esc="maint_request.name"/></a>
+                            </li>
+                            <li class="breadcrumb-item active">Editar</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="card mt-2">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa fa-edit me-2"/>Editar: <t t-esc="maint_request.name"/></h5>
+                </div>
+                <div class="card-body">
+                    <form t-att-action="action_url" method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Asunto</label>
+                                <input type="text" name="name" class="form-control"
+                                       t-att-value="maint_request.name" required="required"/>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Tipo de mantenimiento</label>
+                                <select name="maintenance_type" class="form-select">
+                                    <t t-foreach="maintenance_type_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if maint_request.maintenance_type == opt[0] else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Prioridad</label>
+                                <select name="priority" class="form-select">
+                                    <t t-foreach="priority_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if maint_request.priority == opt[0] else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <!--<div class="col-md-4">
+                                <label class="form-label fw-semibold">Estado Kanban</label>
+                                <select name="kanban_state" class="form-select">
+                                    <t t-foreach="kanban_state_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if maint_request.kanban_state == opt[0] else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>-->
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Etapa</label>
+                                <select name="stage_id" class="form-select">
+                                    <option value="">— Sin etapa —</option>
+                                    <t t-foreach="stages" t-as="stage">
+                                        <option t-att-value="stage.id"
+                                                t-att-selected="'selected' if maint_request.stage_id.id == stage.id else None">
+                                            <t t-esc="stage.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <!--<div class="col-md-4">
+                                <label class="form-label fw-semibold">Equipo de mantenimiento</label>
+                                <select name="maintenance_team_id" class="form-select">
+                                    <t t-foreach="teams" t-as="team">
+                                        <option t-att-value="team.id"
+                                                t-att-selected="'selected' if maint_request.maintenance_team_id.id == team.id else None">
+                                            <t t-esc="team.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>-->
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Responsable</label>
+                                <select name="user_id" class="form-select">
+                                    <option value="">— Sin responsable —</option>
+                                    <t t-foreach="users" t-as="usr">
+                                        <option t-att-value="usr.id"
+                                                t-att-selected="'selected' if maint_request.user_id.id == usr.id else None">
+                                            <t t-esc="usr.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Equipo</label>
+                                <select name="equipment_id" class="form-select">
+                                    <option value="">— Sin equipo —</option>
+                                    <t t-foreach="equipment_list" t-as="eq">
+                                        <option t-att-value="eq.id"
+                                                t-att-selected="'selected' if maint_request.equipment_id.id == eq.id else None">
+                                            <t t-esc="eq.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                                <t t-if="maint_request.category_id">
+                                    <small class="text-muted">
+                                        Categoría actual: <t t-esc="maint_request.category_id.name"/>
+                                    </small>
+                                </t>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Fecha programada</label>
+                                <input type="datetime-local" name="schedule_date" class="form-control"
+                                       t-att-value="maint_request.schedule_date.strftime('%Y-%m-%dT%H:%M') if maint_request.schedule_date else ''"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Fin programado</label>
+                                <input type="datetime-local" name="schedule_end" class="form-control"
+                                       t-att-value="maint_request.schedule_end.strftime('%Y-%m-%dT%H:%M') if maint_request.schedule_end else ''"/>
+                            </div>
+                        </div>
+
+                        <!-- Para / Centro de trabajo / Orden de fabricación -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Para</label>
+                                <select name="maintenance_for" class="form-select">
+                                    <t t-foreach="maintenance_for_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if maint_request.maintenance_for == opt[0] else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Centro de trabajo</label>
+                                <select name="workcenter_id" class="form-select">
+                                    <option value="">— Sin centro —</option>
+                                    <t t-foreach="workcenters" t-as="wc">
+                                        <option t-att-value="wc.id"
+                                                t-att-selected="'selected' if maint_request.workcenter_id.id == wc.id else None">
+                                            <t t-esc="wc.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Orden de fabricación</label>
+                                <div class="position-relative">
+                                    <input type="text" id="ws_prod_name" class="form-control"
+                                           t-att-value="maint_request.production_id.display_name or ''"
+                                           autocomplete="off" placeholder="Buscar OF..."/>
+                                    <input type="hidden" name="production_id" id="ws_prod_id"
+                                           t-att-value="maint_request.production_id.id or ''"/>
+                                    <div id="ws_prod_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Origen</label>
+                                <input type="text" name="request_origin" class="form-control"
+                                       t-att-value="maint_request.request_origin or ''"
+                                       placeholder="Origen de la solicitud"/>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Descripción</label>
+                                <textarea name="description" class="form-control" rows="5"
+                                          placeholder="Descripción de la tarea..."><t t-esc="description_text"/></textarea>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a t-att-href="back_url" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-save me-1"/> Guardar
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
+            <script>
+            (function () {
+                const nameInput = document.getElementById('ws_prod_name');
+                const idInput = document.getElementById('ws_prod_id');
+                const suggestions = document.getElementById('ws_prod_suggestions');
+                if (!nameInput) return;
+                let timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/productions/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(p => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = p.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = p.name;
+                                    idInput.value = p.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(() => { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
 
         </t>
     </template>
