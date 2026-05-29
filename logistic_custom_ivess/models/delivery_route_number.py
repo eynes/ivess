@@ -47,5 +47,18 @@ class DeliveryRouteNumber(models.Model):
         default=True,
         help="If checked, customers can enter a manual address for this delivery."
     )
+    remittance_sequence_id = fields.Many2one(
+        'ir.sequence',
+        string='Remittance Booklet',
+    )
+    collection_journal_id = fields.Many2one(
+        'account.journal',
+        string='Collection Booklet',
+        domain=[('type', 'in', ['receipt'])],
+    )
+    repair_order_sequence_id = fields.Many2one(
+        'ir.sequence',
+        string='Repair Orders Booklet',
+    )
 
 

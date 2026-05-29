@@ -25,7 +25,7 @@ class ProductTemplate(models.Model):
         (
             'unique_abbreviation',
             'unique(abbreviation)',
-            _('The abbreviation must be unique.')
+            _('Duplicate abbreviation.')
         )
     ]
 
@@ -42,10 +42,17 @@ class ProductTemplate(models.Model):
     )
 
     @api.constrains('abbreviation')
-    def _check_abbreviation_length(self):
+    def _check_abbreviation(self):
         for rec in self:
-            if rec.abbreviation and len(rec.abbreviation) > 10:
-                raise ValidationError(_("The abbreviation cannot exceed 10 characters."))
+            if rec.abbreviation:
+                if len(rec.abbreviation) > 10:
+                    raise ValidationError(_("The abbreviation cannot exceed 10 characters."))
+                duplicate = self.search([
+                    ('abbreviation', '=', rec.abbreviation),
+                    ('id', '!=', rec.id),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_("Duplicate abbreviation."))
 
     def create(self, vals):
         """

@@ -17,14 +17,6 @@ class WaterContainer(models.Model):
         'res.partner',
         string='Customer',
     )
-    container_type = fields.Selection(
-        [
-            ('bottle', 'Bottle'),
-            ('jug', 'Jug'),
-        ],
-        string='Container Type',
-        required=True
-    )
     assignment_date = fields.Date(
         string='Assignment Date',
         required=True
@@ -43,6 +35,46 @@ class WaterContainer(models.Model):
         string="Product",
         domain=[('is_returnable', '=', True)],
     )
+    stock_move_ids = fields.One2many(
+        'stock.move',
+        'water_container_id',
+        string='Stock Moves',
+    )
+    quantity = fields.Float(
+        string='Quantity',
+        compute='_compute_quantity',
+        store=True,
+    )
+    is_nonproductive = fields.Boolean(
+        string='Envase Improductivo',
+        default=False,
+    )
+
+    @api.depends('stock_move_ids', 'stock_move_ids.state', 'stock_move_ids.quantity',
+                 'stock_move_ids.picking_id.picking_type_code')
+    def _compute_quantity(self):
+        for rec in self:
+            done_moves = rec.stock_move_ids.filtered(lambda m: m.state == 'done')
+            qty_out = sum(
+                m.quantity for m in done_moves
+                if m.picking_id.picking_type_code == 'outgoing'
+            )
+            qty_in = sum(
+                m.quantity for m in done_moves
+                if m.picking_id.picking_type_code == 'incoming'
+            )
+            rec.quantity = qty_out - qty_in
+
+    @api.onchange('partner_id')
+    def _onchange_partner_id_fill_return_date(self):
+        if self.partner_id:
+            today = fields.Date.context_today(self)
+            next_route = self.env['delivery.route'].search([
+                ('delivery_route_line_ids.client_id', '=', self.partner_id.id),
+                ('delivery_date', '>=', today),
+                ('state', '!=', 'closed'),
+            ], order='delivery_date asc', limit=1)
+            self.return_date = next_route.delivery_date if next_route else False
 
     @api.model
     def create(self, vals_list):
@@ -52,6 +84,15 @@ class WaterContainer(models.Model):
         for vals in vals_list:
             if not vals.get('name') or vals['name'] in ('/', 'New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('seq.water.container') or '/'
+            if not vals.get('return_date') and vals.get('partner_id'):
+                today = fields.Date.context_today(self)
+                next_route = self.env['delivery.route'].search([
+                    ('delivery_route_line_ids.client_id', '=', vals['partner_id']),
+                    ('delivery_date', '>=', today),
+                    ('state', '!=', 'closed'),
+                ], order='delivery_date asc', limit=1)
+                if next_route:
+                    vals['return_date'] = next_route.delivery_date
 
         records = super().create(vals_list)
         return records

@@ -17,6 +17,7 @@
         "repair",
     ],
     "data": [
+        "security/groups.xml",
         "security/ir.model.access.csv",
         "views/helpdesk_team_views.xml",
         "views/helpdesk_ticket_views.xml",

@@ -25,6 +25,26 @@ class HelpdeskTicket(models.Model):
         for ticket in self:
             ticket.maintenance_orders_count = mapped.get(ticket.id, 0)
 
+    @api.model
+    def create(self, vals_list):
+        if isinstance(vals_list, dict):
+            vals_list = [vals_list]
+        tickets = super().create(vals_list)
+        for ticket in tickets:
+            if ticket.use_maintenance_orders:
+                ticket._auto_create_maintenance_order()
+        return tickets
+
+    def _auto_create_maintenance_order(self):
+        self.ensure_one()
+        clean_ctx = {k: v for k, v in self.env.context.items() if not k.startswith('default_')}
+        self.env['maintenance.request'].with_context(clean_ctx).create({
+            'name': self.name,
+            'ticket_id': self.id,
+            'company_id': self.company_id.id,
+            'description': self.description,
+        })
+
     def action_create_maintenance_order(self):
         self.ensure_one()
         clean_ctx = {k: v for k, v in self.env.context.items() if not k.startswith('default_')}
@@ -121,6 +141,7 @@ class HelpdeskTicket(models.Model):
     item_ids = fields.One2many("helpdesk.ticket.item", "ticket_id", string="Ítems")
 
     # Workshop (Taller Mecánico) fields
+    intake_user = fields.Char(string="Usuario JMobile")
     dispatch = fields.Char(string="Reparto")
     driver_name = fields.Char(string="Nombre")
     vehicle_model = fields.Char(string="Modelo")
