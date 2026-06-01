@@ -49,7 +49,7 @@ class RepairOrder(models.Model):
     )
 
     is_outsourced = fields.Boolean(
-        string="Terciarizado",
+        string="Tercerizado",
         default=False,
     )
 
@@ -62,7 +62,7 @@ class RepairOrder(models.Model):
 
     outsource_transfer_id = fields.Many2one(
         comodel_name='stock.picking',
-        string="Traslado de Terciarización",
+        string="Traslado de Tercerización",
         readonly=True,
         copy=False,
     )
@@ -85,7 +85,7 @@ class RepairOrder(models.Model):
             if order.repair_equipment_type != 'frio_calor':
                 raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
             if order.is_outsourced:
-                raise UserError(_("No se puede avanzar la etapa de una orden terciarizada."))
+                raise UserError(_("No se puede avanzar la etapa de una orden tercerizada."))
             stages = order._get_stage_sequence()
             current = order.frio_calor_stage
             if current not in stages:
@@ -106,7 +106,7 @@ class RepairOrder(models.Model):
             if order.repair_equipment_type != 'frio_calor':
                 raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
             if order.is_outsourced:
-                raise UserError(_("No se puede revertir la etapa de una orden terciarizada."))
+                raise UserError(_("No se puede revertir la etapa de una orden tercerizada."))
             stages = order._get_stage_sequence()
             current = order.frio_calor_stage
             if current not in stages:
@@ -127,7 +127,7 @@ class RepairOrder(models.Model):
         if self.repair_equipment_type != 'frio_calor':
             raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
         if self.is_outsourced:
-            raise UserError(_("No se puede avanzar la etapa de una orden terciarizada."))
+            raise UserError(_("No se puede avanzar la etapa de una orden tercerizada."))
         stages = self._get_stage_sequence()
         current_idx = stages.index(self.frio_calor_stage) if self.frio_calor_stage in stages else -1
         self.with_context(_frio_calor_stage_advance=True).write({'frio_calor_stage': stages[current_idx + 1]})
@@ -137,7 +137,7 @@ class RepairOrder(models.Model):
         if self.repair_equipment_type != 'frio_calor':
             raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
         if self.is_outsourced:
-            raise UserError(_("No se puede avanzar la etapa de una orden terciarizada."))
+            raise UserError(_("No se puede avanzar la etapa de una orden tercerizada."))
         stages = self._get_stage_sequence()
         current_idx = stages.index(self.frio_calor_stage) if self.frio_calor_stage in stages else -1
         stage_dict = dict(FRIO_CALOR_STAGES)
@@ -163,7 +163,7 @@ class RepairOrder(models.Model):
         if self.repair_equipment_type != 'frio_calor':
             raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
         if self.is_outsourced:
-            raise UserError(_("No se puede revertir la etapa de una orden terciarizada."))
+            raise UserError(_("No se puede revertir la etapa de una orden tercerizada."))
         stages = self._get_stage_sequence()
         current_idx = stages.index(self.frio_calor_stage) if self.frio_calor_stage in stages else 0
         stage_dict = dict(FRIO_CALOR_STAGES)
@@ -195,10 +195,10 @@ class RepairOrder(models.Model):
             if not internal_picking_type:
                 raise UserError(_("No se encontró un tipo de operación de traslado interno."))
 
-            dest_location = order.company_id.terciarizacion_location_id
+            dest_location = order.company_id.tercerizacion_location_id
             if not dest_location:
                 raise UserError(_(
-                    "No se configuró la ubicación de terciarización para la empresa '%s'. "
+                    "No se configuró la ubicación de tercerización para la empresa '%s'. "
                     "Configúrela en la ficha de la empresa."
                 ) % order.company_id.name)
 
@@ -214,7 +214,7 @@ class RepairOrder(models.Model):
                 'picking_type_id': internal_picking_type.id,
                 'location_id': source_location.id,
                 'location_dest_id': dest_location.id,
-                'origin': _("Terciarización etapa: %s - %s - %s") % (stage_label, order.name, dest_location.display_name),
+                'origin': _("Tercerización etapa: %s - %s - %s") % (stage_label, order.name, dest_location.display_name),
                 'move_ids': [(0, 0, move_vals)],
             })
             picking.action_confirm()
@@ -224,7 +224,7 @@ class RepairOrder(models.Model):
                 'outsource_transfer_id': picking.id,
             })
             order.message_post(
-                body=_("La orden fue terciarizada desde la etapa '%s'. Se generó el traslado %s hacia %s.", stage_label, picking.name, dest_location.display_name),
+                body=_("La orden fue tercerizada desde la etapa '%s'. Se generó el traslado %s hacia %s.", stage_label, picking.name, dest_location.display_name),
             )
 
     def action_receive_from_third_party(self):
@@ -249,12 +249,19 @@ class RepairOrder(models.Model):
             order.with_context(_frio_calor_stage_advance=True).frio_calor_stage = order.prev_frio_calor_stage or 'calidad'
             order.message_post(body=_("La orden volvió de reparación a su estado anterior."))
 
+    def action_validate(self):
+        for order in self:
+            if order.repair_equipment_type == 'frio_calor':
+                order.check_unique_repair_order()
+        super().action_validate()
+
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
         now = fields.Datetime.now()
         for record in records:
             if record.repair_equipment_type == 'frio_calor':
+                record.check_unique_repair_order()
                 self.env['repair.order.stage.log'].create({
                     'repair_id': record.id,
                     'stage': record.frio_calor_stage,
@@ -273,11 +280,11 @@ class RepairOrder(models.Model):
             }
 
         for order in self:
-            # Bloqueo por terciarización
+            # Bloqueo por tercerización
             if order.is_outsourced and not self.env.context.get('_outsource_action'):
                 allowed_fields = {'is_outsourced', 'message_ids', 'message_follower_ids'}
                 if not set(vals.keys()) <= allowed_fields:
-                    raise UserError(_("No se puede modificar una orden terciarizada. Primero debe recibirse del tercero."))
+                    raise UserError(_("No se puede modificar una orden tercerizada. Primero debe recibirse del tercero."))
 
             # Protección de frio_calor_stage contra escritura directa
             if 'frio_calor_stage' in vals and order.repair_equipment_type == 'frio_calor':
@@ -316,7 +323,7 @@ class RepairOrder(models.Model):
     def unlink(self):
         for order in self:
             if order.is_outsourced:
-                raise UserError(_("No se puede eliminar una orden terciarizada."))
+                raise UserError(_("No se puede eliminar una orden tercerizada."))
         return super().unlink()
 
     @api.model
@@ -353,3 +360,14 @@ class RepairOrder(models.Model):
             'view_mode': 'form',
             'views': [(False, 'form')],
         }
+
+    def check_unique_repair_order(self):
+        for ro in self:
+            if ro.search_count([
+                ('lot_id', '=', ro.lot_id.id),
+                ('state', 'not in', ['cancelled', 'done']),
+            ]) > 1:
+                raise UserError(_(
+                    "El producto a reparar '%s' ya tiene una orden de reparación asociada en proceso para el número de serie '%s'.",
+                    ro.product_id.name, ro.lot_id.name
+                ))

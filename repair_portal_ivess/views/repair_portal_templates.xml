@@ -183,7 +183,7 @@
             <t t-set="o_portal_fullwidth_alert">
                 <t t-if="repair.is_outsourced">
                     <div class="alert alert-warning mb-0" role="alert">
-                        <i class="fa fa-lock me-1"/> Esta orden está actualmente <strong>terciarizada</strong>. El cambio de etapa no está disponible hasta que sea recibida.
+                        <i class="fa fa-lock me-1"/> Esta orden está actualmente <strong>tercerizada</strong>. El cambio de etapa no está disponible hasta que sea recibida.
                     </div>
                 </t>
             </t>
@@ -269,9 +269,9 @@
                         </t>
                     </div>
                     </t>
-                    <!-- Acciones de flujo: reparación y terciarización -->
+                    <!-- Acciones de flujo: reparación y tercerización -->
                     <div class="d-flex justify-content-center gap-2 mt-3 pt-3 border-top flex-wrap">
-                        <!-- Enviar a reparación: cuando NO está en repair NI terciarizado -->
+                        <!-- Enviar a reparación: cuando NO está en repair NI tercerizado -->
                         <t t-if="repair.frio_calor_stage != 'repair' and not repair.is_outsourced">
                             <form t-attf-action="/my/repairs/#{repair.id}/init_repair" method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
@@ -289,16 +289,16 @@
                                 </button>
                             </form>
                         </t>
-                        <!-- Terciarizar: cuando NO está terciarizado -->
+                        <!-- Tercerizar: cuando NO está tercerizado -->
                         <t t-if="not repair.is_outsourced">
                             <form t-attf-action="/my/repairs/#{repair.id}/outsource" method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <button type="submit" class="btn btn-outline-warning btn-sm">
-                                    <i class="fa fa-share-square me-1"/> Terciarizar
+                                    <i class="fa fa-share-square me-1"/> Tercerizar
                                 </button>
                             </form>
                         </t>
-                        <!-- Recibir de tercero: cuando está terciarizado -->
+                        <!-- Recibir de tercero: cuando está tercerizado -->
                         <t t-if="repair.is_outsourced">
                             <form t-attf-action="/my/repairs/#{repair.id}/receive_from_third_party" method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>

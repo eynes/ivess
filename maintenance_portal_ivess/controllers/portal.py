@@ -181,6 +181,101 @@ class MaintenancePortalController(CustomerPortal):
             return 'save_failed'
         return None
 
+    def _maint_create_from_post(self, post):
+        """Create a maintenance.request from workshop portal POST data."""
+        name = (post.get('name') or '').strip()
+        if not name:
+            return None
+
+        team_raw = (post.get('maintenance_team_id') or '').strip()
+        try:
+            team_id = int(team_raw) if team_raw else 0
+        except ValueError:
+            team_id = 0
+        if not team_id:
+            return None
+
+        vals = {
+            'name': name,
+            'maintenance_team_id': team_id,
+            'company_id': request.env.company.id,
+        }
+
+        # employee_id: find the employee linked to the portal user
+        emp_raw = (post.get('employee_id') or '').strip()
+        try:
+            emp_id = int(emp_raw) if emp_raw else 0
+            if emp_id:
+                vals['employee_id'] = emp_id
+        except ValueError:
+            pass
+
+        if post.get('maintenance_type') in ('corrective', 'preventive'):
+            vals['maintenance_type'] = post['maintenance_type']
+        if post.get('priority') in ('0', '1', '2', '3'):
+            vals['priority'] = post['priority']
+
+        # equipment_id is required for workshop creation
+        equip_raw = (post.get('equipment_id') or '').strip()
+        try:
+            equip_id = int(equip_raw) if equip_raw else 0
+        except ValueError:
+            equip_id = 0
+        if not equip_id:
+            return None
+        vals['equipment_id'] = equip_id
+
+        for field in ('stage_id', 'user_id', 'workcenter_id'):
+            raw = (post.get(field) or '').strip()
+            try:
+                val = int(raw) if raw else 0
+                if val:
+                    vals[field] = val
+            except ValueError:
+                pass
+
+        for field in ('schedule_date', 'schedule_end'):
+            raw = (post.get(field) or '').strip()
+            if raw:
+                try:
+                    vals[field] = _dt.strptime(raw, '%Y-%m-%dT%H:%M')
+                except ValueError:
+                    pass
+
+        desc = (post.get('description') or '').strip()
+        if desc:
+            if not desc.startswith('<'):
+                desc = f'<p>{desc}</p>'
+            vals['description'] = desc
+
+        origin = (post.get('request_origin') or '').strip()
+        if origin:
+            vals['request_origin'] = origin
+
+        if post.get('recurring_maintenance') == 'on':
+            vals['recurring_maintenance'] = True
+            try:
+                vals['repeat_interval'] = max(1, int(post.get('repeat_interval') or 1))
+            except ValueError:
+                vals['repeat_interval'] = 1
+            if post.get('repeat_unit') in ('day', 'week', 'month', 'year'):
+                vals['repeat_unit'] = post['repeat_unit']
+            if post.get('repeat_type') in ('forever', 'until'):
+                vals['repeat_type'] = post['repeat_type']
+                if post['repeat_type'] == 'until' and post.get('repeat_until'):
+                    vals['repeat_until'] = post['repeat_until']  # 'YYYY-MM-DD'
+
+        try:
+            with request.env.cr.savepoint():
+                maint_request = request.env['maintenance.request'].sudo().with_context(
+                    allowed_company_ids=[request.env.company.id],
+                ).create(vals)
+        except Exception as e:
+            _logger.exception("Portal workshop create failed: %s", e)
+            return None
+
+        return maint_request
+
     def _maint_add_material(self, maint_request, post):
         """Add a material line to a maintenance.request."""
         try:
@@ -372,6 +467,36 @@ class MaintenancePortalController(CustomerPortal):
             'product_search_url': '/my/maintenance/products/search',
         })
         return request.render('maintenance_portal_ivess.portal_workshop_detail', values)
+
+    @http.route(
+        ['/my/workshop/new'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_workshop_new(self, **post):
+        if request.httprequest.method == 'POST':
+            new_req = self._maint_create_from_post(post)
+            if new_req:
+                return request.redirect(f'/my/workshop/{new_req.id}')
+            return request.redirect('/my/workshop/new')
+
+        taller_team = request.env['maintenance.team'].sudo().search(
+            [('name', 'ilike', 'Taller Mecánico')], limit=1,
+        )
+        current_employee = request.env['hr.employee'].sudo().search(
+            [('user_id', '=', request.env.uid)], limit=1,
+        )
+
+        values = self._prepare_portal_layout_values()
+        values.update(self._maint_edit_context())
+        values.update({
+            'page_name': 'workshop_new',
+            'back_url': '/my/workshop',
+            'back_label': 'Servicios de Taller',
+            'action_url': '/my/workshop/new',
+            'default_team': taller_team,
+            'current_employee': current_employee,
+        })
+        return request.render('maintenance_portal_ivess.portal_workshop_new', values)
 
     @http.route(
         ['/my/workshop/<int:request_id>/edit'],

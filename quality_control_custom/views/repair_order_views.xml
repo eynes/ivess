@@ -34,11 +34,11 @@
             </xpath>
 
 
-            <!-- Botones en el header (terciarizar/recibir) -->
+            <!-- Botones en el header (tercerizar/recibir) -->
             <xpath expr="//button[@name='action_validate']" position="before">
                 <button name="action_outsource"
                         type="object"
-                        string="Terciarizar"
+                        string="Tercerizar"
                         invisible="repair_equipment_type != 'frio_calor' or is_outsourced"/>
                 <button name="action_receive_from_third_party"
                         type="object"
@@ -112,13 +112,13 @@
                 <attribute name="invisible">frio_calor_stage != 'repair'</attribute>
             </xpath>
 
-            <!-- Campo quality_check_id y traslado de terciarización en el grupo derecho -->
+            <!-- Campo quality_check_id y traslado de tercerización en el grupo derecho -->
             <xpath expr="//field[@name='tag_ids']" position="after">
                 <field name="quality_check_id" readonly="1" invisible="not quality_check_id"/>
                 <field name="outsource_transfer_id" readonly="1" invisible="not outsource_transfer_id"/>
             </xpath>
 
-            <!-- Readonly en campos críticos cuando está terciarizado -->
+            <!-- Readonly en campos críticos cuando está tercerizado -->
             <xpath expr="//field[@name='product_id']" position="attributes">
                 <attribute name="readonly">state in ['cancel', 'done'] or is_outsourced</attribute>
             </xpath>
