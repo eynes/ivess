@@ -7,3 +7,4 @@ access_ivess_container_loan_report_user,ivess.container.loan.report.user,model_i
 access_ivess_no_purchase_reason_report_user,ivess.no.purchase.reason.report.user,model_ivess_no_purchase_reason_report,base.group_user,1,0,0,0
 access_ivess_replacement_reason_report_user,ivess.replacement.reason.report.user,model_ivess_replacement_reason_report,base.group_user,1,0,0,0
 access_ivess_products_report_user,ivess.products.report.user,model_ivess_products_report,base.group_user,1,0,0,0
+access_ivess_non_productive_container_report_user,ivess.non.productive.container.report.user,model_ivess_non_productive_container_report,base.group_user,1,0,0,0
