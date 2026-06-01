@@ -8,3 +8,4 @@ access_ivess_no_purchase_reason_report_user,ivess.no.purchase.reason.report.user
 access_ivess_replacement_reason_report_user,ivess.replacement.reason.report.user,model_ivess_replacement_reason_report,base.group_user,1,0,0,0
 access_ivess_breakdown_intake_user,ivess.breakdown.intake.user,model_ivess_breakdown_intake,base.group_user,1,0,1,0
 access_ivess_products_report_user,ivess.products.report.user,model_ivess_products_report,base.group_user,1,0,0,0
+access_ivess_non_productive_container_report_user,ivess.non.productive.container.report.user,model_ivess_non_productive_container_report,base.group_user,1,0,0,0

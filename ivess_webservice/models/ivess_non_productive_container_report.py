@@ -1,17 +1,15 @@
 from odoo import api, fields, models, tools
 
 
-
-class IvessContainerLoanReport(models.Model):
-    _name = "ivess.container.loan.report"
-    _description = "Vista SQL de envases en comodato y prestados expuesta al middleware Ivess"
+class IvessNonProductiveContainerReport(models.Model):
+    _name = "ivess.non.productive.container.report"
+    _description = "Vista SQL de envases no productivos expuesta al middleware Ivess"
     _auto = False
 
-    customer_code = fields.Char(readonly=True)
-    default_code  = fields.Char(readonly=True)
-    quantity      = fields.Float(readonly=True)
-    state_id      = fields.Many2one("water.container.state", readonly=True)
-    return_date   = fields.Date(readonly=True)
+    customer_code  = fields.Char(readonly=True)
+    default_code   = fields.Char(readonly=True)
+    quantity       = fields.Float(readonly=True)
+    is_nonproductive = fields.Boolean(readonly=True)
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -23,17 +21,17 @@ class IvessContainerLoanReport(models.Model):
                     rp.customer_code AS customer_code,
                     pt.default_code  AS default_code,
                     wc.quantity      AS quantity,
-                    wc.state_id      AS state_id,
-                    wc.return_date   AS return_date
+                    wc.is_nonproductive AS is_nonproductive
                 FROM water_container wc
                 JOIN res_partner      rp ON wc.partner_id = rp.id
                 JOIN product_template pt ON wc.product_id = pt.id
+                WHERE wc.is_nonproductive = true
             )
             """.format(table=self._table)
         )
 
     @api.model
-    def get_container_loans(self, **kwargs):
+    def get_non_productive_containers(self, **kwargs):
         allowed_params = {"customer_code", "distribution"}
         unknown_params = set(kwargs) - allowed_params
         if unknown_params:
@@ -78,9 +76,9 @@ class IvessContainerLoanReport(models.Model):
             domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
 
         if customer_code:
-            return self.search(domain).read(["default_code", "quantity", "state_id", "return_date"])
+            return self.search(domain).read(["default_code", "quantity"])
 
-        records = self.search(domain).read(["customer_code", "default_code", "quantity", "state_id", "return_date"])
+        records = self.search(domain).read(["customer_code", "default_code", "quantity"])
         grouped = {}
         for rec in records:
             code = rec["customer_code"]
@@ -88,8 +86,6 @@ class IvessContainerLoanReport(models.Model):
                 grouped[code] = {"customer_code": code, "containers": []}
             grouped[code]["containers"].append({
                 "default_code": rec["default_code"],
-                "quantity":     rec["quantity"],
-                "state_id":     rec["state_id"][1] if rec["state_id"] else False,
-                "return_date":  rec["return_date"],
+                "quantity": rec["quantity"],
             })
         return list(grouped.values())
