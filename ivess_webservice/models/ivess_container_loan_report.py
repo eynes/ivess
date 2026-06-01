@@ -1,6 +1,7 @@
 from odoo import api, fields, models, tools
 
 
+
 class IvessContainerLoanReport(models.Model):
     _name = "ivess.container.loan.report"
     _description = "Vista SQL de envases en comodato y prestados expuesta al middleware Ivess"
@@ -76,7 +77,19 @@ class IvessContainerLoanReport(models.Model):
             customer_codes = [c for c in partner_distrs.mapped("partner_id.customer_code") if c]
             domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
 
-        fields_to_read = ["default_code", "quantity", "state_id", "return_date"]
-        if distribution:
-            fields_to_read.append("customer_code")
-        return self.search(domain).read(fields_to_read)
+        if customer_code:
+            return self.search(domain).read(["default_code", "quantity", "state_id", "return_date"])
+
+        records = self.search(domain).read(["customer_code", "default_code", "quantity", "state_id", "return_date"])
+        grouped = {}
+        for rec in records:
+            code = rec["customer_code"]
+            if code not in grouped:
+                grouped[code] = {"customer_code": code, "containers": []}
+            grouped[code]["containers"].append({
+                "default_code": rec["default_code"],
+                "quantity":     rec["quantity"],
+                "state_id":     rec["state_id"][1] if rec["state_id"] else False,
+                "return_date":  rec["return_date"],
+            })
+        return list(grouped.values())
