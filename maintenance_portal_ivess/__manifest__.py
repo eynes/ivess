@@ -15,6 +15,7 @@
         'maintenance',
         'helpdesk_maint_custom',
         'mrp_maintenance',
+        'hr_maintenance',
     ],
     'data': [
         'views/maintenance_views.xml',

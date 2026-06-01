@@ -762,9 +762,14 @@
         <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="True"/>
 
-            <t t-call="portal.portal_searchbar">
-                <t t-set="title">Servicios de Taller</t>
-            </t>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <t t-call="portal.portal_searchbar">
+                    <t t-set="title">Servicios de Taller</t>
+                </t>
+                <a href="/my/workshop/new" class="btn btn-primary btn-sm">
+                    <i class="fa fa-plus me-1"/> Nueva solicitud
+                </a>
+            </div>
 
             <t t-if="not maintenance_requests">
                 <div class="alert alert-warning mt-3">
@@ -1447,6 +1452,240 @@
                 });
                 nameInput.addEventListener('blur', function () {
                     setTimeout(() => { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Nueva solicitud Workshop: /my/workshop/new
+    ============================================================ -->
+    <template id="portal_workshop_new" name="Nuevo Servicio de Taller">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/workshop">Servicios de Taller</a>
+                            </li>
+                            <li class="breadcrumb-item active">Nueva solicitud</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="card mt-2">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa fa-plus-circle me-2"/>Nueva solicitud de taller</h5>
+                </div>
+                <div class="card-body">
+                    <form action="/my/workshop/new" method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                        <!-- Asunto -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Asunto <span class="text-danger">*</span></label>
+                                <input type="text" name="name" class="form-control"
+                                       placeholder="Descripción breve del servicio requerido" required="required"/>
+                            </div>
+                        </div>
+
+                        <!-- Tipo + Prioridad -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Tipo de mantenimiento</label>
+                                <select name="maintenance_type" class="form-select">
+                                    <t t-foreach="maintenance_type_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if opt[0] == 'corrective' else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Prioridad</label>
+                                <select name="priority" class="form-select">
+                                    <t t-foreach="priority_options" t-as="opt">
+                                        <option t-att-value="opt[0]"
+                                                t-att-selected="'selected' if opt[0] == '0' else None">
+                                            <t t-esc="opt[1]"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Equipo mant. + Técnico + Empleado -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Equipo de mantenimiento</label>
+                                <div class="form-control bg-light">
+                                    <t t-esc="default_team.name if default_team else '—'"/>
+                                </div>
+                                <input type="hidden" name="maintenance_team_id"
+                                       t-att-value="default_team.id if default_team else ''"/>
+                                <!--<select name="maintenance_team_id" class="form-select" required="required" readonly="readonly">
+                                    <t t-foreach="teams" t-as="team">
+                                        <option t-att-value="team.id"
+                                                t-att-selected="'selected' if default_team and team.id == default_team.id else None">
+                                            <t t-esc="team.name"/>
+                                        </option>
+                                    </t>
+                                </select>-->
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Técnico responsable</label>
+                                <select name="user_id" class="form-select">
+                                    <option value="">— Sin asignar —</option>
+                                    <t t-foreach="users" t-as="usr">
+                                        <option t-att-value="usr.id">
+                                            <t t-esc="usr.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Empleado solicitante</label>
+                                <t t-if="current_employee">
+                                    <input type="hidden" name="employee_id" t-att-value="current_employee.id"/>
+                                    <div class="form-control bg-light">
+                                        <i class="fa fa-user me-1 text-muted"/>
+                                        <t t-esc="current_employee.name"/>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div class="form-control bg-light text-muted">Sin empleado asociado</div>
+                                </t>
+                            </div>
+                        </div>
+
+                        <!-- Equipo / Centro de trabajo -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Equipo <span class="text-danger">*</span></label>
+                                <select name="equipment_id" class="form-select" required="required">
+                                    <option value="">— Seleccionar equipo —</option>
+                                    <t t-foreach="equipment_list" t-as="eq">
+                                        <option t-att-value="eq.id">
+                                            <t t-esc="eq.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Centro de trabajo</label>
+                                <select name="workcenter_id" class="form-select">
+                                    <option value="">— Sin centro —</option>
+                                    <t t-foreach="workcenters" t-as="wc">
+                                        <option t-att-value="wc.id">
+                                            <t t-esc="wc.name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Fechas programadas -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Fecha programada</label>
+                                <input type="datetime-local" name="schedule_date" class="form-control"/>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Fin programado</label>
+                                <input type="datetime-local" name="schedule_end" class="form-control"/>
+                            </div>
+                        </div>
+
+                        <!-- Origen -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Origen</label>
+                                <input type="text" name="request_origin" class="form-control"
+                                       placeholder="Origen de la solicitud"/>
+                            </div>
+                        </div>
+
+                        <!-- Descripción -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Descripción</label>
+                                <textarea name="description" class="form-control" rows="4"
+                                          placeholder="Detalle el trabajo a realizar..."/>
+                            </div>
+                        </div>
+
+                        <!-- Mantenimiento recurrente -->
+                        <div class="row g-3 mb-2">
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="recurring_maintenance" id="new_recurring_check" value="on"/>
+                                    <label class="form-check-label fw-semibold" for="new_recurring_check">
+                                        Mantenimiento recurrente
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="new_recurring_fields" class="row g-3 mb-3" style="display:none">
+                            <div class="col-md-3">
+                                <label class="form-label small">Repetir cada</label>
+                                <input type="number" name="repeat_interval" class="form-control"
+                                       value="1" min="1"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Unidad</label>
+                                <select name="repeat_unit" class="form-select">
+                                    <option value="day">Días</option>
+                                    <option value="week" selected="selected">Semanas</option>
+                                    <option value="month">Meses</option>
+                                    <option value="year">Años</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Tipo</label>
+                                <select name="repeat_type" id="new_repeat_type" class="form-select">
+                                    <option value="forever" selected="selected">Para siempre</option>
+                                    <option value="until">Hasta fecha</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3" id="new_repeat_until_col" style="display:none">
+                                <label class="form-label small">Hasta</label>
+                                <input type="date" name="repeat_until" class="form-control"/>
+                            </div>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="d-flex gap-2 justify-content-end mt-3">
+                            <a href="/my/workshop" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-save me-1"/> Crear solicitud
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
+            <script>
+            (function () {
+                var check = document.getElementById('new_recurring_check');
+                var fields = document.getElementById('new_recurring_fields');
+                var repeatType = document.getElementById('new_repeat_type');
+                var untilCol = document.getElementById('new_repeat_until_col');
+                if (!check) return;
+                check.addEventListener('change', function () {
+                    fields.style.display = this.checked ? 'flex' : 'none';
+                });
+                repeatType.addEventListener('change', function () {
+                    untilCol.style.display = this.value === 'until' ? 'block' : 'none';
                 });
             })();
             </script>
