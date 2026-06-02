@@ -7,10 +7,12 @@
     'summary': 'Integración Odoo ↔ Aguas para equipos de frío-calor',
     'depends': [
         'stock',
+        'repair',
         'quality_control_custom',
     ],
     'data': [
         'security/ir.model.access.csv',
+        'data/ir_cron.xml',
         'views/res_company_views.xml',
         'views/stock_location_views.xml',
     ],

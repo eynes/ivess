@@ -10,6 +10,9 @@
                 <field name="aguas_fc_taller_location_id"/>
                 <field name="aguas_fc_picking_type_id"/>
                 <field name="aguas_fc_product_id"/>
+                <field name="aguas_fc_repair_picking_type_id"/>
+                <field name="aguas_fc_expedicion_location_id"/>
+                <field name="aguas_fc_salida_picking_type_id"/>
             </xpath>
         </field>
     </record>
