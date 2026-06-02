@@ -250,7 +250,7 @@ class ResPartner(models.Model):
         return self.env['water.container'].search_count(
             [
                 ('partner_id', '=', self.id),
-                ('state_id.is_pending_return', '=', True)
+                ('is_pending_return', '=', True)
             ]
         )
 

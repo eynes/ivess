@@ -10,7 +10,10 @@ class IvessContainerLoanReport(models.Model):
     customer_code = fields.Char(readonly=True)
     default_code  = fields.Char(readonly=True)
     quantity      = fields.Float(readonly=True)
-    state_id      = fields.Many2one("water.container.state", readonly=True)
+    state         = fields.Selection(
+        [('prestado', 'Prestado'), ('en_comodato', 'En Comodato')],
+        readonly=True,
+    )
     return_date   = fields.Date(readonly=True)
 
     def init(self):
@@ -23,7 +26,7 @@ class IvessContainerLoanReport(models.Model):
                     rp.customer_code AS customer_code,
                     pt.default_code  AS default_code,
                     wc.quantity      AS quantity,
-                    wc.state_id      AS state_id,
+                    wc.state         AS state,
                     wc.return_date   AS return_date
                 FROM water_container wc
                 JOIN res_partner      rp ON wc.partner_id = rp.id
@@ -78,9 +81,9 @@ class IvessContainerLoanReport(models.Model):
             domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
 
         if customer_code:
-            return self.search(domain).read(["default_code", "quantity", "state_id", "return_date"])
+            return self.search(domain).read(["default_code", "quantity", "state", "return_date"])
 
-        records = self.search(domain).read(["customer_code", "default_code", "quantity", "state_id", "return_date"])
+        records = self.search(domain).read(["customer_code", "default_code", "quantity", "state", "return_date"])
         grouped = {}
         for rec in records:
             code = rec["customer_code"]
@@ -89,7 +92,7 @@ class IvessContainerLoanReport(models.Model):
             grouped[code]["containers"].append({
                 "default_code": rec["default_code"],
                 "quantity":     rec["quantity"],
-                "state_id":     rec["state_id"][1] if rec["state_id"] else False,
+                "state":        rec["state"],
                 "return_date":  rec["return_date"],
             })
         return list(grouped.values())
