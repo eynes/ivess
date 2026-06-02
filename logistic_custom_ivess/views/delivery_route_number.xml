@@ -49,9 +49,9 @@
                         <page string="Booklets" name="booklets">
                             <group>
                                 <group>
-                                    <field name="remittance_sequence_id"/>
+                                    <field name="remittance_sequence_ids" widget="many2many_tags"/>
                                     <field name="collection_journal_id"/>
-                                    <field name="repair_order_sequence_id"/>
+                                    <field name="repair_order_sequence_id" invisible="is_cold_hot_delivery == False"/>
                                 </group>
                             </group>
                         </page>
