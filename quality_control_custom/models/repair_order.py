@@ -328,7 +328,17 @@ class RepairOrder(models.Model):
 
     @api.model
     def find_repair_by_serial(self, barcode):
-        lot = self.env['stock.lot'].search([('name', '=', barcode)], limit=1)
+        # Odoo ZPL lot labels use GS1 AI "21" (serial number) prefix.
+        # Try original value; if not found, strip the "21" prefix and retry.
+        candidates = [barcode]
+        if barcode.startswith('21') and len(barcode) > 2:
+            candidates.append(barcode[2:])
+
+        lot = None
+        for candidate in candidates:
+            lot = self.env['stock.lot'].search([('name', '=', candidate)], limit=1)
+            if lot:
+                break
         if not lot:
             return {
                 'error': 'not_found',
