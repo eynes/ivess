@@ -7,10 +7,14 @@ class IvessBreakdownIntake(models.Model):
 
     @api.model
     def create_ticket(self, **kwargs):
+        if not kwargs:
+            return {"error": "No se enviaron datos en el cuerpo de la solicitud"}
+
         partner_name = kwargs.get("partner_id", "")
         partner_phone = kwargs.get("partner_phone", "")
         webhub_dispatch = kwargs.get("webhub_dispatch", "")
         webhub_vehicle_model = kwargs.get("webhub_vehicle_model", "")
+        webhub_description = kwargs.get("webhub_description", "")
         vehicle_location = kwargs.get("vehicle_location", "")
         maps_location = kwargs.get("maps_location", "")
         breakdown_reason = kwargs.get("breakdown_reason", "")
@@ -27,6 +31,7 @@ class IvessBreakdownIntake(models.Model):
             partner_phone=partner_phone,
             webhub_dispatch=webhub_dispatch,
             webhub_vehicle_model=webhub_vehicle_model,
+            webhub_description=webhub_description,
             vehicle_location=vehicle_location,
             maps_location=maps_location,
             breakdown_reason=breakdown_reason,
@@ -46,7 +51,7 @@ class IvessBreakdownIntake(models.Model):
         )
 
     def _create_helpdesk_ticket(self, team, partner, partner_phone, webhub_dispatch,
-                                webhub_vehicle_model, vehicle_location, maps_location,
+                                webhub_vehicle_model, webhub_description, vehicle_location, maps_location,
                                 breakdown_reason):
         vals = {
             "name": f"Auxilio - {breakdown_reason}" if breakdown_reason else "Auxilio",
@@ -55,6 +60,7 @@ class IvessBreakdownIntake(models.Model):
             "partner_phone": partner_phone,
             "webhub_dispatch": webhub_dispatch,
             "webhub_vehicle_model": webhub_vehicle_model,
+            "webhub_description": webhub_description,
             "vehicle_location": vehicle_location,
             "maps_location": maps_location,
             "breakdown_reason": breakdown_reason,
