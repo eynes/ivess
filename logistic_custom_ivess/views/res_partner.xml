@@ -33,6 +33,7 @@
                                 <field name="frequency"/>
                             </list>
                         </field>
+                        <field name="average_hour" widget="float_time"/>
                     </group>
                 </group>
             </xpath>

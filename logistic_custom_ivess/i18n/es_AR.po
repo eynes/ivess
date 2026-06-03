@@ -136,6 +136,12 @@ msgid "Attachment Count"
 msgstr "Cantidad de archivos adjuntos"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner__average_hour
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_users__average_hour
+msgid "Average Hour"
+msgstr "Hora Promedio"
+
+#. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_stock_move__container_state
 msgid "Container State"
 msgstr "Estado del Envase"

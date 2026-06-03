@@ -98,6 +98,9 @@ class ResPartner(models.Model):
         string="Canal de Alta",
         tracking=True,
     )
+    average_hour = fields.Float(
+        string="Average Hour"
+    )
 
     @api.model_create_multi
     def create(self, vals_list):
