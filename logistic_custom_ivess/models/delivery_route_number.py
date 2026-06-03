@@ -34,7 +34,7 @@ class DeliveryRouteNumber(models.Model):
     allow_previous_price = fields.Boolean(string='Allow Previous Price')
     allow_sale_without_stock = fields.Boolean(string='Allow sale without stock')
     allow_closing_with_rake = fields.Boolean(string='Allow closing with rake')
-    is_cold_hot_delivery = fields.Boolean(string="Is cold hot delivery")
+    is_cold_hot_delivery = fields.Boolean(string="Is cold hot delivery", default=False)
     allow_cash_sale = fields.Boolean(
         string='Allow Cash Sale',
         required=True,
@@ -47,8 +47,11 @@ class DeliveryRouteNumber(models.Model):
         default=True,
         help="If checked, customers can enter a manual address for this delivery."
     )
-    remittance_sequence_id = fields.Many2one(
+    remittance_sequence_ids = fields.Many2many(
         'ir.sequence',
+        relation='delivery_route_number_ir_sequence_rel',
+        column1='route_number_id',
+        column2='sequence_id',
         string='Remittance Booklet',
     )
     collection_journal_id = fields.Many2one(
@@ -57,7 +60,7 @@ class DeliveryRouteNumber(models.Model):
         domain=[('type', 'in', ['receipt'])],
     )
     repair_order_sequence_id = fields.Many2one(
-        'ir.sequence',
+        'ir.sequence' ,
         string='Repair Orders Booklet',
     )
 

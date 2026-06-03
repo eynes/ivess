@@ -1227,7 +1227,7 @@ msgid "Collection Booklet"
 msgstr "Talonario de Cobranza"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__remittance_sequence_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__remittance_sequence_ids
 msgid "Remittance Booklet"
 msgstr "Talonario de Remitos"
 
