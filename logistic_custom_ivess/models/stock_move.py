@@ -1,4 +1,5 @@
-from odoo import models, fields
+from odoo import models, fields, api
+from .water_container import STATE_SELECTION
 
 
 class StockMove(models.Model):
@@ -8,8 +9,8 @@ class StockMove(models.Model):
         'water.container',
         string='Envase',
     )
-    container_state_id = fields.Many2one(
-        'water.container.state',
+    container_state = fields.Selection(
+        STATE_SELECTION,
         string='Estado del Envase',
     )
     is_returnable = fields.Boolean(
@@ -17,3 +18,7 @@ class StockMove(models.Model):
         store=True,
         string='Es Retornable',
     )
+
+    @api.onchange('water_container_id')
+    def _onchange_water_container_id(self):
+        self.container_state = self.water_container_id.state if self.water_container_id else False

@@ -1,5 +1,9 @@
 from odoo import models, fields, api
 
+STATE_SELECTION = [
+    ('prestado', 'Prestado'),
+    ('en_comodato', 'En Comodato'),
+]
 
 class WaterContainer(models.Model):
     _name = 'water.container'
@@ -24,11 +28,11 @@ class WaterContainer(models.Model):
     return_date = fields.Date(
         string='Return Date'
     )
-    state_id = fields.Many2one(
-        'water.container.state',
+    state = fields.Selection(
+        STATE_SELECTION,
         string='Status',
         required=True,
-        tracking=True
+        tracking=True,
     )
     product_id = fields.Many2one(
         'product.template',
@@ -96,32 +100,3 @@ class WaterContainer(models.Model):
 
         records = super().create(vals_list)
         return records
-
-
-class WaterContainerState(models.Model):
-    _name = 'water.container.state'
-    _description = 'Water Container Status'
-    _order = 'code'
-
-    name = fields.Char(string='Status', required=True)
-    code = fields.Integer(
-        string='Code',
-        readonly=True,
-        copy=False,
-        index=True
-    )
-    is_pending_return = fields.Boolean(string="Pending return")
-
-    @api.model
-    def create(self, vals_list):
-        if isinstance(vals_list, dict):
-            vals_list = [vals_list]
-
-        # Obtener el último código actual
-        last_code = self.search([], order='code desc', limit=1).code or 0
-
-        for vals in vals_list:
-            last_code += 1
-            vals['code'] = last_code
-
-        return super(WaterContainerState, self).create(vals_list)

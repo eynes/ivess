@@ -136,7 +136,7 @@ msgid "Attachment Count"
 msgstr "Cantidad de archivos adjuntos"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_stock_move__container_state_id
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_stock_move__container_state
 msgid "Container State"
 msgstr "Estado del Envase"
 
@@ -837,7 +837,7 @@ msgid "Partner Type"
 msgstr "Tipo de cliente"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__is_pending_return
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__is_pending_return
 msgid "Pending return"
 msgstr "Devolución pendiente"
 
@@ -1023,8 +1023,7 @@ msgstr "Estado"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_visit_status__status_name
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__state_id
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__name
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container__state
 msgid "Status"
 msgstr "Estado"
 
@@ -1181,10 +1180,6 @@ msgstr "Consumo de agua"
 msgid "Water Container"
 msgstr "Envase de agua"
 
-#. module: logistic_custom_ivess
-#: model:ir.model,name:logistic_custom_ivess.model_water_container_state
-msgid "Water Container Status"
-msgstr "Estado del envase de agua"
 
 #. module: logistic_custom_ivess
 #: model:ir.actions.act_window,name:logistic_custom_ivess.action_water_container
@@ -1263,3 +1258,23 @@ msgstr ""
 msgid ""
 "because was either archived or flagged as potentially inactive on %(date)s"
 msgstr "porque fue archivado o marcado como potencialmente inactivo el %(date)s"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__water_container__state__prestado
+msgid "Prestado"
+msgstr "Prestado"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__water_container__state__en_comodato
+msgid "En Comodato"
+msgstr "En Comodato"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__stock_move__container_state__prestado
+msgid "Prestado"
+msgstr "Prestado"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__stock_move__container_state__en_comodato
+msgid "En Comodato"
+msgstr "En Comodato"

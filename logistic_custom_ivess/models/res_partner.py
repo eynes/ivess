@@ -233,26 +233,14 @@ class ResPartner(models.Model):
 
         # Se ejecuta solo si se está desactivando el cliente (archivando)
         if vals is None or vals.get('active') is False:
-            pending_containers = self.check_water_container()
             unpaid_invoices = self.get_unpaid_invoice_count()
 
             errors = []
-            if pending_containers > 0:
-                errors.append(_("This customer has %s water containers pending return.") % pending_containers)
             if unpaid_invoices > 0:
                 errors.append(_("This customer has %s unpaid or partially paid invoice(s).") % unpaid_invoices)
 
             if errors:
                 raise UserError('\n'.join(errors))
-
-    def check_water_container(self):
-        self.ensure_one()
-        return self.env['water.container'].search_count(
-            [
-                ('partner_id', '=', self.id),
-                ('state_id.is_pending_return', '=', True)
-            ]
-        )
 
     def get_unpaid_invoice_count(self):
         """Retorna la cantidad de facturas sin pagar o parcialmente pagadas del cliente."""

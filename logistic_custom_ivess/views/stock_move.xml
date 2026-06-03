@@ -9,7 +9,7 @@
                 <field name="water_container_id" optional="show"
                        invisible="not is_returnable"
                        domain="[('partner_id', '=', parent.partner_id)]"/>
-                <field name="container_state_id" optional="show"
+                <field name="container_state" optional="show"
                        invisible="not is_returnable"/>
             </xpath>
         </field>

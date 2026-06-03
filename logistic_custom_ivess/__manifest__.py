@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': "Sale Custom Ivess",
-    'version': '19.0.0.0.1',
+    'version': '19.0.0.0.2',
     'description': """
     """,
     'author': "Eynes",
@@ -14,6 +14,7 @@
         'mail',
         'stock',
         'l10n_ar_eynes',
+        'custom_ivess_product',
     ],
     'data': [
         'security/ir.model.access.csv',
