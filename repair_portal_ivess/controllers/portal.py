@@ -82,19 +82,33 @@ class RepairPortalController(CustomerPortal):
             return request.render('repair_portal_ivess.portal_repair_scan', values)
 
         barcode = barcode.strip()
-        RepairOrder = request.env['repair.order'].sudo()
 
-        repair = RepairOrder.search([
-            ('lot_id.name', '=', barcode),
-            ('repair_equipment_type', '=', 'frio_calor'),
-            ('state', 'not in', ['cancel', 'done']),
-        ], order='create_date desc', limit=1)
+        # Odoo ZPL encodes lot labels with GS1 AI "21" (serial number) prefix.
+        # Physical scanners or unmodified camera scanners may return "21<lot_name>".
+        # Build candidate list: try original value first, then without GS1 prefix.
+        candidates = [barcode]
+        if barcode.startswith('21') and len(barcode) > 2:
+            candidates.append(barcode[2:])
+
+        RepairOrder = request.env['repair.order'].sudo()
+        repair = None
+        for candidate in candidates:
+            repair = RepairOrder.search([
+                ('lot_id.name', '=', candidate),
+                ('repair_equipment_type', '=', 'frio_calor'),
+                ('state', 'not in', ['cancel', 'done']),
+            ], order='create_date desc', limit=1)
+            if repair:
+                break
 
         if not repair:
-            repair = RepairOrder.search([
-                ('lot_id.name', '=', barcode),
-                ('repair_equipment_type', '=', 'frio_calor'),
-            ], order='create_date desc', limit=1)
+            for candidate in candidates:
+                repair = RepairOrder.search([
+                    ('lot_id.name', '=', candidate),
+                    ('repair_equipment_type', '=', 'frio_calor'),
+                ], order='create_date desc', limit=1)
+                if repair:
+                    break
 
         if repair:
             return request.redirect(f'/my/repairs/{repair.id}')

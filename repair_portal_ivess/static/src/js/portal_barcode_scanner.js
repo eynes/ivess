@@ -1,5 +1,10 @@
 /* Portal barcode camera scanner for /my/repairs/scan */
-document.addEventListener('DOMContentLoaded', function () {
+(function init() {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+        return;
+    }
+
     var cameraBtn = document.getElementById('repair-scan-camera-btn');
     if (!cameraBtn) return;
 
@@ -11,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var rafId = null;
     var active = false;
 
-    // Build fullscreen overlay dynamically
+    // ── Overlay ────────────────────────────────────────────────────────────────
     var overlay = document.createElement('div');
     overlay.style.cssText = [
         'display:none', 'position:fixed', 'top:0', 'left:0',
@@ -25,16 +30,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var video = document.createElement('video');
     video.setAttribute('autoplay', '');
-    video.setAttribute('playsinline', '');   // required on iOS Safari
+    video.setAttribute('playsinline', '');
     video.setAttribute('muted', '');
     video.style.cssText = 'width:100%;border-radius:10px;display:block;';
 
-    // Scan-guide rectangle overlay
+    // Guide square — sized in JS once the video is playing
     var guide = document.createElement('div');
     guide.style.cssText = [
         'position:absolute', 'top:50%', 'left:50%',
         'transform:translate(-50%,-50%)',
-        'width:72%', 'height:32%',
+        'width:70%', 'height:70%',   // overridden in JS after video plays
         'border:2.5px solid #875a7b', 'border-radius:8px',
         'pointer-events:none',
         'box-shadow:0 0 0 9999px rgba(0,0,0,0.45)',
@@ -47,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var hint = document.createElement('p');
     hint.className = 'text-white mt-2 small text-center px-3';
-    hint.textContent = 'Apunte la cámara al código de barras del equipo';
+    hint.textContent = 'Centre el código en el cuadro y acérquese';
 
     videoWrap.appendChild(video);
     videoWrap.appendChild(guide);
@@ -56,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function () {
     overlay.appendChild(hint);
     document.body.appendChild(overlay);
 
+    // ── Stop ──────────────────────────────────────────────────────────────────
     function stopCamera() {
         active = false;
         if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
@@ -66,33 +72,69 @@ document.addEventListener('DOMContentLoaded', function () {
 
     cancelBtn.addEventListener('click', stopCamera);
 
-    // ZXing-based detector (fallback for older iOS Safari < 17)
+    // Once the video is playing, size the guide to a square that fits the frame.
+    // This MUST match the crop calculation in detect() below.
+    video.addEventListener('playing', function () {
+        var dw = video.clientWidth;
+        var dh = video.clientHeight;
+        // Square that fits 88% of whichever dimension is shorter
+        var gsz = Math.round(Math.min(dw, dh) * 0.88);
+        guide.style.width = gsz + 'px';
+        guide.style.height = gsz + 'px';
+    }, { once: true });
+
+    // ── ZXing detector ────────────────────────────────────────────────────────
     function buildZXingDetector(ZXing) {
         var hints = new Map([
             [ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                ZXing.BarcodeFormat.DATA_MATRIX,
+                ZXing.BarcodeFormat.QR_CODE,
+                ZXing.BarcodeFormat.AZTEC,
                 ZXing.BarcodeFormat.CODE_128,
-                ZXing.BarcodeFormat.CODE_39,
                 ZXing.BarcodeFormat.EAN_13,
                 ZXing.BarcodeFormat.EAN_8,
-                ZXing.BarcodeFormat.QR_CODE,
-                ZXing.BarcodeFormat.DATA_MATRIX,
-                ZXing.BarcodeFormat.ITF,
             ]],
             [ZXing.DecodeHintType.TRY_HARDER, true],
         ]);
         var reader = new ZXing.MultiFormatReader();
         reader.setHints(hints);
+
         return {
             detect: function (videoEl) {
                 if (videoEl.readyState < 2) return Promise.resolve([]);
+                var vw = videoEl.videoWidth;
+                var vh = videoEl.videoHeight;
+                var dw = videoEl.clientWidth;
+                var dh = videoEl.clientHeight;
+                if (!vw || !vh || !dw || !dh) return Promise.resolve([]);
+
+                // Guide is a square = 88% of the shorter display dimension, centered.
+                // Must match the sizing in the 'playing' handler above.
+                var guideDisplaySize = Math.min(dw, dh) * 0.88;
+                var guideDx = (dw - guideDisplaySize) / 2;
+                var guideDy = (dh - guideDisplaySize) / 2;
+
+                // Map display coords → video frame coords
+                var sx = vw / dw;
+                var sy = vh / dh;
+                var cropX = Math.max(0, Math.round(guideDx * sx));
+                var cropY = Math.max(0, Math.round(guideDy * sy));
+                var cropW = Math.min(Math.round(guideDisplaySize * sx), vw - cropX);
+                var cropH = Math.min(Math.round(guideDisplaySize * sy), vh - cropY);
+
                 var canvas = document.createElement('canvas');
-                canvas.width = videoEl.videoWidth;
-                canvas.height = videoEl.videoHeight;
-                canvas.getContext('2d').drawImage(videoEl, 0, 0);
-                var luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                var bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+                canvas.width = cropW;
+                canvas.height = cropH;
+                canvas.getContext('2d').drawImage(
+                    videoEl,
+                    cropX, cropY, cropW, cropH,
+                    0, 0, cropW, cropH
+                );
+
+                var lum = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                var bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
                 try {
-                    var result = reader.decodeWithState(bitmap);
+                    var result = reader.decodeWithState(bmp);
                     return Promise.resolve([{ rawValue: result.getText() }]);
                 } catch (e) {
                     return Promise.resolve([]);
@@ -103,16 +145,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function getDetector() {
         if (detector) return Promise.resolve(detector);
-
-        // Native BarcodeDetector (Chrome, Safari 17+ iOS)
-        if ('BarcodeDetector' in window) {
-            return BarcodeDetector.getSupportedFormats().then(function (formats) {
-                detector = new BarcodeDetector({ formats: formats });
-                return detector;
-            });
-        }
-
-        // ZXing fallback — use Odoo's own bundled library
         return new Promise(function (resolve, reject) {
             if (window.ZXing) {
                 detector = buildZXingDetector(window.ZXing);
@@ -131,12 +163,24 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // ── Scan loop ─────────────────────────────────────────────────────────────
     function scanFrame(det) {
         if (!active) return;
         det.detect(video)
             .then(function (codes) {
                 if (codes && codes.length > 0) {
                     var value = codes[0].rawValue;
+                    // Ignore spurious 1–2 char reads (e.g. Code39 false positives
+                    // like "G" misread from the Data Matrix finder pattern).
+                    if (!value || value.length < 3) {
+                        rafId = requestAnimationFrame(function () { scanFrame(det); });
+                        return;
+                    }
+                    // Odoo ZPL uses GS1 AI "21" (serial number) prefix: "21" + lot_name.
+                    // Strip it so the search matches stock.lot.name directly.
+                    if (/^21\d/.test(value) && value.length > 2) {
+                        value = value.slice(2);
+                    }
                     if (window.navigator.vibrate) window.navigator.vibrate(100);
                     stopCamera();
                     barcodeInput.value = value;
@@ -150,6 +194,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    // ── Camera button ─────────────────────────────────────────────────────────
     cameraBtn.addEventListener('click', function () {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert('La cámara no está disponible. Acceda al sitio usando HTTPS.');
@@ -158,7 +203,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         overlay.style.display = 'flex';
 
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+        navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+            },
+            audio: false,
+        })
             .then(function (s) {
                 stream = s;
                 video.srcObject = s;
@@ -182,4 +234,4 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert(msg);
             });
     });
-});
+}());
