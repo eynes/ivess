@@ -2,15 +2,13 @@ def migrate(cr, version):
     # Drop dependent SQL views before altering columns
     cr.execute("DROP VIEW IF EXISTS ivess_container_loan_report")
 
-    # Populate new 'state' selection and 'is_pending_return' from the old Many2one
+    # Populate new 'state' selection from the old Many2one
     cr.execute("""
         UPDATE water_container wc
-        SET
-            state = CASE
+        SET state = CASE
                 WHEN LOWER(wcs.name) LIKE '%comodato%' THEN 'en_comodato'
                 ELSE 'prestado'
-            END,
-            is_pending_return = wcs.is_pending_return
+            END
         FROM water_container_state wcs
         WHERE wc.state_id = wcs.id
     """)

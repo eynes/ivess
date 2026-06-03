@@ -34,8 +34,6 @@ class WaterContainer(models.Model):
         required=True,
         tracking=True,
     )
-    is_pending_return = fields.Boolean(string='Pending return')
-    
     product_id = fields.Many2one(
         'product.template',
         string="Product",

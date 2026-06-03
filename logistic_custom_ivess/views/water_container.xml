@@ -11,7 +11,6 @@
                 <field name="assignment_date"/>
                 <!--<field name="return_date"/>-->
                 <field name="state"/>
-                <field name="is_pending_return"/>
                 <field name="is_nonproductive"/>
             </list>
         </field>
@@ -31,7 +30,6 @@
                         <field name="assignment_date" required="1"/>
                         <field name="return_date"/>
                         <field name="state" required="1"/>
-                        <field name="is_pending_return"/>
                         <field name="is_nonproductive"/>
                     </group>
                 </sheet>
