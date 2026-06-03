@@ -225,7 +225,7 @@ class MaintenancePortalController(CustomerPortal):
             return None
         vals['equipment_id'] = equip_id
 
-        for field in ('stage_id', 'user_id', 'workcenter_id'):
+        for field in ('stage_id', 'user_id', 'workcenter_id', 'production_id'):
             raw = (post.get(field) or '').strip()
             try:
                 val = int(raw) if raw else 0
@@ -233,6 +233,9 @@ class MaintenancePortalController(CustomerPortal):
                     vals[field] = val
             except ValueError:
                 pass
+
+        if post.get('maintenance_for') in ('equipment', 'workcenter'):
+            vals['maintenance_for'] = post['maintenance_for']
 
         for field in ('schedule_date', 'schedule_end'):
             raw = (post.get(field) or '').strip()
@@ -414,6 +417,35 @@ class MaintenancePortalController(CustomerPortal):
             return request.redirect('/my/maintenance')
         self._maint_delete_material(maint_request, material_id)
         return request.redirect(f'/my/maintenance/{request_id}')
+
+    @http.route(
+        ['/my/maintenance/new'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_maintenance_new(self, **post):
+        if request.httprequest.method == 'POST':
+            new_req = self._maint_create_from_post(post)
+            if new_req:
+                return request.redirect(f'/my/maintenance/{new_req.id}')
+            return request.redirect('/my/maintenance/new')
+
+        current_employee = request.env['hr.employee'].sudo().search(
+            [('user_id', '=', request.env.uid)], limit=1,
+        )
+        maintenance_team = request.env['maintenance.team'].sudo().search(
+            [('name', 'ilike', 'Mantenimiento interno')], limit=1,
+        )
+        values = self._prepare_portal_layout_values()
+        values.update(self._maint_edit_context())
+        values.update({
+            'page_name': 'maintenance_new',
+            'back_url': '/my/maintenance',
+            'back_label': 'Órdenes de Mantenimiento',
+            'action_url': '/my/maintenance/new',
+            'current_employee': current_employee,
+            'default_team': maintenance_team,
+        })
+        return request.render('maintenance_portal_ivess.portal_maintenance_new', values)
 
     # ── Servicios de Taller  —  /my/workshop ─────────────────────────────────
 
