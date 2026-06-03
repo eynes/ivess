@@ -13,8 +13,12 @@
     'depends': [
         'portal',
         'maintenance',
+        'helpdesk_maint_custom',
+        'mrp_maintenance',
+        'hr_maintenance',
     ],
     'data': [
+        'views/maintenance_views.xml',
         'views/maintenance_portal_templates.xml',
     ],
     'installable': True,

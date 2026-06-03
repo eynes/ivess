@@ -18,6 +18,11 @@
     'data': [
         'views/repair_portal_templates.xml',
     ],
+    'assets': {
+        'web.assets_frontend': [
+            'repair_portal_ivess/static/src/js/portal_barcode_scanner.js',
+        ],
+    },
     'installable': True,
     'auto_install': False,
     'license': 'LGPL-3',
