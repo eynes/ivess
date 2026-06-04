@@ -75,7 +75,7 @@ class IvessNonProductiveContainerReport(models.Model):
             customer_codes = [c for c in partner_distrs.mapped("partner_id.customer_code") if c]
             domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
 
-        records = self.search(domain).read(["id", "customer_code", "default_code", "quantity"])
+        records = self.search(domain, order="customer_code").read(["id", "customer_code", "default_code", "quantity"])
         grouped = {}
         for rec in records:
             code = rec["customer_code"]

@@ -80,16 +80,14 @@ class IvessContainerLoanReport(models.Model):
             customer_codes = [c for c in partner_distrs.mapped("partner_id.customer_code") if c]
             domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
 
-        if customer_code:
-            return self.search(domain).read(["default_code", "quantity", "state", "return_date"])
-
-        records = self.search(domain).read(["customer_code", "default_code", "quantity", "state", "return_date"])
+        records = self.search(domain, order="customer_code").read(["id", "customer_code", "default_code", "quantity", "state", "return_date"])
         grouped = {}
         for rec in records:
             code = rec["customer_code"]
             if code not in grouped:
                 grouped[code] = {"customer_code": code, "containers": []}
             grouped[code]["containers"].append({
+                "id":           rec["id"],
                 "default_code": rec["default_code"],
                 "quantity":     rec["quantity"],
                 "state":        rec["state"],

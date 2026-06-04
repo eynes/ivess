@@ -83,10 +83,10 @@ class IvessPerceptionReport(models.Model):
             ])
             customer_codes = [c for c in partner_distrs.mapped("partner_id.customer_code") if c]
             domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
-        lines = self.search(domain)
+        lines = self.search(domain, order="customer_code")
 
-        result = []
-        for customer, perception in set(lines.mapped(lambda l: (l.customer_code, l.perception_id))):
+        grouped = {}
+        for customer, perception in sorted(set(lines.mapped(lambda l: (l.customer_code, l.perception_id))), key=lambda x: x[0]):
             perception_lines = lines.filtered(
                 lambda l: l.customer_code == customer and l.perception_id == perception
             )
@@ -98,13 +98,12 @@ class IvessPerceptionReport(models.Model):
             )
             if match:
                 line = match[:1]
-                entry = {
+                if customer not in grouped:
+                    grouped[customer] = {"customer_code": customer, "perceptions": []}
+                grouped[customer]["perceptions"].append({
                     "perception_id": (perception.id, perception.display_name),
                     "tax_minimum": line.tax_minimum,
                     "percent": line.percent,
-                }
-                if not customer_code:
-                    entry["customer_code"] = customer
-                result.append(entry)
-                
-        return result
+                })
+
+        return list(grouped.values())
