@@ -3,7 +3,7 @@ from odoo import api, fields, models, tools
 
 class IvessNonProductiveContainerReport(models.Model):
     _name = "ivess.non.productive.container.report"
-    _description = "Vista SQL de envases no productivos expuesta al middleware Ivess"
+    _description = "Vista SQL de envases improductivos expuesta al middleware Ivess"
     _auto = False
 
     customer_code  = fields.Char(readonly=True)
@@ -76,7 +76,10 @@ class IvessNonProductiveContainerReport(models.Model):
             domain = [("customer_code", "in", customer_codes)] if customer_codes else [("id", "=", False)]
 
         if customer_code:
-            return self.search(domain).read(["default_code", "quantity"])
+            records = self.search(domain).read(["default_code", "quantity"])
+            for rec in records:
+                rec.pop("id", None)
+            return records
 
         records = self.search(domain).read(["customer_code", "default_code", "quantity"])
         grouped = {}
