@@ -9,7 +9,7 @@
                 <field name="product_id"/>
                 <field name="quantity"/>
                 <field name="assignment_date"/>
-                <!--<field name="return_date"/>-->
+                <field name="return_date"/>
                 <field name="state"/>
                 <field name="is_nonproductive"/>
             </list>
@@ -23,6 +23,20 @@
         <field name="arch" type="xml">
             <form string="Water Container">
                 <sheet>
+                    <div name="button_box" class="oe_button_box">
+                        <button name="action_open_outgoing_pickings"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-truck">
+                            <field name="count_outgoing_pickings" widget="statinfo" string="Entregas"/>
+                        </button>
+                        <button name="action_open_incoming_pickings"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-undo">
+                            <field name="count_incoming_pickings" widget="statinfo" string="Devoluciones"/>
+                        </button>
+                    </div>
                     <group>
                         <field name="partner_id" readonly="1"/>
                         <field name="product_id"/>

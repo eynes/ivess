@@ -19,3 +19,4 @@ from . import res_company
 from . import purchase_order_line
 from . import registration_channel
 from . import stock_move
+from . import stock_picking

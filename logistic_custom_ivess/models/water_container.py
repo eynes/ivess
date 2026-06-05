@@ -29,7 +29,8 @@ class WaterContainer(models.Model):
         required=True
     )
     return_date = fields.Date(
-        string='Return Date'
+        string='Return Date',
+        compute='_compute_return_date',
     )
     state = fields.Selection(
         STATE_SELECTION,
@@ -56,6 +57,14 @@ class WaterContainer(models.Model):
         string='Envase Improductivo',
         default=False,
     )
+    count_outgoing_pickings = fields.Integer(
+        string='Entregas',
+        compute='_compute_picking_counts',
+    )
+    count_incoming_pickings = fields.Integer(
+        string='Devoluciones',
+        compute='_compute_picking_counts',
+    )
 
     @api.depends('stock_move_ids', 'stock_move_ids.state', 'stock_move_ids.quantity',
                  'stock_move_ids.picking_id.picking_type_code')
@@ -72,16 +81,52 @@ class WaterContainer(models.Model):
             )
             rec.quantity = qty_out - qty_in
 
-    @api.onchange('partner_id')
-    def _onchange_partner_id_fill_return_date(self):
-        if self.partner_id:
-            today = fields.Date.context_today(self)
-            next_route = self.env['delivery.route'].search([
-                ('delivery_route_line_ids.client_id', '=', self.partner_id.id),
-                ('delivery_date', '>=', today),
+    @api.depends('stock_move_ids.picking_id', 'stock_move_ids.picking_id.picking_type_code')
+    def _compute_picking_counts(self):
+        for rec in self:
+            pickings = rec.stock_move_ids.mapped('picking_id')
+            rec.count_outgoing_pickings = len(
+                pickings.filtered(lambda p: p.picking_type_code == 'outgoing')
+            )
+            rec.count_incoming_pickings = len(
+                pickings.filtered(lambda p: p.picking_type_code == 'incoming')
+            )
+
+    def action_open_outgoing_pickings(self):
+        move_ids = self.stock_move_ids.filtered(
+            lambda m: m.picking_id.picking_type_code == 'outgoing'
+        ).ids
+        return {
+            'name': 'Entregas',
+            'type': 'ir.actions.act_window',
+            'res_model': 'stock.move',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', move_ids)],
+        }
+
+    def action_open_incoming_pickings(self):
+        move_ids = self.stock_move_ids.filtered(
+            lambda m: m.picking_id.picking_type_code == 'incoming'
+        ).ids
+        return {
+            'name': 'Devoluciones',
+            'type': 'ir.actions.act_window',
+            'res_model': 'stock.move',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', move_ids)],
+        }
+
+    @api.depends('partner_id')
+    def _compute_return_date(self):
+        for rec in self:
+            if not rec.partner_id:
+                rec.return_date = False
+                continue
+            route = self.env['delivery.route'].search([
+                ('delivery_route_line_ids.client_id', '=', rec.partner_id.id),
                 ('state', '!=', 'closed'),
             ], order='delivery_date asc', limit=1)
-            self.return_date = next_route.delivery_date if next_route else False
+            rec.return_date = route.delivery_date if route else False
 
     @api.model
     def _cron_check_nonproductive_containers(self):
@@ -125,15 +170,6 @@ class WaterContainer(models.Model):
         for vals in vals_list:
             if not vals.get('name') or vals['name'] in ('/', 'New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('seq.water.container') or '/'
-            if not vals.get('return_date') and vals.get('partner_id'):
-                today = fields.Date.context_today(self)
-                next_route = self.env['delivery.route'].search([
-                    ('delivery_route_line_ids.client_id', '=', vals['partner_id']),
-                    ('delivery_date', '>=', today),
-                    ('state', '!=', 'closed'),
-                ], order='delivery_date asc', limit=1)
-                if next_route:
-                    vals['return_date'] = next_route.delivery_date
 
         records = super().create(vals_list)
         return records
