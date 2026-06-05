@@ -233,44 +233,63 @@
 
                     <!-- Botones de navegación de etapa -->
                     <t t-if="repair.frio_calor_stage != 'repair' and not repair.is_outsourced">
-                    <div class="d-flex justify-content-center gap-3 mt-4">
-                        <t t-if="repair.frio_calor_stage == 'calidad'">
-                            <!-- Etapa Control de Calidad: Aprueba / Falla -->
-                            <form t-attf-action="/my/repairs/#{repair.id}/quality_approve" method="post">
-                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit"
-                                        class="btn btn-success btn-lg"
-                                        t-att-disabled="repair.is_outsourced or None">
-                                    <i class="fa fa-check me-1"/> Aprueba
-                                </button>
-                            </form>
-                            <form t-attf-action="/my/repairs/#{repair.id}/quality_fail" method="post">
-                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit"
-                                        class="btn btn-danger btn-lg"
-                                        t-att-disabled="repair.is_outsourced or None">
-                                    <i class="fa fa-times me-1"/> Falla
-                                </button>
-                            </form>
-                        </t>
-                        <t t-else="">
-                            <!-- Otras etapas: Revertir / Siguiente -->
-                            <form t-attf-action="/my/repairs/#{repair.id}/prev_stage" method="post">
-                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit"
-                                        class="btn btn-outline-secondary"
-                                        t-att-disabled="not can_go_prev or None">
-                                    <i class="fa fa-chevron-left me-1"/> Revertir Etapa
-                                </button>
-                            </form>
-                            <form t-attf-action="/my/repairs/#{repair.id}/next_stage" method="post">
-                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit"
-                                        class="btn btn-primary"
-                                        t-att-disabled="not can_go_next or None">
-                                    Siguiente Etapa <i class="fa fa-chevron-right ms-1"/>
-                                </button>
-                            </form>
+                    <div>
+                        <div class="d-flex justify-content-center gap-3 mt-4">
+                            <t t-if="repair.frio_calor_stage == 'calidad'">
+                                <!-- Etapa Control de Calidad: Aprueba / Falla -->
+                                <form t-attf-action="/my/repairs/#{repair.id}/quality_approve" method="post">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <button type="submit"
+                                            class="btn btn-success btn-lg"
+                                            t-att-disabled="repair.is_outsourced or None">
+                                        <i class="fa fa-check me-1"/> Aprueba
+                                    </button>
+                                </form>
+                                <form t-attf-action="/my/repairs/#{repair.id}/quality_fail" method="post">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <button type="submit"
+                                            class="btn btn-danger btn-lg"
+                                            t-att-disabled="repair.is_outsourced or None">
+                                        <i class="fa fa-times me-1"/> Falla
+                                    </button>
+                                </form>
+                            </t>
+                            <t t-else="">
+                                <!-- Otras etapas: Revertir (toggle collapse) / Siguiente -->
+                                <t t-if="can_go_prev and prev_stages">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                                            data-bs-toggle="collapse"
+                                            t-attf-data-bs-target="#revert-collapse-#{repair.id}"
+                                            aria-expanded="false">
+                                        <i class="fa fa-chevron-left me-1"/> Revertir Etapa
+                                    </button>
+                                </t>
+                                <form t-attf-action="/my/repairs/#{repair.id}/next_stage" method="post">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <button type="submit"
+                                            class="btn btn-primary"
+                                            t-att-disabled="not can_go_next or None">
+                                        Siguiente Etapa <i class="fa fa-chevron-right ms-1"/>
+                                    </button>
+                                </form>
+                            </t>
+                        </div>
+                        <!-- Selector de etapa destino (se despliega al presionar Revertir Etapa) -->
+                        <t t-if="repair.frio_calor_stage != 'calidad' and can_go_prev and prev_stages">
+                            <div class="collapse mt-2" t-attf-id="revert-collapse-#{repair.id}">
+                                <form t-attf-action="/my/repairs/#{repair.id}/revert_to_stage" method="post"
+                                      class="d-flex justify-content-center align-items-center gap-2">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <select name="target_stage" class="form-select form-select-sm" style="max-width:250px;min-width:160px">
+                                        <t t-foreach="prev_stages" t-as="ps">
+                                            <option t-att-value="ps['key']"><t t-esc="ps['label']"/></option>
+                                        </t>
+                                    </select>
+                                    <button type="submit" class="btn btn-outline-danger btn-sm text-nowrap">
+                                        <i class="fa fa-check me-1"/> Confirmar
+                                    </button>
+                                </form>
+                            </div>
                         </t>
                     </div>
                     </t>
@@ -348,10 +367,11 @@
                                     <tr>
                                         <th>Tipo</th>
                                         <th>Producto</th>
-                                        <th class="text-end">Demanda</th>
+                                        <!--<th class="text-end">Demanda</th>-->
                                         <th class="text-end">Cantidad</th>
                                         <th>UdM</th>
                                         <th>Lote / N° de Serie</th>
+                                        <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -363,14 +383,14 @@
                                                 </span>
                                             </td>
                                             <td><t t-esc="move.product_id.display_name"/></td>
-                                            <td class="text-end"><t t-esc="move.product_uom_qty"/></td>
+                                            <!--<td class="text-end"><t t-esc="move.product_uom_qty"/></td>-->
                                             <td class="text-end">
                                                 <t t-if="repair.frio_calor_stage == 'repair' and not repair.is_outsourced">
                                                     <form t-attf-action="/my/repairs/#{repair.id}/update_part_qty" method="post" class="d-inline-flex align-items-center gap-1">
                                                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                                         <input type="hidden" name="move_id" t-att-value="move.id"/>
                                                         <input type="number" name="quantity"
-                                                               t-att-value="move.quantity"
+                                                               t-att-value="move.quantity or move.product_uom_qty"
                                                                class="form-control form-control-sm text-end"
                                                                style="width:80px"
                                                                min="0" step="0.01"/>
@@ -391,6 +411,15 @@
                                                     </t>
                                                 </t>
                                                 <t t-else="">—</t>
+                                            </td>
+                                            <td>
+                                                <form t-attf-action="/my/repairs/#{repair.id}/delete_part" method="post" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                    <input type="hidden" name="move_id" t-att-value="move.id"/>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger p-1" title="Eliminar">
+                                                        <i class="fa fa-trash"/>
+                                                    </button>
+                                                </form>
                                             </td>
                                         </tr>
                                     </t>

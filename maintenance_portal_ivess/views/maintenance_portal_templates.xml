@@ -318,7 +318,7 @@
                                     <tr>
                                         <th>Producto</th>
                                         <th>Descripción</th>
-                                        <th class="text-end">Demanda</th>
+                                        <!--<th class="text-end">Demanda</th>-->
                                         <th class="text-end">Cantidad</th>
                                         <th>UdM</th>
                                         <th>Estado</th>
@@ -330,8 +330,23 @@
                                         <tr>
                                             <td><t t-esc="mat.product_id.display_name or '—'"/></td>
                                             <td><t t-esc="mat.description or '—'"/></td>
-                                            <td class="text-end"><t t-esc="'%.2f' % mat.product_uom_qty"/></td>
-                                            <td class="text-end"><t t-esc="'%.2f' % mat.quantity"/></td>
+                                            <!--<td class="text-end"><t t-esc="'%.2f' % mat.product_uom_qty"/></td>-->
+                                            <td class="text-end">
+                                                <t t-if="not (mat.stock_move_id and mat.stock_move_id.state == 'done')">
+                                                    <form t-att-action="update_material_url" method="post" class="d-inline-flex align-items-center gap-1">
+                                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                        <input type="hidden" name="material_id" t-att-value="mat.id"/>
+                                                        <input type="number" name="quantity"
+                                                               t-att-value="mat.quantity or mat.product_uom_qty"
+                                                               class="form-control form-control-sm text-end"
+                                                               style="width:80px" min="0" step="0.01"/>
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary p-1" title="Guardar">
+                                                            <i class="fa fa-save"/>
+                                                        </button>
+                                                    </form>
+                                                </t>
+                                                <t t-else=""><t t-esc="'%.2f' % mat.quantity"/></t>
+                                            </td>
                                             <td><t t-esc="mat.product_uom.name or '—'"/></td>
                                             <td>
                                                 <t t-if="mat.stock_move_id">
@@ -382,7 +397,6 @@
                                          class="list-group position-absolute w-100 shadow-sm"
                                          style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
                                 </div>
-                                <small id="mat_product_uom" class="text-muted"></small>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small mb-1">Descripción</label>
@@ -409,7 +423,6 @@
                 const searchUrl = document.currentScript.dataset.searchUrl;
                 const nameInput = document.getElementById('mat_product_name');
                 const idInput = document.getElementById('mat_product_id');
-                const uomLabel = document.getElementById('mat_product_uom');
                 const descInput = document.getElementById('mat_description');
                 const submitBtn = document.getElementById('mat_submit_btn');
                 const suggestions = document.getElementById('mat_product_suggestions');
@@ -449,7 +462,6 @@
                                     e.preventDefault();
                                     nameInput.value = p.name;
                                     idInput.value = p.id;
-                                    uomLabel.textContent = p.uom || '';
                                     if (!descInput.value) descInput.value = p.name;
                                     suggestions.style.display = 'none';
                                     submitBtn.disabled = false;
@@ -1050,7 +1062,7 @@
                                     <tr>
                                         <th>Producto</th>
                                         <th>Descripción</th>
-                                        <th class="text-end">Demanda</th>
+                                        <!--<th class="text-end">Demanda</th>-->
                                         <th class="text-end">Cantidad</th>
                                         <th>UdM</th>
                                         <th>Estado</th>
@@ -1062,8 +1074,23 @@
                                         <tr>
                                             <td><t t-esc="mat.product_id.display_name or '—'"/></td>
                                             <td><t t-esc="mat.description or '—'"/></td>
-                                            <td class="text-end"><t t-esc="'%.2f' % mat.product_uom_qty"/></td>
-                                            <td class="text-end"><t t-esc="'%.2f' % mat.quantity"/></td>
+                                            <!--<td class="text-end"><t t-esc="'%.2f' % mat.product_uom_qty"/></td>-->
+                                            <td class="text-end">
+                                                <t t-if="not (mat.stock_move_id and mat.stock_move_id.state == 'done')">
+                                                    <form t-att-action="update_material_url" method="post" class="d-inline-flex align-items-center gap-1">
+                                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                        <input type="hidden" name="material_id" t-att-value="mat.id"/>
+                                                        <input type="number" name="quantity"
+                                                               t-att-value="mat.quantity or mat.product_uom_qty"
+                                                               class="form-control form-control-sm text-end"
+                                                               style="width:80px" min="0" step="0.01"/>
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary p-1" title="Guardar">
+                                                            <i class="fa fa-save"/>
+                                                        </button>
+                                                    </form>
+                                                </t>
+                                                <t t-else=""><t t-esc="'%.2f' % mat.quantity"/></t>
+                                            </td>
                                             <td><t t-esc="mat.product_uom.name or '—'"/></td>
                                             <td>
                                                 <t t-if="mat.stock_move_id">
@@ -1113,7 +1140,6 @@
                                          class="list-group position-absolute w-100 shadow-sm"
                                          style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
                                 </div>
-                                <small id="ws_mat_product_uom" class="text-muted"></small>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small mb-1">Descripción</label>
@@ -1140,7 +1166,6 @@
                 const searchUrl = document.currentScript.dataset.searchUrl;
                 const nameInput = document.getElementById('ws_mat_product_name');
                 const idInput = document.getElementById('ws_mat_product_id');
-                const uomLabel = document.getElementById('ws_mat_product_uom');
                 const descInput = document.getElementById('ws_mat_description');
                 const submitBtn = document.getElementById('ws_mat_submit_btn');
                 const suggestions = document.getElementById('ws_mat_product_suggestions');
@@ -1180,7 +1205,6 @@
                                     e.preventDefault();
                                     nameInput.value = p.name;
                                     idInput.value = p.id;
-                                    uomLabel.textContent = p.uom || '';
                                     if (!descInput.value) descInput.value = p.name;
                                     suggestions.style.display = 'none';
                                     submitBtn.disabled = false;
