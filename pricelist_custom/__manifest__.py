@@ -1,6 +1,6 @@
 {
     'name': "Pricelist Custom",
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.3',
     'description': (
         "Lógica de precios personalizada: precios especiales por cliente, "
         "% de descuento y lista de precios por plantilla de ruta de reparto."
