@@ -203,6 +203,13 @@ class ResPartner(models.Model):
 
         res = super().write(vals)
 
+        if vals.get('active') is False:
+            nonproductive = self.water_container_ids.filtered(lambda c: not c.is_nonproductive)
+            if nonproductive:
+                nonproductive.write({'is_nonproductive': True})
+                for c in nonproductive:
+                    c.message_post(body=_('Marcado como Improductivo: cliente dado de baja.'))
+
         if 'distribution' in vals or 'frequency' in vals:
             if vals.get('distribution'):
                 self._process_new_template_delivery(vals.get('distribution'))

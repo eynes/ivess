@@ -1,4 +1,7 @@
-from odoo import models, fields, api
+from datetime import timedelta
+
+from odoo import api, fields, models
+from odoo.tools.translate import _
 
 STATE_SELECTION = [
     ('prestado', 'Prestado'),
@@ -79,6 +82,40 @@ class WaterContainer(models.Model):
                 ('state', '!=', 'closed'),
             ], order='delivery_date asc', limit=1)
             self.return_date = next_route.delivery_date if next_route else False
+
+    @api.model
+    def _cron_check_nonproductive_containers(self):
+        four_weeks_ago = fields.Date.today() - timedelta(weeks=4)
+        containers = self.search([
+            ('is_nonproductive', '=', False),
+            ('product_id', '!=', False),
+            ('partner_id', '!=', False),
+        ])
+        to_deactivate = self.env['water.container']
+        for container in containers:
+            has_recent_sale = self.env['sale.order.line'].search_count([
+                ('order_id.partner_id', '=', container.partner_id.id),
+                ('product_id.product_tmpl_id', '=', container.product_id.id),
+                ('order_id.state', 'in', ['sale', 'done']),
+                ('order_id.date_order', '>=', four_weeks_ago),
+            ])
+            if not has_recent_sale:
+                to_deactivate |= container
+        if to_deactivate:
+            to_deactivate.write({'is_nonproductive': True})
+            for c in to_deactivate:
+                c.message_post(body=_('Marcado como Improductivo: sin compras en las últimas 4 semanas.'))
+
+    def _reactivate_for_partner_products(self, partner_id, product_tmpl_ids):
+        containers = self.search([
+            ('partner_id', '=', partner_id),
+            ('product_id', 'in', product_tmpl_ids),
+            ('is_nonproductive', '=', True),
+        ])
+        if containers:
+            containers.write({'is_nonproductive': False})
+            for c in containers:
+                c.message_post(body=_('Reactivado: nueva compra del producto registrada.'))
 
     @api.model
     def create(self, vals_list):
