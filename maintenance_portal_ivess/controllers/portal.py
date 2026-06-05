@@ -301,11 +301,34 @@ class MaintenancePortalController(CustomerPortal):
                     'product_id': product.id,
                     'description': description,
                     'product_uom_qty': product_uom_qty,
+                    'quantity': product_uom_qty,
                     'product_uom': product.uom_id.id,
                     'company_id': maint_request.company_id.id,
                 })
         except Exception as e:
             _logger.exception("Portal add_material failed request=%s: %s", maint_request.id, e)
+
+    def _maint_update_material_qty(self, maint_request, post):
+        """Update product_uom_qty and quantity on a material line."""
+        try:
+            material_id = int(post.get('material_id') or 0)
+            quantity = float(post.get('quantity') or 0)
+            if quantity < 0:
+                quantity = 0.0
+        except (ValueError, TypeError):
+            return
+        if not material_id:
+            return
+        material = request.env['maintenance.request.material'].sudo().browse(material_id)
+        if not material.exists() or material.request_id.id != maint_request.id:
+            return
+        if material.stock_move_id and material.stock_move_id.state == 'done':
+            return
+        try:
+            with request.env.cr.savepoint():
+                material.write({'quantity': quantity, 'product_uom_qty': quantity})
+        except Exception as e:
+            _logger.exception("Portal update_material_qty failed mat=%s: %s", material_id, e)
 
     def _maint_delete_material(self, maint_request, material_id):
         """Delete a material line if it belongs to this request and its move isn't done."""
@@ -368,6 +391,7 @@ class MaintenancePortalController(CustomerPortal):
             'back_label': 'Órdenes de Mantenimiento',
             'edit_url': f'/my/maintenance/{request_id}/edit',
             'add_material_url': f'/my/maintenance/{request_id}/add_material',
+            'update_material_url': f'/my/maintenance/{request_id}/update_material_qty',
             'del_material_base': f'/my/maintenance/{request_id}/delete_material',
             'product_search_url': '/my/maintenance/products/search',
         })
@@ -416,6 +440,17 @@ class MaintenancePortalController(CustomerPortal):
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
         self._maint_delete_material(maint_request, material_id)
+        return request.redirect(f'/my/maintenance/{request_id}')
+
+    @http.route(
+        ['/my/maintenance/<int:request_id>/update_material_qty'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_maintenance_update_material_qty(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/maintenance')
+        self._maint_update_material_qty(maint_request, post)
         return request.redirect(f'/my/maintenance/{request_id}')
 
     @http.route(
@@ -495,6 +530,7 @@ class MaintenancePortalController(CustomerPortal):
             'back_label': 'Servicios de Taller',
             'edit_url': f'/my/workshop/{request_id}/edit',
             'add_material_url': f'/my/workshop/{request_id}/add_material',
+            'update_material_url': f'/my/workshop/{request_id}/update_material_qty',
             'del_material_base': f'/my/workshop/{request_id}/delete_material',
             'product_search_url': '/my/maintenance/products/search',
         })
@@ -573,6 +609,17 @@ class MaintenancePortalController(CustomerPortal):
         if not maint_request.exists():
             return request.redirect('/my/workshop')
         self._maint_delete_material(maint_request, material_id)
+        return request.redirect(f'/my/workshop/{request_id}')
+
+    @http.route(
+        ['/my/workshop/<int:request_id>/update_material_qty'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_workshop_update_material_qty(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/workshop')
+        self._maint_update_material_qty(maint_request, post)
         return request.redirect(f'/my/workshop/{request_id}')
 
     # ── JSON: búsqueda de productos para materiales ───────────────────────────

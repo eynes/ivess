@@ -45,6 +45,25 @@ _REPAIRS_PER_PAGE = 20
 #   invisible="frio_calor_stage in ('hidrolavadora', 'calidad', 'repair') or is_outsourced"
 _NO_REVERT_FROM = frozenset({'hidrolavadora', 'calidad', 'repair'})
 
+# Etapas que NO pueden ser destino de un revertir (deben alcanzarse por flujos propios).
+# Alineado con el dominio del wizard backend:
+#   domain="[..., ('key', 'not in', ('repair', 'calidad'))]"
+_NO_REVERT_TARGET = frozenset({'repair', 'calidad'})
+
+
+def _get_prev_stages(repair, stage_labels, stage_order, stage_order_no_paint):
+    """Retorna lista de {'key': k, 'label': l} de etapas anteriores válidas como destino de revertir."""
+    stages = stage_order if repair.requires_painting else stage_order_no_paint
+    current = repair.frio_calor_stage
+    if current not in stages:
+        return []
+    current_idx = stages.index(current)
+    return [
+        {'key': k, 'label': stage_labels[k]}
+        for k in stages[:current_idx]
+        if k not in _NO_REVERT_TARGET and k in stage_labels
+    ]
+
 
 def _stage_nav_flags(repair):
     """Retorna (can_go_prev, can_go_next) según la etapa y estado actual del registro."""
@@ -158,6 +177,7 @@ class RepairPortalController(CustomerPortal):
             return request.redirect('/my/repairs')
 
         can_go_prev, can_go_next = _stage_nav_flags(repair)
+        prev_stages = _get_prev_stages(repair, _STAGE_LABELS, FRIO_CALOR_STAGE_ORDER, FRIO_CALOR_STAGE_ORDER_NO_PAINT) if can_go_prev else []
 
         parts = repair.move_ids.filtered(lambda m: m.repair_line_type)
 
@@ -169,6 +189,7 @@ class RepairPortalController(CustomerPortal):
             'stage_badge': _STAGE_BADGE,
             'can_go_prev': can_go_prev,
             'can_go_next': can_go_next,
+            'prev_stages': prev_stages,
             'parts': parts,
             'line_type_labels': _REPAIR_LINE_TYPE_LABELS,
             'line_type_badge': _REPAIR_LINE_TYPE_BADGE,
@@ -295,6 +316,48 @@ class RepairPortalController(CustomerPortal):
         return request.redirect(f'/my/repairs/{repair_id}')
 
     @http.route(
+        ['/my/repairs/<int:repair_id>/revert_to_stage'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_revert_to_stage(self, repair_id, **post):
+        repair = request.env['repair.order'].sudo().browse(repair_id)
+        if not repair.exists() or repair.is_outsourced:
+            return request.redirect(f'/my/repairs/{repair_id}')
+
+        target_stage = (post.get('target_stage') or '').strip()
+        stages = FRIO_CALOR_STAGE_ORDER if repair.requires_painting else FRIO_CALOR_STAGE_ORDER_NO_PAINT
+
+        if (not target_stage
+                or target_stage not in stages
+                or target_stage in _NO_REVERT_TARGET
+                or repair.frio_calor_stage not in stages
+                or repair.frio_calor_stage in _NO_REVERT_FROM):
+            return request.redirect(f'/my/repairs/{repair_id}')
+
+        current_idx = stages.index(repair.frio_calor_stage)
+        target_idx = stages.index(target_stage)
+        if target_idx >= current_idx:
+            return request.redirect(f'/my/repairs/{repair_id}')
+
+        try:
+            stage_dict = dict(FRIO_CALOR_STAGES)
+            old_label = stage_dict.get(repair.frio_calor_stage, repair.frio_calor_stage)
+            new_label = stage_dict.get(target_stage, target_stage)
+            repair.with_context(
+                _revert_stage=True,
+                _portal_user_id=request.env.uid,
+            ).write({'frio_calor_stage': target_stage})
+            repair.message_post(
+                body=_(
+                    "Regresión manual de etapa desde portal: de '%s' a '%s'.",
+                    old_label, new_label,
+                )
+            )
+        except UserError:
+            pass
+        return request.redirect(f'/my/repairs/{repair_id}')
+
+    @http.route(
         ['/my/repairs/<int:repair_id>/update_part_qty'],
         type='http', auth='user', website=True, methods=['POST'],
     )
@@ -325,9 +388,43 @@ class RepairPortalController(CustomerPortal):
                 move.with_context(
                     _portal_user_id=request.env.uid,
                     allowed_company_ids=[repair.company_id.id],
-                ).write({'quantity': quantity})
+                ).write({'quantity': quantity, 'product_uom_qty': quantity})
         except Exception as e:
             _logger.exception("Portal update_part_qty failed repair_id=%s move_id=%s: %s", repair_id, move_id, e)
+
+        return request.redirect(f'/my/repairs/{repair_id}')
+
+    @http.route(
+        ['/my/repairs/<int:repair_id>/delete_part'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_delete_part(self, repair_id, **post):
+        repair = request.env['repair.order'].sudo().browse(repair_id)
+        if not repair.exists() or repair.repair_equipment_type != 'frio_calor':
+            return request.redirect('/my/repairs')
+        if repair.is_outsourced or repair.frio_calor_stage != 'repair' or repair.state in ('done', 'cancel'):
+            return request.redirect(f'/my/repairs/{repair_id}')
+
+        try:
+            move_id = int(post.get('move_id') or 0)
+        except ValueError:
+            return request.redirect(f'/my/repairs/{repair_id}')
+
+        if not move_id:
+            return request.redirect(f'/my/repairs/{repair_id}')
+
+        move = request.env['stock.move'].sudo().browse(move_id)
+        if not move.exists() or move.repair_id.id != repair_id:
+            return request.redirect(f'/my/repairs/{repair_id}')
+
+        try:
+            with request.env.cr.savepoint():
+                move.with_context(
+                    _portal_user_id=request.env.uid,
+                    allowed_company_ids=[repair.company_id.id],
+                ).unlink()
+        except Exception as e:
+            _logger.exception("Portal delete_part failed repair_id=%s move_id=%s: %s", repair_id, move_id, e)
 
         return request.redirect(f'/my/repairs/{repair_id}')
 
@@ -388,6 +485,7 @@ class RepairPortalController(CustomerPortal):
                     'repair_line_type': repair_line_type,
                     'product_id': product.id,
                     'product_uom_qty': product_uom_qty,
+                    'quantity': product_uom_qty,
                     'product_uom': product.uom_id.id,
                     'company_id': repair.company_id.id,
                 })
