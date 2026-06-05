@@ -268,7 +268,7 @@ msgstr "Crear desde asistente"
 #. module: logistic_custom_ivess
 #: model_terms:ir.actions.act_window,help:logistic_custom_ivess.action_delivery_route_number
 msgid "Create your delivery route numbers here."
-msgstr "Cree aquí sus números de ruta de reparto."
+msgstr "Cree aquí sus repartos."
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__create_uid
@@ -363,37 +363,37 @@ msgstr "Repartidor"
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_order__delivery_route_id
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
 msgid "Delivery Route"
-msgstr "Ruta de reparto"
+msgstr "Ruta"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_delivery_route_line
 msgid "Delivery Route Line"
-msgstr "Línea de ruta de reparto"
+msgstr "Línea de ruta"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_delivery_route_number
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_template_delivery_route__delivery_number_id
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_number_form
 msgid "Delivery Route Number"
-msgstr "Número de ruta de reparto"
+msgstr "Reparto"
 
 #. module: logistic_custom_ivess
 #: model:ir.actions.act_window,name:logistic_custom_ivess.action_delivery_route_number
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_number_tree
 msgid "Delivery Route Numbers"
-msgstr "Números de rutas de reparto"
+msgstr "Repartos"
 
 #. module: logistic_custom_ivess
 #: model:ir.actions.act_window,name:logistic_custom_ivess.action_delivery_route
 #: model:ir.ui.menu,name:logistic_custom_ivess.menu_delivery_route_root
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_tree
 msgid "Delivery Routes"
-msgstr "Rutas de reparto"
+msgstr "Rutas"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__delivery_number_id
 msgid "Delivery route number"
-msgstr "Número de ruta de reparto"
+msgstr "Reparto"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_res_partner_water_consumption__name
@@ -462,7 +462,7 @@ msgstr "Habilitar reordenamiento"
 #: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route_number__allow_reordering
 #: model:ir.model.fields,help:logistic_custom_ivess.field_template_delivery_route__allow_reordering
 msgid "Enables reordering of customers in delivery routes."
-msgstr "Permite reordenar los clientes en las rutas de reparto."
+msgstr "Permite reordenar los clientes en las rutas."
 
 #. module: logistic_custom_ivess
 #: model:ir.ui.menu,name:logistic_custom_ivess.menu_water_container_main
@@ -573,8 +573,8 @@ msgstr "Ícono para indicar una actividad de excepción."
 #: model:ir.model.fields,help:logistic_custom_ivess.field_template_delivery_route__allow_manual_address
 msgid "If checked, customers can enter a manual address for this delivery."
 msgstr ""
-"Si se marca, los clientes pueden ingresar una dirección manual para este "
-"reparto."
+"Si se marca, los clientes pueden ingresar una dirección manual para esta "
+"ruta."
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__message_needaction
@@ -594,7 +594,7 @@ msgstr "Si está marcado, algunos mensajes tienen un error de entrega."
 #: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route_number__allow_cash_sale
 msgid "If checked, this delivery number permits sales paid in cash."
 msgstr ""
-"Si se marca, este número de reparto permite ventas pagadas en efectivo."
+"Si se marca, este reparto permite ventas pagadas en efectivo."
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__delivery_route__state__in_progress
@@ -911,21 +911,29 @@ msgstr "Motivo por el cual no se pudo completar la visita."
 #: model:ir.model.fields,help:logistic_custom_ivess.field_delivery_route__allow_cash_sale
 #: model:ir.model.fields,help:logistic_custom_ivess.field_template_delivery_route__allow_cash_sale
 msgid "Reflects the cash‑sale setting of the associated delivery number."
-msgstr "Refleja la configuración de venta contado del número de reparto asociado."
+msgstr "Refleja la configuración de venta contado del reparto asociado."
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_account_bank_statement_line__delivery_route_ids
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_account_move__delivery_route_ids
-#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_partner_form_inherit_sales_purchases
 msgid "Reparto"
-msgstr "Reparto"
+msgstr "Ruta"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_partner_form_inherit_sales_purchases
+msgid "Recorrido"
+msgstr "Recorrido"
 
 #. module: logistic_custom_ivess
 #: model:ir.actions.act_window,name:logistic_custom_ivess.action_template_delivery_route
 #: model:ir.ui.menu,name:logistic_custom_ivess.menu_tempalte_delivery_route
-#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_move_form_inherit_add_m2m
 msgid "Repartos"
-msgstr "Repartos"
+msgstr "Recorridos"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_move_form_inherit_add_m2m
+msgid "Rutas"
+msgstr "Rutas"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_replacement_reason
@@ -993,7 +1001,7 @@ msgstr "Roles"
 #. module: logistic_custom_ivess
 #: model:ir.ui.menu,name:logistic_custom_ivess.menu_delivery_route_number
 msgid "Route Numbers"
-msgstr "Números de ruta"
+msgstr "Repartos"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__message_has_sms_error
@@ -1055,14 +1063,14 @@ msgstr "Domingo"
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__template_route_id
 msgid "Template Delivery Route"
-msgstr "Plantilla de ruta de reparto"
+msgstr "Recorrido"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_template_delivery_route
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__template_delivery_route_id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__template_delivery_route_id
 msgid "Template delivery route"
-msgstr "Plantilla de ruta de reparto"
+msgstr "Recorrido"
 
 #. module: logistic_custom_ivess
 #. odoo-python
@@ -1110,7 +1118,7 @@ msgstr "Jueves"
 #. odoo-python
 #: code:addons/logistic_custom_ivess/models/delivery_route.py:0
 msgid "To start a delivery route, you must first set the delivery date."
-msgstr "Para iniciar una ruta de reparto, primero debe establecer la fecha de reparto."
+msgstr "Para iniciar una ruta, primero debe establecer la fecha de entrega."
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__truck_id
@@ -1284,3 +1292,15 @@ msgstr "Prestado"
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__stock_move__container_state__en_comodato
 msgid "En Comodato"
 msgstr "En Comodato"
+
+#. module: logistic_custom_ivess
+#: model:ir.actions.act_window,name:logistic_custom_ivess.action_delivery_route_mass_create_wizard
+#: model:ir.ui.menu,name:logistic_custom_ivess.menu_delivery_route_mass_create
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_mass_create_wizard_form
+msgid "Generate Delivery Routes"
+msgstr "Generar Rutas"
+
+#. module: logistic_custom_ivess
+#: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_mass_create_wizard_form
+msgid "Se generarán rutas dentro del rango seleccionado para el recorrido asignado."
+msgstr "Se generarán rutas dentro del rango seleccionado para el recorrido asignado."

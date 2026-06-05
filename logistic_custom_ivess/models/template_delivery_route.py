@@ -47,7 +47,7 @@ class TemplateDeliveryRoute(models.Model):
     )
     delivery_number_id = fields.Many2one(
         'delivery.route.number',
-        string="Delivery Route Number",
+        string="Reparto",
     )
     truck_id = fields.Many2one(
        'fleet.vehicle',
@@ -116,7 +116,7 @@ class UserAssignedLines(models.Model):
 
     template_delivery_route_id = fields.Many2one(
         'template.delivery.route',
-        string="Template delivery route",
+        string="Recorrido",
         ondelete='cascade',
     )
     user_id = fields.Many2one(
