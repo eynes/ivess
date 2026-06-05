@@ -3,7 +3,7 @@
         <field name="name">delivery.route.form</field>
         <field name="model">delivery.route</field>
         <field name="arch" type="xml">
-            <form string="Delivery Route">
+            <form string="Ruta">
                 <header>
                     <button name="action_set_in_progress" type="object" string="In Progress" invisible="state not in ('draft')" class="btn-primary"/>
                     <button name="action_set_closed" type="object" string="Close" invisible="state not in ('in_progress')" class="btn-success"  confirm="Esta seguro que desea cerrar la ruta?"/>
@@ -69,7 +69,7 @@
         <field name="name">delivery.route.tree</field>
         <field name="model">delivery.route</field>
         <field name="arch" type="xml">
-            <list string="Delivery Routes"> <field name="name"/>
+            <list string="Rutas"> <field name="name"/>
                 <field name="truck_id"/>
                 <field name="delivery_person_id"/>
                 <field name="delivery_date"/>
@@ -79,7 +79,7 @@
     </record>
 
     <record id="action_delivery_route" model="ir.actions.act_window">
-        <field name="name">Delivery Routes</field>
+        <field name="name">Rutas</field>
         <field name="res_model">delivery.route</field>
         <field name="view_mode">list,form</field>
     </record>

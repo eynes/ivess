@@ -7,7 +7,7 @@ class SaleOrder(models.Model):
 
     delivery_route_id = fields.Many2one(
         'delivery.route', 
-        string="Delivery Route"
+        string="Ruta"
     )
 
     def write(self, vals):

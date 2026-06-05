@@ -5,7 +5,7 @@
         <field name="name">delivery.route.number.tree</field>
         <field name="model">delivery.route.number</field>
         <field name="arch" type="xml">
-            <list string="Delivery Route Numbers">
+            <list string="Repartos">
                 <field name="number"/>
                 <field name="allow_price_editing"/>
                 <field name="allow_free_of_charge"/>
@@ -23,7 +23,7 @@
         <field name="name">delivery.route.number.form</field>
         <field name="model">delivery.route.number</field>
         <field name="arch" type="xml">
-            <form string="Delivery Route Number">
+            <form string="Reparto">
                 <sheet>
                     <group>
                         <group>
@@ -63,7 +63,7 @@
 
     <!-- Acción -->
     <record id="action_delivery_route_number" model="ir.actions.act_window">
-        <field name="name">Delivery Route Numbers</field>
+        <field name="name">Repartos</field>
         <field name="res_model">delivery.route.number</field>
         <field name="view_mode">list,form</field>
         <field name="help" type="html">
@@ -74,7 +74,7 @@
     </record>
 
     <menuitem id="menu_delivery_route_number"
-            name="Route Numbers"
+            name="Repartos"
             parent="sale.menu_sale_config"
             action="action_delivery_route_number" />
 </odoo>

@@ -29,7 +29,7 @@ class DeliveryRouteMassCreateWizard(models.TransientModel):
 
     date_from = fields.Date(string="Date from", required=True)
     date_to = fields.Date(string="Date to", required=True)
-    template_delivery_route_id = fields.Many2one('template.delivery.route', string="Template route", required=True)
+    template_delivery_route_id = fields.Many2one('template.delivery.route', string="Recorrido", required=True)
 
     def _validate_dates(self):
         """Valida que la fecha de inicio (date_from) no sea mayor que la fecha de fin (date_to).

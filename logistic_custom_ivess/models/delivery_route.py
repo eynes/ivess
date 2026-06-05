@@ -32,7 +32,7 @@ class DeliveryRoute(models.Model):
     )
     template_delivery_route_id = fields.Many2one(
         'template.delivery.route',
-        string="Template delivery route",
+        string="Recorrido",
     )
     delivery_person_id = fields.Many2one(
         'res.users',
@@ -70,7 +70,7 @@ class DeliveryRoute(models.Model):
         string='Create from wizard',
     )
     delivery_number_id = fields.Many2one(
-        string="Delivery route number",
+        string="Reparto",
         related="template_delivery_route_id.delivery_number_id",
         # required=True,
         store=True,
@@ -240,14 +240,14 @@ class DeliveryRouteLine(models.Model):
 
     route_id = fields.Many2one(
         'delivery.route',
-        string='Delivery Route',
+        string='Ruta',
         # required=True,
         ondelete='cascade',
         copy=False,
     )
     template_route_id = fields.Many2one(
         'template.delivery.route',
-        string='Template Delivery Route',
+        string='Recorrido',
         # required=True,
         ondelete='cascade',
         copy=False,
