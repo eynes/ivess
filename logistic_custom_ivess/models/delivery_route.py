@@ -59,6 +59,7 @@ class DeliveryRoute(models.Model):
     state = fields.Selection(
         [
             ('draft', 'Draft'),
+            ('sincronizado', 'Sincronizado'),
             ('in_progress', 'In Progress'),
             ('closed', 'Closed')
         ],
@@ -167,6 +168,9 @@ class DeliveryRoute(models.Model):
     #         return user not in self.truck_id.user_assigned_ids
     #     return False
 
+    def action_set_synchronized(self):
+        self.state = 'sincronizado'
+
     def action_set_in_progress(self):
         # if not self.delivery_route_line_ids:
         #     raise UserError(_('To start the route, you should first assign clients to visit.'))
@@ -182,7 +186,7 @@ class DeliveryRoute(models.Model):
 
     def _validate_state(self):
         if self.state != 'in_progress':
-            raise ValidationError("Solo se pueden cerrar registros en estado 'En Progreso'.")
+            raise ValidationError(_("Solo se pueden cerrar registros en estado 'En Progreso'."))
 
     def _validate_rake_restriction(self):
         if not self.allow_closing_with_rake:
@@ -306,6 +310,20 @@ class DeliveryRouteLine(models.Model):
         'res.partner.category',
         domain=[('parent_id.name','=','Posible Baja')],
         string="Reason of Withdrawal", tracking=True
+    )
+    effective_visit_hour = fields.Float(
+        string='Hora Efectiva de Visita',
+    )
+    sale_order_id = fields.Many2one(
+        'sale.order',
+        string='SO Relacionada',
+    )
+    stock_picking_id = fields.Many2one(
+        'stock.picking',
+        string='Remito Relacionado',
+    )
+    origin = fields.Char(
+        string='Origen',
     )
 
     @api.model_create_multi

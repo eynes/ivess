@@ -21,6 +21,9 @@
                 <field name="registration_channel_id"/>
                 <field name="customer_code"/>
             </xpath>
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="is_important_client"/>
+            </xpath>
             <xpath expr="//page[@name='sales_purchases']" position="inside">
                 <group invisible="not id">
                     <group name="group_route" string="Recorrido">
@@ -34,6 +37,7 @@
                             </list>
                         </field>
                         <field name="average_hour" widget="float_time"/>
+                        <field name="visit_hour" widget="float_time"/>
                     </group>
                 </group>
             </xpath>

@@ -1,6 +1,13 @@
 from odoo import models, fields, api, _
 
 
+class DeliveryRouteNumberCategory(models.Model):
+    _name = 'delivery.route.number.category'
+    _description = 'Delivery Route Number Category'
+
+    name = fields.Char(string="Nombre", required=True)
+
+
 class DeliveryRouteNumber(models.Model):
     _name = 'delivery.route.number'
     _description = 'Delivery Route Number'
@@ -62,6 +69,32 @@ class DeliveryRouteNumber(models.Model):
     repair_order_sequence_id = fields.Many2one(
         'ir.sequence' ,
         string='Repair Orders Booklet',
+    )
+    region_id = fields.Many2one(
+        'delivery.route.region',
+        string='Región',
+    )
+    license_plate = fields.Char(
+        string='Patente',
+        related='truck_id.license_plate',
+        store=True,
+        readonly=True,
+    )
+    supervisor_id = fields.Many2one(
+        'res.partner',
+        string='Supervisor',
+    )
+    conductor_id = fields.Many2one(
+        'res.partner',
+        string='Conductor',
+    )
+    ayudante_id = fields.Many2one(
+        'res.partner',
+        string='Ayudante',
+    )
+    category_id = fields.Many2one(
+        'delivery.route.number.category',
+        string='Categoría',
     )
 
 
