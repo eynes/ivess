@@ -117,6 +117,16 @@ class ResPartner(models.Model):
                     vals['customer_code'] = sequence.next_by_id()
         return super(ResPartner, self).create(vals_list)
 
+    @api.constrains('visit_hour')
+    def _check_visit_hour(self):
+        for record in self:
+            if not record.visit_hour:
+                continue
+            hours = int(record.visit_hour)
+            minutes = round((record.visit_hour - hours) * 60)
+            if record.visit_hour < 0 or hours > 23 or minutes > 59:
+                raise ValidationError(_("El horario de visita debe ser un horario válido (entre 00:00 y 23:59)."))
+
     @api.constrains('date_from', 'date_to')
     def _check_dates(self):
         for record in self:
