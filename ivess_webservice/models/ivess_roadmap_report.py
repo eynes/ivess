@@ -1,6 +1,14 @@
 from odoo import api, fields, models, tools
 
 
+def _format_float_time(value):
+    if not value and value != 0:
+        return False
+    hours = int(value)
+    minutes = round((value - hours) * 60)
+    return "%02d:%02d" % (hours, minutes)
+
+
 class IvessRoadmapReport(models.Model):
     _name = "ivess.roadmap.report"
     _description = "Vista SQL de roadmap expuesta al middleware Ivess"
@@ -20,6 +28,7 @@ class IvessRoadmapReport(models.Model):
         readonly=True,
     )
     name = fields.Char(readonly=True)
+    avg_hour = fields.Float(readonly=True)
     street = fields.Char(readonly=True)
     street2 = fields.Char(readonly=True)
     street_number = fields.Char(readonly=True)
@@ -56,6 +65,7 @@ class IvessRoadmapReport(models.Model):
                     drl.customer_code                   AS customer_code,
                     tdr.day                             AS day,
                     rp.name                             AS name,
+                    rp.average_hour                     AS avg_hour,
                     rp.street                           AS street,
                     rp.street2                          AS street2,
                     rp.num                              AS street_number,
@@ -125,6 +135,7 @@ class IvessRoadmapReport(models.Model):
             "customer_code",
             "day",
             "name",
+            "avg_hour",
             "street",
             "street2",
             "street_number",
@@ -148,6 +159,7 @@ class IvessRoadmapReport(models.Model):
                 grouped[code] = {
                     "customer_code": code,
                     "name": rec["name"],
+                    "avg_hour": _format_float_time(rec["avg_hour"]),
                     "street": rec["street"],
                     "street2": rec["street2"],
                     "street_number": rec["street_number"],
