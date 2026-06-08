@@ -46,6 +46,7 @@
                                     <field name="visit_status_id" optional="show" column_invisible="parent.state in ('draft')"/>
                                     <field name="requires_reason" optional="hide"/>
                                     <field name="no_purchase_reason_id"  widget="many2one" optional="show" column_invisible="parent.state in ('draft')" readonly="requires_reason == False" required="requires_reason == True"/>
+                                    <field name="visit_hour" widget="float_time" optional="show"/>
                                     <field name="effective_visit_hour" widget="float_time" optional="show"/>
                                     <field name="sale_order_id" optional="show"/>
                                     <field name="stock_picking_id" optional="show"/>

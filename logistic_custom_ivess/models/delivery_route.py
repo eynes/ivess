@@ -311,6 +311,12 @@ class DeliveryRouteLine(models.Model):
         domain=[('parent_id.name','=','Posible Baja')],
         string="Reason of Withdrawal", tracking=True
     )
+    visit_hour = fields.Float(
+        string='Hora de Visita',
+        related='client_id.visit_hour',
+        store=True,
+        readonly=True,
+    )
     effective_visit_hour = fields.Float(
         string='Hora Efectiva de Visita',
     )
