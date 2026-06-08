@@ -101,6 +101,12 @@ class ResPartner(models.Model):
     average_hour = fields.Float(
         string="Average Hour"
     )
+    visit_hour = fields.Float(
+        string="Horario de Visita",
+    )
+    is_important_client = fields.Boolean(
+        string="Cliente Importante",
+    )
 
     @api.model_create_multi
     def create(self, vals_list):

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': "Sale Custom Ivess",
-    'version': '19.0.0.0.7',
+    'version': '19.0.0.0.8',
     'description': """
     """,
     'author': "Eynes",
@@ -24,6 +24,7 @@
         'data/res_groups.xml',
         'views/client_type.xml',
         'views/registration_channel.xml',
+        'views/delivery_route_region.xml',
         'views/delivery_route.xml',
         'views/delivery_route_number.xml',
         'views/account_move.xml',

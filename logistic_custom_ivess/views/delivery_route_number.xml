@@ -28,6 +28,21 @@
                     <group>
                         <group>
                             <field name="number"/>
+                            <field name="region_id"/>
+                        </group>
+                        <group>
+                            <field name="truck_id"/>
+                            <field name="license_plate"/>
+                        </group>
+                    </group>
+                    <group string="Personal" name="personal_group">
+                        <group>
+                            <field name="supervisor_id"/>
+                            <field name="conductor_id"/>
+                        </group>
+                        <group>
+                            <field name="ayudante_id"/>
+                            <field name="category_id"/>
                         </group>
                     </group>
                     <group string="Configuración" name="conf_group">
