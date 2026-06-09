@@ -10,6 +10,7 @@
         "sale",
         "account",
         "l10n_ar_eynes",
+        "logistic_custom_ivess",
     ],
     "data": [
         "views/res_partner.xml",

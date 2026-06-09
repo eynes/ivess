@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
-from odoo import models, fields, api
+from odoo import models, fields, api, _
+from odoo.exceptions import UserError
 
 
 class ResPartner(models.Model):
@@ -52,3 +53,45 @@ class ResPartner(models.Model):
 
             partner.unbilled_balance = unbilled
             partner.final_balance = total_orders - payment_totals.get(partner.id, 0.0)
+
+    def write(self, vals):
+        self._check_pending_water_containers_before_archiving(vals)
+        return super().write(vals)
+
+    def unlink(self):
+        for partner in self:
+            partner._check_pending_water_containers_before_archiving()
+        return super().unlink()
+
+    def _check_pending_water_containers_before_archiving(self, vals=None):
+        """Valida si hay envases pendientes al intentar archivar o eliminar."""
+        if self.env.user.has_group('logistic_custom_ivess.group_allow_archive_debt_or_containers'):
+            return
+
+        if vals is None or vals.get('active') is False:
+            errors = []
+            for partner in self:
+                pending = partner.check_water_container()
+                unpaid = partner.get_unpaid_invoice_count()
+                if pending > 0:
+                    errors.append(_("This customer has %s water containers pending return.") % pending)
+                if unpaid > 0:
+                    errors.append(_("This customer has %s unpaid or partially paid invoice(s).") % unpaid)
+            if errors:
+                raise UserError('\n'.join(errors))
+
+    def check_water_container(self):
+        self.ensure_one()
+        containers = self.env['water.container'].search([
+            ('partner_id', '=', self.id),
+        ])
+        return sum(containers.mapped('quantity'))
+
+    def get_unpaid_invoice_count(self):
+        self.ensure_one()
+        return self.env['account.move'].search_count([
+            ('partner_id', '=', self.id),
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('payment_state', 'in', ['not_paid', 'partial']),
+        ])
