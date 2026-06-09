@@ -25,3 +25,15 @@ msgstr "Saldo no facturado"
 #: model:ir.model.fields,field_description:ivess_partner_custom.field_res_partner__final_balance
 msgid "Final Balance"
 msgstr "Saldo final"
+
+#. module: ivess_partner_custom
+#. odoo-python
+#: code:addons/ivess_partner_custom/models/res_partner.py:0
+msgid "This customer has %s water containers pending return."
+msgstr "Este cliente tiene %s envases pendientes de devolución."
+
+#. module: ivess_partner_custom
+#. odoo-python
+#: code:addons/ivess_partner_custom/models/res_partner.py:0
+msgid "This customer has %s unpaid or partially paid invoice(s)."
+msgstr "Este cliente tiene %s factura(s) sin pagar o parcialmente pagadas."
