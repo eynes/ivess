@@ -28,7 +28,7 @@ _REPAIR_LINE_TYPE_BADGE = {
 
 _STAGE_BADGE = {
     'repair': 'danger',
-    'calidad': 'info',
+    'prueba_inicial': 'info',
     'hidrolavadora': 'primary',
     'pileta': 'primary',
     'prueba': 'warning',
@@ -39,16 +39,16 @@ _STAGE_BADGE = {
 
 _REPAIRS_PER_PAGE = 20
 
-# Etapas a las que no se puede retroceder desde el botón Revertir del portal.
-# Se llega a ellas por flujos propios ('calidad' via wizard QC, 'repair' via botón dedicado).
-# Alineado con la misma restricción del backend:
-#   invisible="frio_calor_stage in ('hidrolavadora', 'calidad', 'repair') or is_outsourced"
-_NO_REVERT_FROM = frozenset({'hidrolavadora', 'calidad', 'repair'})
+# Etapas desde las que el botón Revertir no se muestra en el portal.
+# 'repair' se maneja con botón dedicado; 'prueba_inicial' no tiene etapas previas válidas.
+# Alineado con la restricción del backend:
+#   invisible="frio_calor_stage in ('prueba_inicial', 'repair') or is_outsourced"
+_NO_REVERT_FROM = frozenset({'prueba_inicial', 'repair'})
 
 # Etapas que NO pueden ser destino de un revertir (deben alcanzarse por flujos propios).
 # Alineado con el dominio del wizard backend:
-#   domain="[..., ('key', 'not in', ('repair', 'calidad'))]"
-_NO_REVERT_TARGET = frozenset({'repair', 'calidad'})
+#   domain="[..., ('key', 'not in', ('repair', 'prueba_inicial'))]"
+_NO_REVERT_TARGET = frozenset({'repair'})
 
 
 def _get_prev_stages(repair, stage_labels, stage_order, stage_order_no_paint):
@@ -198,37 +198,23 @@ class RepairPortalController(CustomerPortal):
         return request.render('repair_portal_ivess.portal_repair_detail', values)
 
     @http.route(
-        ['/my/repairs/<int:repair_id>/quality_approve'],
+        ['/my/repairs/<int:repair_id>/set_initial_test_result'],
         type='http', auth='user', website=True, methods=['POST'],
     )
-    def portal_repair_quality_approve(self, repair_id, **kw):
+    def portal_repair_set_initial_test_result(self, repair_id, **post):
         repair = request.env['repair.order'].sudo().browse(repair_id)
-        if not repair.exists() or repair.frio_calor_stage != 'calidad' or repair.is_outsourced:
-            return request.redirect(f'/my/repairs/{repair_id}')
-        try:
-            repair.with_context(_portal_user_id=request.env.uid).action_open_advance_next_stage()
-            quality_check = repair.quality_check_ids.filtered(lambda c: c.quality_state == 'none')[:1]
-            if quality_check:
-                quality_check.with_context(_portal_user_id=request.env.uid).do_pass()
-        except (UserError, Exception):
-            pass
-        return request.redirect(f'/my/repairs/{repair_id}')
+        if not repair.exists() or repair.repair_equipment_type != 'frio_calor':
+            return request.redirect('/my/repairs')
 
-    @http.route(
-        ['/my/repairs/<int:repair_id>/quality_fail'],
-        type='http', auth='user', website=True, methods=['POST'],
-    )
-    def portal_repair_quality_fail(self, repair_id, **kw):
-        repair = request.env['repair.order'].sudo().browse(repair_id)
-        if not repair.exists() or repair.frio_calor_stage != 'calidad' or repair.is_outsourced:
+        resultado = (post.get('resultado') or '').strip()
+        if resultado not in ('no_definido', 'aprobado', 'desaprobado'):
             return request.redirect(f'/my/repairs/{repair_id}')
+
         try:
-            repair.with_context(_portal_user_id=request.env.uid).action_open_advance_next_stage()
-            quality_check = repair.quality_check_ids.filtered(lambda c: c.quality_state == 'none')[:1]
-            if quality_check:
-                quality_check.with_context(_portal_user_id=request.env.uid).do_fail()
-        except (UserError, Exception):
-            pass
+            repair.write({'prueba_inicial_resultado': resultado})
+        except Exception as e:
+            _logger.exception("Portal set_initial_test_result failed repair_id=%s: %s", repair_id, e)
+
         return request.redirect(f'/my/repairs/{repair_id}')
 
     @http.route(
