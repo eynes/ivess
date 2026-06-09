@@ -43,59 +43,49 @@
             </t>
 
             <t t-if="maintenance_requests">
-                <div class="card mt-3">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Asunto</th>
-                                    <th>Equipo</th>
-                                    <th>Tipo</th>
-                                    <th>Prioridad</th>
-                                    <th>Etapa</th>
-                                    <th>Fecha solicitud</th>
-                                    <th>Responsable</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-foreach="maintenance_requests" t-as="req">
-                                    <tr>
-                                        <td>
-                                            <a t-attf-href="/my/maintenance/#{req.id}">
-                                                <t t-esc="req.name"/>
-                                            </a>
-                                        </td>
-                                        <td><t t-esc="req.equipment_id.name or '—'"/></td>
-                                        <td>
-                                            <span class="badge rounded-pill text-bg-secondary">
-                                                <t t-esc="maintenance_type_labels.get(req.maintenance_type, req.maintenance_type)"/>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(req.priority, 'secondary')}">
-                                                <t t-esc="priority_labels.get(req.priority, req.priority)"/>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span t-attf-class="badge rounded-pill text-bg-#{
-                                                'success' if req.stage_id.done else
-                                                'secondary' if req.stage_id.fold else
-                                                'primary'}">
-                                                <t t-esc="req.stage_id.name or '—'"/>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <t t-if="req.request_date">
-                                                <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
-                                            </t>
-                                            <t t-else="">—</t>
-                                        </td>
-                                        <td><t t-esc="req.user_id.name or '—'"/></td>
-                                    </tr>
-                                </t>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="list-group mt-3 shadow-sm">
+                    <t t-foreach="maintenance_requests" t-as="req">
+                        <a t-attf-href="/my/maintenance/#{req.id}"
+                           class="list-group-item list-group-item-action px-3 py-3">
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                <span class="fw-semibold lh-sm">
+                                    <t t-esc="req.name"/>
+                                </span>
+                                <span t-attf-class="badge rounded-pill text-bg-#{
+                                    'success' if req.stage_id.done else
+                                    'secondary' if req.stage_id.fold else
+                                    'primary'} flex-shrink-0">
+                                    <t t-esc="req.stage_id.name or '—'"/>
+                                </span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <span class="badge rounded-pill text-bg-secondary">
+                                    <t t-esc="maintenance_type_labels.get(req.maintenance_type, req.maintenance_type)"/>
+                                </span>
+                                <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(req.priority, 'secondary')}">
+                                    <i class="fa fa-flag me-1"/>
+                                    <t t-esc="priority_labels.get(req.priority, req.priority)"/>
+                                </span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-3 text-muted small">
+                                <span>
+                                    <i class="fa fa-wrench me-1"/>
+                                    <t t-esc="req.equipment_id.name or '—'"/>
+                                </span>
+                                <span>
+                                    <i class="fa fa-calendar me-1"/>
+                                    <t t-if="req.request_date">
+                                        <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
+                                    </t>
+                                    <t t-else="">—</t>
+                                </span>
+                                <span>
+                                    <i class="fa fa-user me-1"/>
+                                    <t t-esc="req.user_id.name or '—'"/>
+                                </span>
+                            </div>
+                        </a>
+                    </t>
                 </div>
 
                 <div t-if="pager" class="o_portal_pager text-center mt-3">
@@ -795,59 +785,49 @@
             </t>
 
             <t t-if="maintenance_requests">
-                <div class="card mt-3">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Asunto</th>
-                                    <th>Equipo</th>
-                                    <th>Tipo</th>
-                                    <th>Prioridad</th>
-                                    <th>Etapa</th>
-                                    <th>Fecha solicitud</th>
-                                    <th>Responsable</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-foreach="maintenance_requests" t-as="req">
-                                    <tr>
-                                        <td>
-                                            <a t-attf-href="/my/workshop/#{req.id}">
-                                                <t t-esc="req.name"/>
-                                            </a>
-                                        </td>
-                                        <td><t t-esc="req.equipment_id.name or '—'"/></td>
-                                        <td>
-                                            <span class="badge rounded-pill text-bg-secondary">
-                                                <t t-esc="maintenance_type_labels.get(req.maintenance_type, req.maintenance_type)"/>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(req.priority, 'secondary')}">
-                                                <t t-esc="priority_labels.get(req.priority, req.priority)"/>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span t-attf-class="badge rounded-pill text-bg-#{
-                                                'success' if req.stage_id.done else
-                                                'secondary' if req.stage_id.fold else
-                                                'primary'}">
-                                                <t t-esc="req.stage_id.name or '—'"/>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <t t-if="req.request_date">
-                                                <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
-                                            </t>
-                                            <t t-else="">—</t>
-                                        </td>
-                                        <td><t t-esc="req.user_id.name or '—'"/></td>
-                                    </tr>
-                                </t>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="list-group mt-3 shadow-sm">
+                    <t t-foreach="maintenance_requests" t-as="req">
+                        <a t-attf-href="/my/workshop/#{req.id}"
+                           class="list-group-item list-group-item-action px-3 py-3">
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                <span class="fw-semibold lh-sm">
+                                    <t t-esc="req.name"/>
+                                </span>
+                                <span t-attf-class="badge rounded-pill text-bg-#{
+                                    'success' if req.stage_id.done else
+                                    'secondary' if req.stage_id.fold else
+                                    'primary'} flex-shrink-0">
+                                    <t t-esc="req.stage_id.name or '—'"/>
+                                </span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <span class="badge rounded-pill text-bg-secondary">
+                                    <t t-esc="maintenance_type_labels.get(req.maintenance_type, req.maintenance_type)"/>
+                                </span>
+                                <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(req.priority, 'secondary')}">
+                                    <i class="fa fa-flag me-1"/>
+                                    <t t-esc="priority_labels.get(req.priority, req.priority)"/>
+                                </span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-3 text-muted small">
+                                <span>
+                                    <i class="fa fa-wrench me-1"/>
+                                    <t t-esc="req.equipment_id.name or '—'"/>
+                                </span>
+                                <span>
+                                    <i class="fa fa-calendar me-1"/>
+                                    <t t-if="req.request_date">
+                                        <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
+                                    </t>
+                                    <t t-else="">—</t>
+                                </span>
+                                <span>
+                                    <i class="fa fa-user me-1"/>
+                                    <t t-esc="req.user_id.name or '—'"/>
+                                </span>
+                            </div>
+                        </a>
+                    </t>
                 </div>
 
                 <div t-if="pager" class="o_portal_pager text-center mt-3">
