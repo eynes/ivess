@@ -87,7 +87,7 @@ class IvessContainerLoanReport(models.Model):
             if code not in grouped:
                 grouped[code] = {"customer_code": code, "containers": []}
             grouped[code]["containers"].append({
-                "id":           rec["id"],
+                "product_id":           rec["id"],
                 "default_code": rec["default_code"],
                 "quantity":     rec["quantity"],
                 "state":        rec["state"],
