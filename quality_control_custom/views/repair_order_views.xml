@@ -10,7 +10,7 @@
             <xpath expr="//field[@name='state']" position="before">
                 <field name="frio_calor_stage" optional="show" widget="badge" 
                 decoration-success="frio_calor_stage == 'armado'" 
-                decoration-info="frio_calor_stage == 'calidad'" 
+                decoration-info="frio_calor_stage == 'prueba_inicial'"
                 decoration-primary="frio_calor_stage in ('hidrolavadora','pileta')" 
                 decoration-muted="frio_calor_stage == 'pintura'"
                 decoration-warning="frio_calor_stage in ('prueba','secado')" 
@@ -62,10 +62,15 @@
                             type="object"
                             class="btn btn-link btn-sm px-1"
                             title="Revertir Etapa"
-                            invisible="frio_calor_stage in ('hidrolavadora', 'calidad', 'repair') or is_outsourced">
+                            invisible="frio_calor_stage in ('prueba_inicial', 'repair') or is_outsourced">
                         <i class="fa fa-chevron-left"/> Revertir Etapa
                     </button>
                     <field name="frio_calor_stage" widget="selection_badge" readonly="1"/>
+                    <field name="prueba_inicial_resultado" widget="badge"
+                           decoration-success="prueba_inicial_resultado == 'aprobado'"
+                           decoration-danger="prueba_inicial_resultado == 'desaprobado'"
+                           decoration-muted="prueba_inicial_resultado == 'no_definido'"
+                           invisible="frio_calor_stage != 'prueba_inicial'"/>
                     <!--<button name="action_open_advance_stage_wizard"
                             type="object"
                             class="btn btn-link btn-sm text-primary px-1"
@@ -77,10 +82,17 @@
                             type="object"
                             class="btn btn-link btn-sm px-1"
                             title="Avanzar Etapa"
-                            invisible="frio_calor_stage in ('armado', 'calidad', 'repair') or is_outsourced">
+                            invisible="frio_calor_stage in ('armado', 'repair') or is_outsourced or prueba_inicial_resultado == 'no_definido'">
                         <i class="fa fa-chevron-right"/><br/>Siguiente Etapa
                     </button>
                 </div>
+            </xpath>
+
+            <!-- Resultado prueba inicial en el body (debajo de parts_availability) -->
+            <xpath expr="//field[@name='parts_availability']" position="after">
+                <field name="prueba_inicial_resultado"
+                       invisible="repair_equipment_type != 'frio_calor'"
+                       readonly="frio_calor_stage != 'prueba_inicial'"/>
             </xpath>
 
             <!-- Campo requires_painting debajo de product_id -->
