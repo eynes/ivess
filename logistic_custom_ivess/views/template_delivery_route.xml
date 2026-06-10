@@ -49,12 +49,12 @@
         </field>
     </record>
     <record id="action_template_delivery_route" model="ir.actions.act_window">
-        <field name="name">Repartos</field>
+        <field name="name">Recorridos</field>
         <field name="res_model">template.delivery.route</field>
         <field name="view_mode">list,form</field>
     </record>
     <menuitem id="menu_tempalte_delivery_route"
-            name="Repartos"
+            name="Recorridos"
             parent="sale.menu_sale_config"
             sequence="23"
             action="action_template_delivery_route" />

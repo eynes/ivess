@@ -3,12 +3,13 @@
         <field name="name">delivery.route.form</field>
         <field name="model">delivery.route</field>
         <field name="arch" type="xml">
-            <form string="Delivery Route">
+            <form string="Ruta">
                 <header>
-                    <button name="action_set_in_progress" type="object" string="In Progress" invisible="state not in ('draft')" class="btn-primary"/>
-                    <button name="action_set_closed" type="object" string="Close" invisible="state not in ('in_progress')" class="btn-success"  confirm="Esta seguro que desea cerrar la ruta?"/>
+                    <button name="action_set_synchronized" type="object" string="Sincronizar" invisible="state not in ('draft')" class="btn-primary"/>
+                    <button name="action_set_in_progress" type="object" string="In Progress" invisible="state not in ('sincronizado')" class="btn-primary"/>
+                    <button name="action_set_closed" type="object" string="Close" invisible="state not in ('in_progress')" class="btn-success" confirm="Esta seguro que desea cerrar la ruta?"/>
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state not in ('closed')" class="btn-secondary"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,closed"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,sincronizado,in_progress,closed"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -45,6 +46,11 @@
                                     <field name="visit_status_id" optional="show" column_invisible="parent.state in ('draft')"/>
                                     <field name="requires_reason" optional="hide"/>
                                     <field name="no_purchase_reason_id"  widget="many2one" optional="show" column_invisible="parent.state in ('draft')" readonly="requires_reason == False" required="requires_reason == True"/>
+                                    <field name="visit_hour" widget="float_time" optional="show"/>
+                                    <field name="effective_visit_hour" widget="float_time" optional="show"/>
+                                    <field name="sale_order_id" optional="show"/>
+                                    <field name="stock_picking_id" optional="show"/>
+                                    <field name="origin" optional="show"/>
                                     <field name="parent_delivery_type" force_save="1" column_invisible="1"/>
                                     <field name="parent_delivery_person" force_save="1" column_invisible="1"/>
                                     <field name="allowed_client" column_invisible="1" force_save="1"/>
@@ -69,7 +75,7 @@
         <field name="name">delivery.route.tree</field>
         <field name="model">delivery.route</field>
         <field name="arch" type="xml">
-            <list string="Delivery Routes"> <field name="name"/>
+            <list string="Rutas"> <field name="name"/>
                 <field name="truck_id"/>
                 <field name="delivery_person_id"/>
                 <field name="delivery_date"/>
@@ -79,7 +85,7 @@
     </record>
 
     <record id="action_delivery_route" model="ir.actions.act_window">
-        <field name="name">Delivery Routes</field>
+        <field name="name">Rutas</field>
         <field name="res_model">delivery.route</field>
         <field name="view_mode">list,form</field>
     </record>

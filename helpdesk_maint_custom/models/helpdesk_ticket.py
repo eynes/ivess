@@ -141,11 +141,15 @@ class HelpdeskTicket(models.Model):
     item_ids = fields.One2many("helpdesk.ticket.item", "ticket_id", string="Ítems")
 
     # Workshop (Taller Mecánico) fields
+    intake_user = fields.Char(string="Usuario JMobile")
     dispatch = fields.Char(string="Reparto")
+    webhub_dispatch = fields.Char(string="Reparto Webhub")
     driver_name = fields.Char(string="Nombre")
     vehicle_model = fields.Char(string="Modelo")
+    webhub_vehicle_model = fields.Char(string="Modelo Webhub")
     equipment_id = fields.Many2one("maintenance.equipment", string="Equipo")
     vehicle_location = fields.Char(string="Ubicación")
     breakdown_reason = fields.Char(string="Motivo de auxilio")
     maps_location = fields.Char(string="Ubicación Maps")
+    webhub_description = fields.Char(string="WebHub Descripción")
     warehouse_id = fields.Many2one('stock.warehouse', string="Planta")

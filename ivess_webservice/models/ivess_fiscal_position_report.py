@@ -25,6 +25,8 @@ class IvessFiscalPositionReport(models.Model):
         )
 
     @api.model
-    def get_fiscal_positions(self):
+    def get_fiscal_positions(self, **kwargs):
+        if kwargs:
+            return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
         records = self.search([])
         return records.read(["name", "afip_code", "supplier_denomination"])

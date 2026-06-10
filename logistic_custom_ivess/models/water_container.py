@@ -1,5 +1,12 @@
-from odoo import models, fields, api
+from datetime import timedelta
 
+from odoo import api, fields, models
+from odoo.tools.translate import _
+
+STATE_SELECTION = [
+    ('prestado', 'Prestado'),
+    ('en_comodato', 'En Comodato'),
+]
 
 class WaterContainer(models.Model):
     _name = 'water.container'
@@ -17,32 +24,162 @@ class WaterContainer(models.Model):
         'res.partner',
         string='Customer',
     )
-    container_type = fields.Selection(
-        [
-            ('bottle', 'Bottle'),
-            ('jug', 'Jug'),
-        ],
-        string='Container Type',
-        required=True
-    )
     assignment_date = fields.Date(
         string='Assignment Date',
-        required=True
+        compute='_compute_assignment_date',
+        store=True,
     )
     return_date = fields.Date(
-        string='Return Date'
+        string='Return Date',
+        compute='_compute_return_date',
     )
-    state_id = fields.Many2one(
-        'water.container.state',
+    state = fields.Selection(
+        STATE_SELECTION,
         string='Status',
         required=True,
-        tracking=True
+        tracking=True,
     )
     product_id = fields.Many2one(
         'product.template',
         string="Product",
         domain=[('is_returnable', '=', True)],
     )
+    stock_move_ids = fields.One2many(
+        'stock.move',
+        'water_container_id',
+        string='Stock Moves',
+    )
+    quantity = fields.Float(
+        string='Quantity',
+        compute='_compute_quantity',
+        store=True,
+    )
+    is_nonproductive = fields.Boolean(
+        string='Envase Improductivo',
+        default=False,
+    )
+    count_outgoing_pickings = fields.Integer(
+        string='Entregas',
+        compute='_compute_picking_counts',
+    )
+    count_incoming_pickings = fields.Integer(
+        string='Devoluciones',
+        compute='_compute_picking_counts',
+    )
+
+    @api.depends('stock_move_ids', 'stock_move_ids.state', 'stock_move_ids.quantity',
+                 'stock_move_ids.picking_id.picking_type_code')
+    def _compute_quantity(self):
+        for rec in self:
+            done_moves = rec.stock_move_ids.filtered(lambda m: m.state == 'done')
+            qty_out = sum(
+                m.quantity for m in done_moves
+                if m.picking_id.picking_type_code == 'outgoing'
+            )
+            qty_in = sum(
+                m.quantity for m in done_moves
+                if m.picking_id.picking_type_code == 'incoming'
+            )
+            rec.quantity = qty_out - qty_in
+
+    @api.depends(
+        'stock_move_ids',
+        'stock_move_ids.state',
+        'stock_move_ids.picking_id.picking_type_code',
+        'stock_move_ids.picking_id.date_done',
+    )
+    def _compute_assignment_date(self):
+        for rec in self:
+            outgoing_pickings = rec.stock_move_ids.filtered(
+                lambda m: m.state == 'done'
+                and m.picking_id.picking_type_code == 'outgoing'
+            ).mapped('picking_id')
+            if outgoing_pickings:
+                last = outgoing_pickings.sorted('date_done', reverse=True)[:1]
+                rec.assignment_date = last.date_done.date() if last.date_done else False
+            else:
+                rec.assignment_date = False
+
+    @api.depends('stock_move_ids.picking_id', 'stock_move_ids.picking_id.picking_type_code')
+    def _compute_picking_counts(self):
+        for rec in self:
+            pickings = rec.stock_move_ids.mapped('picking_id')
+            rec.count_outgoing_pickings = len(
+                pickings.filtered(lambda p: p.picking_type_code == 'outgoing')
+            )
+            rec.count_incoming_pickings = len(
+                pickings.filtered(lambda p: p.picking_type_code == 'incoming')
+            )
+
+    def action_open_outgoing_pickings(self):
+        move_ids = self.stock_move_ids.filtered(
+            lambda m: m.picking_id.picking_type_code == 'outgoing'
+        ).ids
+        return {
+            'name': 'Entregas',
+            'type': 'ir.actions.act_window',
+            'res_model': 'stock.move',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', move_ids)],
+        }
+
+    def action_open_incoming_pickings(self):
+        move_ids = self.stock_move_ids.filtered(
+            lambda m: m.picking_id.picking_type_code == 'incoming'
+        ).ids
+        return {
+            'name': 'Devoluciones',
+            'type': 'ir.actions.act_window',
+            'res_model': 'stock.move',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', move_ids)],
+        }
+
+    @api.depends('partner_id')
+    def _compute_return_date(self):
+        for rec in self:
+            if not rec.partner_id:
+                rec.return_date = False
+                continue
+            route = self.env['delivery.route'].search([
+                ('delivery_route_line_ids.client_id', '=', rec.partner_id.id),
+                ('state', '!=', 'closed'),
+            ], order='delivery_date asc', limit=1)
+            rec.return_date = route.delivery_date if route else False
+
+    @api.model
+    def _cron_check_nonproductive_containers(self):
+        four_weeks_ago = fields.Date.today() - timedelta(weeks=4)
+        containers = self.search([
+            ('is_nonproductive', '=', False),
+            ('product_id', '!=', False),
+            ('partner_id', '!=', False),
+        ])
+        to_deactivate = self.env['water.container']
+        for container in containers:
+            has_recent_sale = self.env['sale.order.line'].search_count([
+                ('order_id.partner_id', '=', container.partner_id.id),
+                ('product_id.product_tmpl_id', '=', container.product_id.id),
+                ('order_id.state', 'in', ['sale', 'done']),
+                ('order_id.date_order', '>=', four_weeks_ago),
+            ])
+            if not has_recent_sale:
+                to_deactivate |= container
+        if to_deactivate:
+            to_deactivate.write({'is_nonproductive': True})
+            for c in to_deactivate:
+                c.message_post(body=_('Marcado como Improductivo: sin compras en las últimas 4 semanas.'))
+
+    def _reactivate_for_partner_products(self, partner_id, product_tmpl_ids):
+        containers = self.search([
+            ('partner_id', '=', partner_id),
+            ('product_id', 'in', product_tmpl_ids),
+            ('is_nonproductive', '=', True),
+        ])
+        if containers:
+            containers.write({'is_nonproductive': False})
+            for c in containers:
+                c.message_post(body=_('Reactivado: nueva compra del producto registrada.'))
 
     @api.model
     def create(self, vals_list):
@@ -55,32 +192,3 @@ class WaterContainer(models.Model):
 
         records = super().create(vals_list)
         return records
-
-
-class WaterContainerState(models.Model):
-    _name = 'water.container.state'
-    _description = 'Water Container Status'
-    _order = 'code'
-
-    name = fields.Char(string='Status', required=True)
-    code = fields.Integer(
-        string='Code',
-        readonly=True,
-        copy=False,
-        index=True
-    )
-    is_pending_return = fields.Boolean(string="Pending return")
-
-    @api.model
-    def create(self, vals_list):
-        if isinstance(vals_list, dict):
-            vals_list = [vals_list]
-
-        # Obtener el último código actual
-        last_code = self.search([], order='code desc', limit=1).code or 0
-
-        for vals in vals_list:
-            last_code += 1
-            vals['code'] = last_code
-
-        return super(WaterContainerState, self).create(vals_list)

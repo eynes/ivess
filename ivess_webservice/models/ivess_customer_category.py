@@ -22,6 +22,8 @@ class IvessCustomerCategory(models.Model):
         )
 
     @api.model
-    def get_customer_categories(self):
+    def get_customer_categories(self, **kwargs):
+        if kwargs:
+            return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
         records = self.search([])
         return records.read(["name"])

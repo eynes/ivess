@@ -177,13 +177,24 @@ msgstr "Pedido de existencias"
 #. module: custom_ivess_product
 #. odoo-python
 #: code:addons/custom_ivess_product/models/product_template.py:0
-msgid "The abbreviation cannot exceed 10 characters."
-msgstr "La abreviatura no puede superar los 10 caracteres."
+msgid "Duplicate abbreviation."
+msgstr "Abreviatura repetida."
 
 #. module: custom_ivess_product
-#: sql_constraint:product.template:0
-msgid "The abbreviation must be unique."
-msgstr "La abreviatura debe ser única."
+#: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__is_regular_app
+msgid "Is Regular (APP)"
+msgstr "Es Habitual (APP)"
+
+#. module: custom_ivess_product
+#: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__allows_replacement
+msgid "Allows Replacement"
+msgstr "Permite Recambio"
+
+#. module: custom_ivess_product
+#. odoo-python
+#: code:addons/custom_ivess_product/models/product_template.py:0
+msgid "The abbreviation cannot exceed 10 characters."
+msgstr "La abreviatura no puede superar los 10 caracteres."
 
 #. module: custom_ivess_product
 #: model:ir.model,name:custom_ivess_product.model_res_users

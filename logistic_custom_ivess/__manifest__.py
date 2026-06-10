@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': "Sale Custom Ivess",
-    'version': '19.0.0.0.0',
+    'version': '19.0.0.0.9',
     'description': """
     """,
     'author': "Eynes",
@@ -12,7 +12,9 @@
         'sale',
         'fleet',
         'mail',
+        'stock',
         'l10n_ar_eynes',
+        'custom_ivess_product',
     ],
     'data': [
         'security/ir.model.access.csv',
@@ -22,6 +24,7 @@
         'data/res_groups.xml',
         'views/client_type.xml',
         'views/registration_channel.xml',
+        'views/delivery_route_region.xml',
         'views/delivery_route.xml',
         'views/delivery_route_number.xml',
         'views/account_move.xml',
@@ -36,6 +39,7 @@
         'views/template_delivery_route.xml',
         'views/visit_status.xml',
         'views/water_container.xml',
+        'views/stock_move.xml',
         'views/purchase_order.xml',
         'views/menuitems.xml',
     ],

@@ -5,7 +5,7 @@
         <field name="name">delivery.route.number.tree</field>
         <field name="model">delivery.route.number</field>
         <field name="arch" type="xml">
-            <list string="Delivery Route Numbers">
+            <list string="Repartos">
                 <field name="number"/>
                 <field name="allow_price_editing"/>
                 <field name="allow_free_of_charge"/>
@@ -23,11 +23,26 @@
         <field name="name">delivery.route.number.form</field>
         <field name="model">delivery.route.number</field>
         <field name="arch" type="xml">
-            <form string="Delivery Route Number">
+            <form string="Reparto">
                 <sheet>
                     <group>
                         <group>
                             <field name="number"/>
+                            <field name="region_id"/>
+                        </group>
+                        <group>
+                            <field name="truck_id"/>
+                            <field name="license_plate"/>
+                        </group>
+                    </group>
+                    <group string="Personal" name="personal_group">
+                        <group>
+                            <field name="supervisor_id"/>
+                            <field name="conductor_id"/>
+                        </group>
+                        <group>
+                            <field name="ayudante_id"/>
+                            <field name="category_id"/>
                         </group>
                     </group>
                     <group string="Configuración" name="conf_group">
@@ -45,6 +60,17 @@
                             <field name="allow_closing_with_rake" invisible="is_cold_hot_delivery == False"/>
                         </group>
                     </group>
+                    <notebook>
+                        <page string="Booklets" name="booklets">
+                            <group>
+                                <group>
+                                    <field name="remittance_sequence_ids" widget="many2many_tags"/>
+                                    <field name="collection_journal_id"/>
+                                    <field name="repair_order_sequence_id" invisible="is_cold_hot_delivery == False"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
@@ -52,7 +78,7 @@
 
     <!-- Acción -->
     <record id="action_delivery_route_number" model="ir.actions.act_window">
-        <field name="name">Delivery Route Numbers</field>
+        <field name="name">Repartos</field>
         <field name="res_model">delivery.route.number</field>
         <field name="view_mode">list,form</field>
         <field name="help" type="html">
@@ -63,7 +89,7 @@
     </record>
 
     <menuitem id="menu_delivery_route_number"
-            name="Route Numbers"
+            name="Repartos"
             parent="sale.menu_sale_config"
             action="action_delivery_route_number" />
 </odoo>
