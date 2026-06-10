@@ -93,7 +93,7 @@ class IvessPriceListReport(models.Model):
         for dist_line in partner.distributions_ids:
             distributions |= dist_line.distribution
 
-        if not distributions:
+        if not distributions or len(distributions) > 1:
             return {
                 "customer_code": customer_code,
                 "distributions": [],
@@ -183,6 +183,8 @@ class IvessPriceListReport(models.Model):
                     ("categ_id", "child_of", item.categ_id.id),
                     ("active", "=", True),
                 ])
+            elif item.applied_on == "3_global":
+                products |= self.env["product.product"].search([("active", "=", True)])
         return products
 
     def _has_product_rule_in_pricelist(self, product, pricelist):
