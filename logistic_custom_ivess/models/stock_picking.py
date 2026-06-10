@@ -31,7 +31,6 @@ class StockPicking(models.Model):
                     container = WaterContainer.create({
                         'partner_id': partner.id,
                         'product_id': product_tmpl.id,
-                        'assignment_date': fields.Date.today(),
                         'state': move.container_state,
                     })
                 move.water_container_id = container
