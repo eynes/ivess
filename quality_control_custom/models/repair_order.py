@@ -11,7 +11,7 @@ FRIO_CALOR_STAGES = [
     ('prueba', 'Prueba y sanitización'),
     ('secado', 'Secado'),
     ('pintura', 'Pintura'),
-    ('armado', 'Armado'),
+    ('armado', 'Embolsado'),
 ]
 
 FRIO_CALOR_STAGE_ORDER = [s[0] for s in FRIO_CALOR_STAGES]

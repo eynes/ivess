@@ -275,7 +275,7 @@
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <button type="submit"
                                         class="btn btn-primary"
-                                        t-att-disabled="not can_go_next or None">
+                                        t-att-disabled="(not can_go_next or (repair.frio_calor_stage == 'prueba_inicial' and repair.prueba_inicial_resultado == 'no_definido')) or None">
                                     Siguiente Etapa <i class="fa fa-chevron-right ms-1"/>
                                 </button>
                             </form>

@@ -281,6 +281,9 @@ class RepairPortalController(CustomerPortal):
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists():
             return request.redirect('/my/repairs')
+        if (repair.frio_calor_stage == 'prueba_inicial'
+                and repair.prueba_inicial_resultado == 'no_definido'):
+            return request.redirect(f'/my/repairs/{repair_id}')
         try:
             repair.with_context(_portal_user_id=request.env.uid).action_open_advance_next_stage()
         except (UserError, IndexError):
