@@ -5,13 +5,13 @@ from odoo.exceptions import UserError, ValidationError
 
 FRIO_CALOR_STAGES = [
     ('repair', 'Reparación'),
-    ('calidad', 'Control de Calidad'),
+    ('prueba_inicial', 'Prueba inicial'),
     ('hidrolavadora', 'Limpieza con hidrolavadora'),
     ('pileta', 'Lavado en pileta'),
     ('prueba', 'Prueba y sanitización'),
     ('secado', 'Secado'),
     ('pintura', 'Pintura'),
-    ('armado', 'Armado'),
+    ('armado', 'Embolsado'),
 ]
 
 FRIO_CALOR_STAGE_ORDER = [s[0] for s in FRIO_CALOR_STAGES]
@@ -32,8 +32,18 @@ class RepairOrder(models.Model):
     frio_calor_stage = fields.Selection(
         selection=FRIO_CALOR_STAGES,
         string="Etapa Frío/Calor",
-        default='calidad',
+        default='prueba_inicial',
         tracking=True,
+    )
+
+    prueba_inicial_resultado = fields.Selection(
+        selection=[
+            ('no_definido', 'No definido'),
+            ('aprobado', 'Aprobado'),
+            ('desaprobado', 'Desaprobado'),
+        ],
+        string="Resultado prueba inicial",
+        default='no_definido',
     )
 
     prev_frio_calor_stage = fields.Selection(
@@ -128,6 +138,10 @@ class RepairOrder(models.Model):
             raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
         if self.is_outsourced:
             raise UserError(_("No se puede avanzar la etapa de una orden tercerizada."))
+        if self.frio_calor_stage == 'prueba_inicial':
+            self.message_post(
+                body=_("El resultado de la prueba inicial de la orden fue '%s'.", self.prueba_inicial_resultado),
+            )
         stages = self._get_stage_sequence()
         current_idx = stages.index(self.frio_calor_stage) if self.frio_calor_stage in stages else -1
         self.with_context(_frio_calor_stage_advance=True).write({'frio_calor_stage': stages[current_idx + 1]})
@@ -246,7 +260,7 @@ class RepairOrder(models.Model):
 
     def action_back_from_repair(self):
         for order in self:
-            order.with_context(_frio_calor_stage_advance=True).frio_calor_stage = order.prev_frio_calor_stage or 'calidad'
+            order.with_context(_frio_calor_stage_advance=True).frio_calor_stage = order.prev_frio_calor_stage or 'prueba_inicial'
             order.message_post(body=_("La orden volvió de reparación a su estado anterior."))
 
     def action_validate(self):
