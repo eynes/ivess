@@ -158,7 +158,8 @@ class IvessPriceListReport(models.Model):
             if special:
                 price = special.special_price
             elif partner_pricelist and self._has_product_rule_in_pricelist(product, partner_pricelist):
-                price = partner_pricelist._get_product_price(product, 1.0)
+                list_price = partner_pricelist._get_product_price(product, 1.0)
+                price = list_price * (1 - partner.customer_discount_percentage / 100)
             else:
                 continue
 
@@ -196,6 +197,7 @@ class IvessPriceListReport(models.Model):
             categ = categ.parent_id
         return bool(pricelist.item_ids.filtered(
             lambda item: (
+                item.applied_on == "3_global" or
                 (item.applied_on == "0_product_variant" and item.product_id == product) or
                 (item.applied_on == "1_product" and item.product_tmpl_id == product_tmpl) or
                 (item.applied_on == "2_product_category" and item.categ_id.id in categ_ids)
