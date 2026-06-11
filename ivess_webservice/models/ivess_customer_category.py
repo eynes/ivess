@@ -25,5 +25,11 @@ class IvessCustomerCategory(models.Model):
     def get_customer_categories(self, **kwargs):
         if kwargs:
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
-        records = self.search([])
-        return records.read(["name"])
+        records = self.search([]).read(["id", "name"])
+        final_records = []
+        for r in records:
+            final_records.append({
+                "customer_category_id": r["id"],
+                "name": r["name"],
+            })
+        return final_records

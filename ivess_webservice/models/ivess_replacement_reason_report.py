@@ -28,5 +28,13 @@ class IvessReplacementReasonReport(models.Model):
     def get_replacement_reasons(self, **kwargs):
         if kwargs:
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
-        records = self.search([])
-        return records.read(["reason", "code", "sequence"])
+        records = self.search([]).read(["id", "reason", "code", "sequence"])
+        final_records = []
+        for r in records:
+            final_records.append({
+                "replacement_reason_id": r["id"],
+                "reason": r["reason"],
+                "code": r["code"],
+                "sequence": r["sequence"],
+            })
+        return final_records
