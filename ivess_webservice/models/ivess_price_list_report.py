@@ -141,8 +141,7 @@ class IvessPriceListReport(models.Model):
         )
 
         all_products = self.env["product.product"].browse(
-            set(dist_products.ids) | set(pricelist_products.ids) |
-            {sp.product_id.id for sp in partner.special_price_ids if sp.product_id}
+            list(dict.fromkeys(dist_products.ids + pricelist_products.ids + list({sp.product_id.id for sp in partner.special_price_ids if sp.product_id})))
         )
 
         overrides = []
