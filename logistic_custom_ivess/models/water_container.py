@@ -26,7 +26,8 @@ class WaterContainer(models.Model):
     )
     assignment_date = fields.Date(
         string='Assignment Date',
-        required=True
+        compute='_compute_assignment_date',
+        store=True,
     )
     return_date = fields.Date(
         string='Return Date',
@@ -80,6 +81,24 @@ class WaterContainer(models.Model):
                 if m.picking_id.picking_type_code == 'incoming'
             )
             rec.quantity = qty_out - qty_in
+
+    @api.depends(
+        'stock_move_ids',
+        'stock_move_ids.state',
+        'stock_move_ids.picking_id.picking_type_code',
+        'stock_move_ids.picking_id.date_done',
+    )
+    def _compute_assignment_date(self):
+        for rec in self:
+            outgoing_pickings = rec.stock_move_ids.filtered(
+                lambda m: m.state == 'done'
+                and m.picking_id.picking_type_code == 'outgoing'
+            ).mapped('picking_id')
+            if outgoing_pickings:
+                last = outgoing_pickings.sorted('date_done', reverse=True)[:1]
+                rec.assignment_date = last.date_done.date() if last.date_done else False
+            else:
+                rec.assignment_date = False
 
     @api.depends('stock_move_ids.picking_id', 'stock_move_ids.picking_id.picking_type_code')
     def _compute_picking_counts(self):

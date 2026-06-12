@@ -25,12 +25,12 @@ class StockPicking(models.Model):
                 container = WaterContainer.search([
                     ('partner_id', '=', partner.id),
                     ('product_id', '=', product_tmpl.id),
+                    ('state', '=', move.container_state)
                 ], limit=1)
                 if not container:
                     container = WaterContainer.create({
                         'partner_id': partner.id,
                         'product_id': product_tmpl.id,
-                        'assignment_date': fields.Date.today(),
-                        'state': 'prestado',
+                        'state': move.container_state,
                     })
                 move.water_container_id = container

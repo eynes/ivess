@@ -1,10 +1,8 @@
 import logging
-
-from dateutil.utils import today
-
-from odoo import models, fields, _, api
-from odoo.exceptions import ValidationError, UserError
 from collections import defaultdict
+
+from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -18,6 +16,18 @@ FREQUENCY_MAPPING = {
 class ResPartner(models.Model):
     _inherit = 'res.partner'
 
+    is_customer = fields.Boolean(
+        string='Es Cliente',
+        compute='_compute_is_customer',
+        inverse='_inverse_is_customer',
+        store=True,
+    )
+    is_supplier = fields.Boolean(
+        string='Es Proveedor',
+        compute='_compute_is_supplier',
+        inverse='_inverse_is_supplier',
+        store=True,
+    )
     distribution = fields.Many2one('template.delivery.route', tracking=True)
     visit_day = fields.Selection(
         related='distribution.day',
@@ -86,8 +96,6 @@ class ResPartner(models.Model):
         string="Customer Code",
         readonly=True,
         copy=False,
-        compute="_compute_customer_code",
-        store=True
     )
     partner_type_id = fields.Many2one(
         comodel_name="client.type",
@@ -108,14 +116,47 @@ class ResPartner(models.Model):
         string="Cliente Importante",
     )
 
+    @api.depends('customer_rank')
+    def _compute_is_customer(self):
+        for rec in self:
+            rec.is_customer = rec.customer_rank > 0
+
+    def _inverse_is_customer(self):
+        for rec in self:
+            if rec.is_customer and rec.customer_rank == 0:
+                rec.customer_rank = 1
+            elif not rec.is_customer:
+                rec.customer_rank = 0
+
+    @api.depends('supplier_rank')
+    def _compute_is_supplier(self):
+        for rec in self:
+            rec.is_supplier = rec.supplier_rank > 0
+
+    def _inverse_is_supplier(self):
+        for rec in self:
+            if rec.is_supplier and rec.supplier_rank == 0:
+                rec.supplier_rank = 1
+            elif not rec.is_supplier:
+                rec.supplier_rank = 0
+
+    def _assign_customer_code(self):
+        for rec in self:
+            if not rec.is_customer or rec.customer_code:
+                continue
+            company_id = rec.company_id.id or self.env.company.id
+            sequence = self.env['ir.sequence'].search([
+                ('code', '=', 'res.partner.ivess'),
+                ('company_id', '=', company_id),
+            ], limit=1)
+            if sequence:
+                rec.customer_code = sequence.next_by_id()
+
     @api.model_create_multi
     def create(self, vals_list):
-        for vals in vals_list:
-            if vals.get('customer_rank', 0) >= 1:
-                sequence = self.env.company.customer_sequence_id
-                if sequence:
-                    vals['customer_code'] = sequence.next_by_id()
-        return super(ResPartner, self).create(vals_list)
+        records = super().create(vals_list)
+        records._assign_customer_code()
+        return records
 
     @api.constrains('visit_hour')
     def _check_visit_hour(self):
@@ -170,38 +211,6 @@ class ResPartner(models.Model):
         for rec in self:
             rec.qty_water_consumption = len(rec.water_consumption_ids)
 
-    @api.depends('customer_rank')
-    def _compute_customer_code(self):
-        for record in self:
-            company_id = record.company_id.id or self.env.company.id
-            sequence = self.env['ir.sequence'].search([
-                ('code', '=', 'res.partner.ivess'),
-                ('company_id', '=', company_id)
-            ], limit=1)
-            if sequence:
-                record.customer_code = sequence.next_by_id()
-            else:
-                record.customer_code = "PENDIENTE"
-
-    def _get_customer_sequence_vals(self):
-        """
-        Retorna un diccionario con el número de secuencia si corresponde.
-        """
-        self.ensure_one() # Nos aseguramos de procesar de a uno
-        if self.customer_rank >= 1 and not self.customer_code:
-            company = self.company_id or self.env.company
-            seq_code = self.env['ir.sequence'].with_company(company).customer_sequence_id.next_by_id()
-            if seq_code:
-                return {'customer_code': seq_code}
-        return {}
-
-    def _set_multicompany_account_fiscal_position(self, property_account_position_id):
-        if self.env.context.get('_setting_multicompany_fiscal_pos'):
-            return
-        return super().with_context(_setting_multicompany_fiscal_pos=True)._set_multicompany_account_fiscal_position(
-            property_account_position_id
-        )
-
     def write(self, vals):
         old_distribution = {
             'distribution': self.distribution.id if self.distribution and 'distribution' in vals else None}
@@ -212,12 +221,10 @@ class ResPartner(models.Model):
             self._delete_route_lines()
             self.empty_vals(vals)
 
-        # if 'customer_rank' in vals:
-        #     sequence_vals = self._get_customer_sequence_vals()
-        #     if sequence_vals:
-        #         vals.update(sequence_vals)
-
         res = super().write(vals)
+
+        if 'is_customer' in vals or 'customer_rank' in vals:
+            self._assign_customer_code()
 
         if vals.get('active') is False:
             nonproductive = self.water_container_ids.filtered(lambda c: not c.is_nonproductive)
@@ -231,7 +238,6 @@ class ResPartner(models.Model):
                 self._process_new_template_delivery(vals.get('distribution'))
             if old_distribution.get('distribution'):
                 self._process_old_template_delivery(old_distribution.get('distribution'))
-
 
             self._reprocess_delivery_routes(vals.get('distribution'), old_distribution.get('distribution'),
                                             vals.get('frequency'))
@@ -253,11 +259,9 @@ class ResPartner(models.Model):
         return vals
 
     def _check_pending_water_containers_before_archiving(self, vals=None):
-        """Valida si hay envases pendientes al intentar archivar o eliminar."""
         if self.env.user.has_group('logistic_custom_ivess.group_allow_archive_debt_or_containers'):
             return
 
-        # Se ejecuta solo si se está desactivando el cliente (archivando)
         if vals is None or vals.get('active') is False:
             unpaid_invoices = self.get_unpaid_invoice_count()
 
@@ -269,7 +273,6 @@ class ResPartner(models.Model):
                 raise UserError('\n'.join(errors))
 
     def get_unpaid_invoice_count(self):
-        """Retorna la cantidad de facturas sin pagar o parcialmente pagadas del cliente."""
         self.ensure_one()
         return self.env['account.move'].search_count([
             ('partner_id', '=', self.id),
@@ -279,11 +282,6 @@ class ResPartner(models.Model):
         ])
 
     def should_delete_related_lines(self, vals):
-        """
-        Evalúa si deben eliminarse líneas relacionadas basado en los valores escritos.
-        Retorna:
-            bool: True si active es False o si state es 'discharge_review'
-        """
         return (
             'active' in vals and vals['active'] is False
         ) or (
@@ -350,7 +348,6 @@ class ResPartner(models.Model):
             new_line = DeliveryRouteLine.create({'client_id': self.id})
             route.delivery_route_line_ids = [(4, new_line.id)]
 
-
     def _cron_check_partner_state(self):
         _logger.info("Cron - Checking partner states")
         today = fields.Date.today()
@@ -370,16 +367,6 @@ class ResPartner(models.Model):
             delete_route_lines.with_context(chatter_note=reason_msg).unlink()
 
     def get_lines_to_delete(self, today):
-        """
-            Obtiene las líneas de ruta (`delivery.route.line`) asociadas al partner que deberían ser eliminadas.
-
-            Se consideran dos tipos de líneas:
-            1. Líneas basadas en una ruta plantilla (`template_route_id`) que no tienen una ruta asignada (`route_id` vacío).
-            2. Líneas asignadas a rutas cuya fecha de entrega (`delivery_date`) sea mayor o igual a la fecha actual.
-
-            Returns:
-                recordset: Un conjunto de registros de `delivery.route.line` que cumplen con los criterios anteriores.
-        """
         DeliveryRouteLine = self.env['delivery.route.line']
         route_lines_template = DeliveryRouteLine.search([
                 ('client_id', '=', self.id),
