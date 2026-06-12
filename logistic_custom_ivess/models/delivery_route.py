@@ -1,3 +1,4 @@
+from markupsafe import Markup
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 import logging
@@ -193,12 +194,25 @@ class DeliveryRoute(models.Model):
             record._validate_state()
             record._validate_rake_restriction()
             record.write({'state': 'closed'})
-            record._generate_next_week_route()
+            created, updated = record._generate_next_week_route()
+            record._post_next_routes_chatter(created, updated)
+
+    def _post_next_routes_chatter(self, created, updated):
+        lines = []
+        for route in created.sorted('delivery_date'):
+            lines.append(Markup('• %s (%s) — creada') % (route.name, route.delivery_date.strftime('%d/%m/%Y')))
+        for route in updated.sorted('delivery_date'):
+            lines.append(Markup('• %s (%s) — actualizada') % (route.name, route.delivery_date.strftime('%d/%m/%Y')))
+        if lines:
+            self.message_post(body=Markup('Rutas generadas al cerrar:<br/>') + Markup('<br/>').join(lines))
 
     def _generate_next_week_route(self):
         """Al cerrar la ruta, genera una ruta por cada fecha siguiente según la frecuencia de cada cliente."""
+        created = self.env['delivery.route']
+        updated = self.env['delivery.route']
+
         if not self.template_delivery_route_id or not self.delivery_date:
-            return
+            return created, updated
 
         template = self.template_delivery_route_id
 
@@ -220,6 +234,7 @@ class DeliveryRoute(models.Model):
 
             if existing_route:
                 route = existing_route
+                updated |= route
             else:
                 route = self.env['delivery.route'].with_context(create_from_wizard=True).create({
                     'name': "{} {}".format(template.name, next_date),
@@ -230,6 +245,7 @@ class DeliveryRoute(models.Model):
                     'delivery_number_id': template.delivery_number_id.id,
                     'create_from_wizard': True,
                 })
+                created |= route
 
             existing_client_ids = route.delivery_route_line_ids.mapped('client_id').ids
             new_lines = [
@@ -239,6 +255,8 @@ class DeliveryRoute(models.Model):
             ]
             if new_lines:
                 self.env['delivery.route.line'].create(new_lines)
+
+        return created, updated
 
     def _compute_next_visit_date(self, frequency, visit_day):
         """Retorna la próxima fecha de visita según la frecuencia y el día de visita del cliente."""
