@@ -28,5 +28,14 @@ class IvessFiscalPositionReport(models.Model):
     def get_fiscal_positions(self, **kwargs):
         if kwargs:
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
-        records = self.search([])
-        return records.read(["name", "afip_code", "supplier_denomination"])
+        records = self.search([]).read(["id", "name", "afip_code", "supplier_denomination"])
+        final_records = []
+        for r in records:
+            final_records.append({
+                "fiscal_position_id": r["id"],
+                "name": r["name"],
+                "afip_code": r["afip_code"],
+                "supplier_denomination": r["supplier_denomination"],
+            })
+        return final_records
+

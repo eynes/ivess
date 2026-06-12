@@ -10,3 +10,4 @@ access_ivess_breakdown_intake_user,ivess.breakdown.intake.user,model_ivess_break
 access_ivess_products_report_user,ivess.products.report.user,model_ivess_products_report,base.group_user,1,0,0,0
 access_ivess_non_productive_container_report_user,ivess.non.productive.container.report.user,model_ivess_non_productive_container_report,base.group_user,1,0,0,0
 access_ivess_roadmap_report_user,ivess.roadmap.report.user,model_ivess_roadmap_report,base.group_user,1,0,0,0
+access_ivess_price_list_report_user,ivess.price.list.report.user,model_ivess_price_list_report,base.group_user,1,0,0,0

@@ -9,3 +9,4 @@ from . import ivess_breakdown_intake
 from . import ivess_products_report
 from . import ivess_non_productive_container_report
 from . import ivess_roadmap_report
+from . import ivess_price_list_report

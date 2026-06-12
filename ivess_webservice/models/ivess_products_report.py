@@ -51,8 +51,8 @@ class IvessProductsReport(models.Model):
     def get_products(self, **kwargs):
         if kwargs:
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
-        records = self.search([])
-        return records.read([
+        records = self.search([]).read([
+            "id",
             "default_code",
             "allow_free_of_charge",
             "allows_replacement",
@@ -64,3 +64,19 @@ class IvessProductsReport(models.Model):
             "order",
             "tax_amount",
         ])
+        final_records = []
+        for r in records:
+            final_records.append({
+                "product_id": r["id"],
+                "default_code": r["default_code"],
+                "allow_free_of_charge": r["allow_free_of_charge"],
+                "allows_replacement": r["allows_replacement"],
+                "abbreviation": r["abbreviation"],
+                "volume": r["volume"],
+                "is_regular_app": r["is_regular_app"],
+                "is_returnable": r["is_returnable"],
+                "type": r["type"],
+                "order": r["order"],
+                "tax_amount": r["tax_amount"],
+            })
+        return final_records

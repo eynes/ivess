@@ -28,5 +28,13 @@ class IvessNoPurchaseReasonReport(models.Model):
     def get_no_purchase_reasons(self, **kwargs):
         if kwargs:
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
-        records = self.search([])
-        return records.read(["reason", "code", "order"])
+        records = self.search([]).read(["id","reason", "code", "order"])
+        final_records = []
+        for r in records:
+            final_records.append({
+                "no_purchase_reason_id": r["id"],
+                "reason": r["reason"],
+                "code": r["code"],
+                "order": r["order"],
+            })
+        return final_records
