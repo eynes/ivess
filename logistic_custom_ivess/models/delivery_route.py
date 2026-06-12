@@ -1,9 +1,20 @@
+from markupsafe import Markup
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 import logging
 from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
+
+WEEKDAY_MAPPING = {
+    'monday': 0,
+    'tuesday': 1,
+    'wednesday': 2,
+    'thursday': 3,
+    'friday': 4,
+    'saturday': 5,
+    'sunday': 6,
+}
 
 class DeliveryRoute(models.Model):
     _name = 'delivery.route'
@@ -182,7 +193,88 @@ class DeliveryRoute(models.Model):
         for record in self:
             record._validate_state()
             record._validate_rake_restriction()
-        self.write({'state': 'closed'})
+            record.write({'state': 'closed'})
+            created, updated = record._generate_next_week_route()
+            record._post_next_routes_chatter(created, updated)
+
+    def _post_next_routes_chatter(self, created, updated):
+        lines = []
+        for route in created.sorted('delivery_date'):
+            lines.append(Markup('• %s (%s) — creada') % (route.name, route.delivery_date.strftime('%d/%m/%Y')))
+        for route in updated.sorted('delivery_date'):
+            lines.append(Markup('• %s (%s) — actualizada') % (route.name, route.delivery_date.strftime('%d/%m/%Y')))
+        if lines:
+            self.message_post(body=Markup('Rutas generadas al cerrar:<br/>') + Markup('<br/>').join(lines))
+
+    def _generate_next_week_route(self):
+        """Al cerrar la ruta, genera una ruta por cada fecha siguiente según la frecuencia de cada cliente."""
+        created = self.env['delivery.route']
+        updated = self.env['delivery.route']
+
+        if not self.template_delivery_route_id or not self.delivery_date:
+            return created, updated
+
+        template = self.template_delivery_route_id
+
+        # Agrupar clientes por su próxima fecha de visita usando las líneas de la ruta cerrada
+        date_clients = {}
+        for line in self.delivery_route_line_ids:
+            client = line.client_id
+            dist = client.distributions_ids.filtered(lambda d: d.distribution.id == template.id)
+            frequency = dist[:1].frequency or client.frequency or 'weekly'
+            visit_day = dist[:1].visit_day or template.day
+            next_date = self._compute_next_visit_date(frequency, visit_day)
+            date_clients.setdefault(next_date, []).append(client.id)
+
+        for next_date, client_ids in date_clients.items():
+            existing_route = self.env['delivery.route'].search([
+                ('delivery_date', '=', next_date),
+                ('template_delivery_route_id', '=', template.id),
+            ], limit=1)
+
+            if existing_route:
+                route = existing_route
+                updated |= route
+            else:
+                route = self.env['delivery.route'].with_context(create_from_wizard=True).create({
+                    'name': "{} {}".format(template.name, next_date),
+                    'template_delivery_route_id': template.id,
+                    'delivery_date': next_date,
+                    'truck_id': self.truck_id.id,
+                    'delivery_person_id': self.delivery_person_id.id,
+                    'delivery_number_id': template.delivery_number_id.id,
+                    'create_from_wizard': True,
+                })
+                created |= route
+
+            existing_client_ids = route.delivery_route_line_ids.mapped('client_id').ids
+            new_lines = [
+                {'route_id': route.id, 'client_id': cid}
+                for cid in client_ids
+                if cid not in existing_client_ids
+            ]
+            if new_lines:
+                self.env['delivery.route.line'].create(new_lines)
+
+        return created, updated
+
+    def _compute_next_visit_date(self, frequency, visit_day):
+        """Retorna la próxima fecha de visita según la frecuencia y el día de visita del cliente."""
+        current_date = self.delivery_date
+        weekday_index = WEEKDAY_MAPPING.get(visit_day, current_date.weekday())
+
+        if frequency == 'biweekly':
+            base_date = current_date + timedelta(days=14)
+        elif frequency == 'monthly':
+            next_month_first = (current_date.replace(day=1) + timedelta(days=32)).replace(day=1)
+            days_ahead = (weekday_index - next_month_first.weekday()) % 7
+            return next_month_first + timedelta(days=days_ahead)
+        else:  # weekly
+            base_date = current_date + timedelta(days=7)
+
+        # Ajustar al día de visita correcto a partir de base_date
+        days_ahead = (weekday_index - base_date.weekday()) % 7
+        return base_date + timedelta(days=days_ahead)
 
     def _validate_state(self):
         if self.state != 'in_progress':

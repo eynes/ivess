@@ -96,6 +96,9 @@ class SaleOrderLine(models.Model):
         return bool(route_pricelist and self.order_id.pricelist_id == route_pricelist)
 
     def _get_route_pricelist(self):
+        # Obtiene la lista de precios de:
+        # 1. Orden de venta -> Ruta de reparto -> Recorrido de reparto -> Lista de precios
+        # 2. Else Orden de venta -> Partner -> Distribución (Recorrido de reparto) -> Lista de reparto
         order = self.order_id
         route_pricelist = (
             order.delivery_route_id
