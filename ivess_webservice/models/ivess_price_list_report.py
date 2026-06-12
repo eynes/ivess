@@ -56,7 +56,12 @@ class IvessPriceListReport(models.Model):
         for product in dist_products:
             if not product.default_code:
                 continue
-            base_prices[product.default_code] = dist_pricelist._get_product_price(product, 1.0)
+            item = self._has_product_rule_in_pricelist(product, dist_pricelist)
+            base_prices[product.default_code] = {
+                "price": dist_pricelist._get_product_price(product, 1.0),
+                "price_id": item.id if item else None,
+                "price_source": "pricelist",
+            }
 
         partners = self.env["res.partner"].search([
             ("distribution", "=", distribution.id),
@@ -76,8 +81,8 @@ class IvessPriceListReport(models.Model):
         return {
             "distribution": distribution_name,
             "products": [
-                {"default_code": code, "price": price}
-                for code, price in base_prices.items()
+                {"price_id": data["price_id"], "price_source": data["price_source"], "default_code": code, "price": data["price"]}
+                for code, data in base_prices.items()
             ],
             "clients": clients,
         }
@@ -113,13 +118,18 @@ class IvessPriceListReport(models.Model):
             for product in dist_products:
                 if not product.default_code:
                     continue
-                base_prices[product.default_code] = dist_pricelist._get_product_price(product, 1.0)
+                item = self._has_product_rule_in_pricelist(product, dist_pricelist)
+                base_prices[product.default_code] = {
+                    "price": dist_pricelist._get_product_price(product, 1.0),
+                    "price_id": item.id if item else None,
+                    "price_source": "pricelist",
+                }
 
             dist_entries.append({
                 "distribution": distribution.name,
                 "products": [
-                    {"default_code": code, "price": price}
-                    for code, price in base_prices.items()
+                    {"price_id": data["price_id"], "price_source": data["price_source"], "default_code": code, "price": data["price"]}
+                    for code, data in base_prices.items()
                 ],
                 "client_products": self._get_partner_overrides(partner, dist_products, base_prices),
             })
@@ -156,17 +166,22 @@ class IvessPriceListReport(models.Model):
             )[:1]
             if special:
                 price = special.special_price
-            elif partner_pricelist and self._has_product_rule_in_pricelist(product, partner_pricelist):
+                price_id = special.id
+                price_source = "special_price"
+            else:
+                pricelist_item = partner_pricelist and self._has_product_rule_in_pricelist(product, partner_pricelist)
+                if not pricelist_item:
+                    continue
                 list_price = partner_pricelist._get_product_price(product, 1.0)
                 price = list_price * (1 - partner.customer_discount_percentage / 100)
-            else:
-                continue
+                price_id = pricelist_item.id
+                price_source = "customer_pricelist"
 
             in_dist = product in dist_products
-            if in_dist and price == base_prices.get(code, 0.0):
+            if in_dist and price == base_prices.get(code, {}).get("price", 0.0):
                 continue
 
-            overrides.append({"default_code": code, "price": price})
+            overrides.append({"price_id": price_id, "price_source": price_source, "default_code": code, "price": price})
             seen_codes.add(code)
 
         return overrides
@@ -194,11 +209,27 @@ class IvessPriceListReport(models.Model):
         while categ:
             categ_ids.add(categ.id)
             categ = categ.parent_id
-        return bool(pricelist.item_ids.filtered(
-            lambda item: (
-                item.applied_on == "3_global" or
-                (item.applied_on == "0_product_variant" and item.product_id == product) or
-                (item.applied_on == "1_product" and item.product_tmpl_id == product_tmpl) or
-                (item.applied_on == "2_product_category" and item.categ_id.id in categ_ids)
-            )
-        ))
+
+        item = pricelist.item_ids.filtered(
+            lambda i: i.applied_on == "0_product_variant" and i.product_id == product
+        )
+        if item:
+            return item[0]
+
+        item = pricelist.item_ids.filtered(
+            lambda i: i.applied_on == "1_product" and i.product_tmpl_id == product_tmpl
+        )
+        if item:
+            return item[0]
+
+        item = pricelist.item_ids.filtered(
+            lambda i: i.applied_on == "2_product_category" and i.categ_id.id in categ_ids
+        )
+        if item:
+            return item[0]
+
+        item = pricelist.item_ids.filtered(lambda i: i.applied_on == "3_global")
+        if item:
+            return item[0]
+
+        return self.env["product.pricelist.item"].browse()
