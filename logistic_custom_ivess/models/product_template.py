@@ -13,3 +13,4 @@ class ProductTemplate(models.Model):
         ],
         string='Tipo de Envase',
     )
+    monthly_limit_free_of_charge = fields.Integer(string='Monthly Free Of Charge Limit', help='Maximum quantity allowed for free of charge per month')
