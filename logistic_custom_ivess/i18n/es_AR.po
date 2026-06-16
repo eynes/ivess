@@ -720,6 +720,11 @@ msgid "Monthly"
 msgstr "Mensual"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_template__monthly_limit_free_of_charge
+msgid "Monthly Free Of Charge Limit"
+msgstr "Maximo mensual sin cargo"
+
+#. module: logistic_custom_ivess
 #: model:ir.ui.menu,name:logistic_custom_ivess.menu_water_consumption_records
 msgid "Monthly Records"
 msgstr "Registros mensuales"
