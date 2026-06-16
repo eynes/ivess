@@ -22,6 +22,12 @@ class StockMove(models.Model):
         related='product_id.product_tmpl_id.allow_free_of_charge',
         string='Permite Sin Cargo',
     )
+    
+    is_frio_calor = fields.Boolean(
+        related='product_id.product_tmpl_id.is_frio_calor',
+        store=True,
+        string='Es Frio/Calor',
+    )
 
     @api.onchange('water_container_id')
     def _onchange_water_container_id(self):

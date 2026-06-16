@@ -40,6 +40,7 @@
         'views/template_delivery_route.xml',
         'views/visit_status.xml',
         'views/water_container.xml',
+        'views/frio_calor_container.xml',
         'views/stock_move.xml',
         'views/purchase_order.xml',
         'views/sale_report.xml',

@@ -8,6 +8,9 @@
                 <button class="oe_stat_button" type="object" name="action_open_water_containers" icon="fa-cube">
                     <field string="Envases" name="qty_water_containers" widget="statinfo"/>
                 </button>
+                <button class="oe_stat_button" type="object" name="action_open_frio_calor_containers" icon="fa-thermometer">
+                    <field string="Equipos F/C" name="qty_frio_calor" widget="statinfo"/>
+                </button>
                 <button class="oe_stat_button" type="object" name="action_open_water_consumption" icon="fa-list">
                     <field string="Consumo de agua historico" name="qty_water_consumption" widget="statinfo"/>
                 </button>
