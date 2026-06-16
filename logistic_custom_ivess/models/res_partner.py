@@ -67,6 +67,10 @@ class ResPartner(models.Model):
         'Qty water containers',
         compute="_compute_qty_containers"
     )
+    qty_frio_calor = fields.Integer(
+        'Qty equipos Frio/Calor',
+        compute='_compute_qty_frio_calor',
+    )
     water_consumption_ids = fields.One2many(
         'res.partner.water.consumption',
         'partner_id',
@@ -174,10 +178,15 @@ class ResPartner(models.Model):
             if record.date_from and record.date_to and record.date_from > record.date_to:
                 raise ValidationError(_("The 'Date From' must be before or equal to 'Date To'."))
 
-    @api.depends('water_container_ids')
+    @api.depends('water_container_ids', 'water_container_ids.is_frio_calor')
     def _compute_qty_containers(self):
         for rec in self:
-            rec.qty_water_containers = len(rec.water_container_ids)
+            rec.qty_water_containers = len(rec.water_container_ids.filtered(lambda c: not c.is_frio_calor))
+
+    @api.depends('water_container_ids', 'water_container_ids.is_frio_calor')
+    def _compute_qty_frio_calor(self):
+        for rec in self:
+            rec.qty_frio_calor = len(rec.water_container_ids.filtered(lambda c: c.is_frio_calor))
 
     @api.depends(
         'water_consumption_ids',
@@ -382,7 +391,14 @@ class ResPartner(models.Model):
     def action_open_water_containers(self):
         self.ensure_one()
         action = self.env.ref('logistic_custom_ivess.action_water_container').sudo().read()[0]
-        action['domain'] = [('partner_id', '=', self.id)]
+        action['domain'] = [('partner_id', '=', self.id), ('is_frio_calor', '=', False)]
+        action['context'] = {'default_partner_id': self.id}
+        return action
+
+    def action_open_frio_calor_containers(self):
+        self.ensure_one()
+        action = self.env.ref('logistic_custom_ivess.action_frio_calor_container').sudo().read()[0]
+        action['domain'] = [('partner_id', '=', self.id), ('is_frio_calor', '=', True)]
         action['context'] = {'default_partner_id': self.id}
         return action
 
