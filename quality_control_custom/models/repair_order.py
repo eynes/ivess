@@ -12,9 +12,11 @@ FRIO_CALOR_STAGES = [
     ('secado', 'Secado'),
     ('pintura', 'Pintura'),
     ('armado', 'Embolsado'),
+    ('finalizado', 'Finalizado'),
 ]
 
-FRIO_CALOR_STAGE_ORDER = [s[0] for s in FRIO_CALOR_STAGES]
+# 'finalizado' se excluye del orden de navegación: solo se alcanza via action_repair_end.
+FRIO_CALOR_STAGE_ORDER = [s[0] for s in FRIO_CALOR_STAGES if s[0] != 'finalizado']
 # Orden sin pintura
 FRIO_CALOR_STAGE_ORDER_NO_PAINT = [s for s in FRIO_CALOR_STAGE_ORDER if s != 'pintura']
 
@@ -269,6 +271,11 @@ class RepairOrder(models.Model):
                 order.check_unique_repair_order()
         super().action_validate()
 
+    def action_repair_end(self):
+        for order in self:
+            order.with_context(_frio_calor_stage_advance=True).write({'frio_calor_stage': 'finalizado'})
+        return super().action_repair_end()
+
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
@@ -307,7 +314,7 @@ class RepairOrder(models.Model):
 
             # Validación de requires_painting
             if 'requires_painting' in vals and not vals['requires_painting']:
-                if order.requires_painting and order.frio_calor_stage in ('pintura', 'armado'):
+                if order.requires_painting and order.frio_calor_stage in ('pintura', 'armado', 'finalizado'):
                     raise ValidationError(
                         _("No se puede desmarcar 'Requiere pintura' cuando la etapa ya está en ejecución o fue superada.")
                     )

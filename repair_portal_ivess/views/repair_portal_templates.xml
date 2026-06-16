@@ -259,7 +259,7 @@
                     </t>
 
                     <!-- Botones de navegación de etapa -->
-                    <t t-if="repair.frio_calor_stage != 'repair' and not repair.is_outsourced">
+                    <t t-if="repair.frio_calor_stage not in ('repair', 'finalizado') and not repair.is_outsourced">
                     <div>
                         <div class="d-flex justify-content-center gap-3 mt-4">
                             <!-- Revertir (toggle collapse) / Siguiente -->
@@ -301,8 +301,17 @@
                     </t>
                     <!-- Acciones de flujo: reparación y tercerización -->
                     <div class="d-flex justify-content-center gap-2 mt-3 pt-3 border-top flex-wrap">
-                        <!-- Enviar a reparación: cuando NO está en repair NI tercerizado -->
-                        <t t-if="repair.frio_calor_stage != 'repair' and not repair.is_outsourced">
+                        <!-- Finalizar reparación: solo desde 'armado' -->
+                        <t t-if="repair.frio_calor_stage == 'armado' and not repair.is_outsourced">
+                            <form t-attf-action="/my/repairs/#{repair.id}/repair_end" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-success btn-sm">
+                                    <i class="fa fa-check-circle me-1"/> Finalizar reparación
+                                </button>
+                            </form>
+                        </t>
+                        <!-- Enviar a reparación: cuando NO está en repair, finalizado, NI tercerizado -->
+                        <t t-if="repair.frio_calor_stage not in ('repair', 'finalizado') and not repair.is_outsourced">
                             <form t-attf-action="/my/repairs/#{repair.id}/init_repair" method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <button type="submit" class="btn btn-outline-danger btn-sm">
@@ -319,8 +328,8 @@
                                 </button>
                             </form>
                         </t>
-                        <!-- Tercerizar: cuando NO está tercerizado -->
-                        <t t-if="not repair.is_outsourced">
+                        <!-- Tercerizar: cuando NO está tercerizado NI finalizado -->
+                        <t t-if="not repair.is_outsourced and repair.frio_calor_stage != 'finalizado'">
                             <form t-attf-action="/my/repairs/#{repair.id}/outsource" method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <button type="submit" class="btn btn-outline-warning btn-sm">
