@@ -52,6 +52,15 @@
                         type="object"
                         string="Enviar a reparación"
                         invisible="frio_calor_stage == 'repair' or is_outsourced"/>
+                <button name="action_send_to_pintura"
+                        type="object"
+                        string="Requiere Pintura"
+                        class="btn-warning"
+                        invisible="frio_calor_stage != 'armado' or is_outsourced"/>
+                <button name="action_back_from_pintura"
+                        type="object"
+                        string="Volver de Pintura"
+                        invisible="frio_calor_stage != 'pintura'"/>
             </xpath>
 
             <!-- Selection badge Frío/Calor con botones de navegación -->
@@ -62,7 +71,7 @@
                             type="object"
                             class="btn btn-link btn-sm px-1"
                             title="Revertir Etapa"
-                            invisible="frio_calor_stage in ('prueba_inicial', 'repair', 'finalizado') or is_outsourced">
+                            invisible="frio_calor_stage in ('prueba_inicial', 'repair', 'finalizado', 'pintura') or is_outsourced">
                         <i class="fa fa-chevron-left"/> Revertir Etapa
                     </button>
                     <field name="frio_calor_stage" widget="selection_badge" readonly="1"/>
@@ -82,7 +91,7 @@
                             type="object"
                             class="btn btn-link btn-sm px-1"
                             title="Avanzar Etapa"
-                            invisible="frio_calor_stage in ('armado', 'repair', 'finalizado') or is_outsourced or prueba_inicial_resultado == 'no_definido'">
+                            invisible="frio_calor_stage in ('armado', 'repair', 'finalizado', 'pintura') or is_outsourced or prueba_inicial_resultado == 'no_definido'">
                         <i class="fa fa-chevron-right"/><br/>Siguiente Etapa
                     </button>
                 </div>
