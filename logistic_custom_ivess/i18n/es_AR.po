@@ -75,6 +75,7 @@ msgstr "Permitir venta contado"
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__allow_free_of_charge
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_product__allow_free_of_charge
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_template__allow_free_of_charge
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_report__allow_free_of_charge
 msgid "Allow Free Of Charge"
 msgstr "Permitir sin cargo"
 
@@ -678,6 +679,11 @@ msgstr "Última actualización por"
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_water_container_state__write_date
 msgid "Last Updated on"
 msgstr "Última actualización el"
+
+#. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_report__location_id
+msgid "Location"
+msgstr "Ubicación de origen"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_product_product__liter_quantity
