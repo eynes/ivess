@@ -18,6 +18,10 @@ class StockMove(models.Model):
         store=True,
         string='Es Retornable',
     )
+    allow_free_of_charge = fields.Boolean(
+        related='product_id.product_tmpl_id.allow_free_of_charge',
+        string='Permite Sin Cargo',
+    )
 
     @api.onchange('water_container_id')
     def _onchange_water_container_id(self):
