@@ -6,6 +6,7 @@ from odoo.tools.translate import _
 STATE_SELECTION = [
     ('prestado', 'Prestado'),
     ('en_comodato', 'En Comodato'),
+    ('asignado', 'Asignado'),
 ]
 
 class WaterContainer(models.Model):
@@ -42,7 +43,20 @@ class WaterContainer(models.Model):
     product_id = fields.Many2one(
         'product.template',
         string="Product",
-        domain=[('is_returnable', '=', True)],
+        domain=['|', ('is_returnable', '=', True), ('is_frio_calor', '=', True)],
+    )
+    lot_id = fields.Many2one(
+        'stock.lot',
+        string='N° de Serie',
+    )
+    is_frio_calor = fields.Boolean(
+        related='product_id.is_frio_calor',
+        store=True,
+        string='Es Frio/Calor',
+    )
+    frio_calor_picking_id = fields.Many2one(
+        'stock.picking',
+        string='Entrega',
     )
     stock_move_ids = fields.One2many(
         'stock.move',
@@ -87,9 +101,16 @@ class WaterContainer(models.Model):
         'stock_move_ids.state',
         'stock_move_ids.picking_id.picking_type_code',
         'stock_move_ids.picking_id.date_done',
+        'is_frio_calor',
+        'frio_calor_picking_id',
+        'frio_calor_picking_id.date_done',
     )
     def _compute_assignment_date(self):
         for rec in self:
+            if rec.is_frio_calor:
+                picking = rec.frio_calor_picking_id
+                rec.assignment_date = picking.date_done.date() if picking and picking.date_done else False
+                continue
             outgoing_pickings = rec.stock_move_ids.filtered(
                 lambda m: m.state == 'done'
                 and m.picking_id.picking_type_code == 'outgoing'
@@ -152,6 +173,7 @@ class WaterContainer(models.Model):
         four_weeks_ago = fields.Date.today() - timedelta(weeks=4)
         containers = self.search([
             ('is_nonproductive', '=', False),
+            ('is_frio_calor', '=', False),
             ('product_id', '!=', False),
             ('partner_id', '!=', False),
         ])
@@ -187,8 +209,16 @@ class WaterContainer(models.Model):
             vals_list = [vals_list]
 
         for vals in vals_list:
-            if not vals.get('name') or vals['name'] in ('/', 'New'):
-                vals['name'] = self.env['ir.sequence'].next_by_code('seq.water.container') or '/'
+            if not vals.get('name') or vals['name'] in ('/', 'New', 'Nuevo'):
+                product_id = vals.get('product_id')
+                is_fc = False
+                if product_id:
+                    product = self.env['product.template'].browse(product_id)
+                    is_fc = product.is_frio_calor
+                if is_fc:
+                    vals['name'] = self.env['ir.sequence'].next_by_code('seq.frio.calor.container') or '/'
+                else:
+                    vals['name'] = self.env['ir.sequence'].next_by_code('seq.water.container') or '/'
 
         records = super().create(vals_list)
         return records

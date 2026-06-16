@@ -9,6 +9,7 @@
                 <field name="abbreviation" invisible="product_variant_count &gt; 1"/>
                 <field name="order"/>
                 <field name="is_returnable"/>
+                <field name="is_frio_calor"/>
                 <field name="allows_replacement"/>
                 <field name="is_regular_app"/>
             </field>
