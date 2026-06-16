@@ -34,7 +34,8 @@ _STAGE_BADGE = {
     'prueba': 'warning',
     'secado': 'warning',
     'pintura': 'secondary',
-    'armado': 'success',
+    'armado': 'primary',
+    'finalizado': 'success',
 }
 
 _REPAIRS_PER_PAGE = 20
@@ -43,7 +44,7 @@ _REPAIRS_PER_PAGE = 20
 # 'repair' se maneja con botón dedicado; 'prueba_inicial' no tiene etapas previas válidas.
 # Alineado con la restricción del backend:
 #   invisible="frio_calor_stage in ('prueba_inicial', 'repair') or is_outsourced"
-_NO_REVERT_FROM = frozenset({'prueba_inicial', 'repair'})
+_NO_REVERT_FROM = frozenset({'prueba_inicial', 'repair', 'finalizado'})
 
 # Etapas que NO pueden ser destino de un revertir (deben alcanzarse por flujos propios).
 # Alineado con el dominio del wizard backend:
@@ -269,6 +270,20 @@ class RepairPortalController(CustomerPortal):
             return request.redirect(f'/my/repairs/{repair_id}')
         try:
             repair.with_context(_portal_user_id=request.env.uid).action_receive_from_third_party()
+        except UserError:
+            pass
+        return request.redirect(f'/my/repairs/{repair_id}')
+
+    @http.route(
+        ['/my/repairs/<int:repair_id>/repair_end'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_end(self, repair_id, **kw):
+        repair = request.env['repair.order'].sudo().browse(repair_id)
+        if not repair.exists() or repair.frio_calor_stage != 'armado' or repair.is_outsourced:
+            return request.redirect(f'/my/repairs/{repair_id}')
+        try:
+            repair.with_context(_portal_user_id=request.env.uid).action_repair_end()
         except UserError:
             pass
         return request.redirect(f'/my/repairs/{repair_id}')
