@@ -15,8 +15,8 @@ FRIO_CALOR_STAGES = [
     ('finalizado', 'Finalizado'),
 ]
 
-# 'finalizado' se excluye del orden de navegación: solo se alcanza via action_repair_end.
-FRIO_CALOR_STAGE_ORDER = [s[0] for s in FRIO_CALOR_STAGES if s[0] != 'finalizado']
+# 'finalizado' y 'pintura' se excluyen del orden de navegación: tienen botones dedicados.
+FRIO_CALOR_STAGE_ORDER = [s[0] for s in FRIO_CALOR_STAGES if s[0] not in ('finalizado', 'pintura')]
 # Orden sin pintura
 FRIO_CALOR_STAGE_ORDER_NO_PAINT = [s for s in FRIO_CALOR_STAGE_ORDER if s != 'pintura']
 
@@ -270,6 +270,26 @@ class RepairOrder(models.Model):
             if order.repair_equipment_type == 'frio_calor':
                 order.check_unique_repair_order()
         super().action_validate()
+
+    def action_send_to_pintura(self):
+        for order in self:
+            if order.repair_equipment_type != 'frio_calor':
+                raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
+            if order.frio_calor_stage != 'armado':
+                raise UserError(_("Solo se puede enviar a Pintura desde la etapa 'Embolsado'."))
+            if order.is_outsourced:
+                raise UserError(_("No se puede modificar la etapa de una orden tercerizada."))
+            order.with_context(_frio_calor_stage_advance=True).write({'frio_calor_stage': 'pintura'})
+            order.message_post(body=_("La orden fue enviada a Pintura desde Embolsado."))
+
+    def action_back_from_pintura(self):
+        for order in self:
+            if order.repair_equipment_type != 'frio_calor':
+                raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
+            if order.frio_calor_stage != 'pintura':
+                raise UserError(_("Esta acción solo aplica cuando la orden está en etapa 'Pintura'."))
+            order.with_context(_revert_stage=True).write({'frio_calor_stage': 'armado'})
+            order.message_post(body=_("La orden volvió de Pintura a Embolsado."))
 
     def action_repair_end(self):
         for order in self:

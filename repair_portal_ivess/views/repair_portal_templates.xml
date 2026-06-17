@@ -259,7 +259,7 @@
                     </t>
 
                     <!-- Botones de navegación de etapa -->
-                    <t t-if="repair.frio_calor_stage not in ('repair', 'finalizado') and not repair.is_outsourced">
+                    <t t-if="repair.frio_calor_stage not in ('repair', 'finalizado', 'pintura') and not repair.is_outsourced">
                     <div>
                         <div class="d-flex justify-content-center gap-3 mt-4">
                             <!-- Revertir (toggle collapse) / Siguiente -->
@@ -301,6 +301,24 @@
                     </t>
                     <!-- Acciones de flujo: reparación y tercerización -->
                     <div class="d-flex justify-content-center gap-2 mt-3 pt-3 border-top flex-wrap">
+                        <!-- Requiere Pintura: solo desde 'armado' -->
+                        <t t-if="repair.frio_calor_stage == 'armado' and not repair.is_outsourced">
+                            <form t-attf-action="/my/repairs/#{repair.id}/send_to_pintura" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-warning btn-sm">
+                                    <i class="fa fa-paint-brush me-1"/> Requiere Pintura
+                                </button>
+                            </form>
+                        </t>
+                        <!-- Volver de Pintura: solo desde 'pintura' -->
+                        <t t-if="repair.frio_calor_stage == 'pintura'">
+                            <form t-attf-action="/my/repairs/#{repair.id}/back_from_pintura" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fa fa-arrow-left me-1"/> Volver a Embolsado
+                                </button>
+                            </form>
+                        </t>
                         <!-- Finalizar reparación: solo desde 'armado' -->
                         <t t-if="repair.frio_calor_stage == 'armado' and not repair.is_outsourced">
                             <form t-attf-action="/my/repairs/#{repair.id}/repair_end" method="post">
