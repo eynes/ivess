@@ -42,7 +42,7 @@
                         </group>
                         <group>
                             <field name="ayudante_id"/>
-                            <field name="category_id"/>
+                            <field name="category_id" required="1"/>
                         </group>
                     </group>
                     <group string="Configuración" name="conf_group">

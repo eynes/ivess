@@ -364,12 +364,12 @@ msgstr "Repartidor"
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_sale_order__delivery_route_id
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_form
 msgid "Delivery Route"
-msgstr "Ruta"
+msgstr "Recorrido"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_delivery_route_line
 msgid "Delivery Route Line"
-msgstr "Línea de ruta"
+msgstr "Línea de recorrido"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_delivery_route_number
@@ -389,7 +389,7 @@ msgstr "Repartos"
 #: model:ir.ui.menu,name:logistic_custom_ivess.menu_delivery_route_root
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_delivery_route_tree
 msgid "Delivery Routes"
-msgstr "Rutas"
+msgstr "Recorridos"
 
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__delivery_number_id
@@ -928,7 +928,7 @@ msgstr "Refleja la configuración de venta contado del reparto asociado."
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_account_bank_statement_line__delivery_route_ids
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_account_move__delivery_route_ids
 msgid "Reparto"
-msgstr "Ruta"
+msgstr "Recorrido"
 
 #. module: logistic_custom_ivess
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_partner_form_inherit_sales_purchases
@@ -939,12 +939,12 @@ msgstr "Recorrido"
 #: model:ir.actions.act_window,name:logistic_custom_ivess.action_template_delivery_route
 #: model:ir.ui.menu,name:logistic_custom_ivess.menu_tempalte_delivery_route
 msgid "Repartos"
-msgstr "Recorridos"
+msgstr "Plantillas"
 
 #. module: logistic_custom_ivess
 #: model_terms:ir.ui.view,arch_db:logistic_custom_ivess.view_move_form_inherit_add_m2m
 msgid "Rutas"
-msgstr "Rutas"
+msgstr "Recorridos"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_replacement_reason
@@ -1074,14 +1074,14 @@ msgstr "Domingo"
 #. module: logistic_custom_ivess
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_line__template_route_id
 msgid "Template Delivery Route"
-msgstr "Recorrido"
+msgstr "Plantilla"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_template_delivery_route
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route__template_delivery_route_id
 #: model:ir.model.fields,field_description:logistic_custom_ivess.field_user_assigned_lines__template_delivery_route_id
 msgid "Template delivery route"
-msgstr "Recorrido"
+msgstr "Plantilla"
 
 #. module: logistic_custom_ivess
 #. odoo-python

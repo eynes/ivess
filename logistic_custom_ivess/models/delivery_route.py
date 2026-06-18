@@ -88,6 +88,34 @@ class DeliveryRoute(models.Model):
         store=True,
         tracking=True,
     )
+    supervisor_id = fields.Many2one(
+        'res.partner',
+        string='Supervisor',
+        related='delivery_number_id.supervisor_id',
+        store=True,
+        readonly=True,
+    )
+    conductor_id = fields.Many2one(
+        'res.partner',
+        string='Conductor',
+        related='delivery_number_id.conductor_id',
+        store=True,
+        readonly=True,
+    )
+    ayudante_id = fields.Many2one(
+        'res.partner',
+        string='Ayudante',
+        related='delivery_number_id.ayudante_id',
+        store=True,
+        readonly=True,
+    )
+    region_id = fields.Many2one(
+        'delivery.route.region',
+        string='Regional',
+        related='delivery_number_id.region_id',
+        store=True,
+        readonly=True,
+    )
     allow_price_editing = fields.Boolean(
         string="Allow Price Editing",
         related="template_delivery_route_id.allow_price_editing",
@@ -241,7 +269,6 @@ class DeliveryRoute(models.Model):
                     'template_delivery_route_id': template.id,
                     'delivery_date': next_date,
                     'truck_id': self.truck_id.id,
-                    'delivery_person_id': self.delivery_person_id.id,
                     'delivery_number_id': template.delivery_number_id.id,
                     'create_from_wizard': True,
                 })
@@ -382,12 +409,6 @@ class DeliveryRouteLine(models.Model):
         store=True,
         readonly=True
     )
-    parent_delivery_person = fields.Many2one(
-        comodel_name='res.users',
-        related='route_id.delivery_person_id',
-        store=True,
-        readonly=True,
-    )
     allowed_client = fields.Many2many(
         comodel_name='res.partner',
         compute='_compute_allowed_client',
@@ -403,9 +424,15 @@ class DeliveryRouteLine(models.Model):
         domain=[('parent_id.name','=','Posible Baja')],
         string="Reason of Withdrawal", tracking=True
     )
-    visit_hour = fields.Float(
-        string='Hora de Visita',
-        related='client_id.visit_hour',
+    visit_hour_from = fields.Float(
+        string='Hora de Visita Desde',
+        related='client_id.visit_hour_from',
+        store=True,
+        readonly=True,
+    )
+    visit_hour_to = fields.Float(
+        string='Hora de Visita Hasta',
+        related='client_id.visit_hour_to',
         store=True,
         readonly=True,
     )
@@ -515,17 +542,12 @@ class DeliveryRouteLine(models.Model):
     'template_route_id',
     'template_route_id.day',
     'parent_delivery_type',
-    'parent_delivery_person',
     )
     def _compute_allowed_client(self):
         partner_obj = self.env['res.partner']
         for rec in self:
             rec.allowed_client = partner_obj.browse()
-            if rec.route_id and rec.parent_delivery_type == 'common' and rec.parent_delivery_person:
-                # users = self.env['res.users'].search([('partner_id', '=', rec.parent_delivery_person.id)])
-                rec.allowed_client = partner_obj.search([('user_id', '=', rec.parent_delivery_person.id)], limit=None)
-
-            elif rec.template_route_id:
+            if rec.template_route_id:
                 rec.allowed_client = partner_obj.search([('visit_day', '=', rec.template_route_id.day)], limit=None)
 
     @api.depends(
