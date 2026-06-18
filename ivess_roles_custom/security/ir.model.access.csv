@@ -94,3 +94,4 @@ cabr_stock_req_order_adm_total,stock.request.order / Administrador TOTAL,stock_r
 cabr_stock_req_alloc_adm_inv,stock.request.allocation / Administrador Inventario,stock_request.model_stock_request_allocation,stock.group_stock_manager,1,1,1,1
 cabr_stock_req_alloc_usr_req,stock.request.allocation / Usuario Solicitudes,stock_request.model_stock_request_allocation,stock_request.group_stock_request_user,1,0,0,0
 cabr_stock_req_alloc_adm_total,stock.request.allocation / Administrador TOTAL,stock_request.model_stock_request_allocation,base.group_system,1,1,1,1
+cabr_delivery_route_usr_compras,delivery.route / Usuario Compras,logistic_custom_ivess.model_delivery_route,purchase.group_purchase_user,1,1,1,1
