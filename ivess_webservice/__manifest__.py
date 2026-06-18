@@ -17,6 +17,7 @@
     ],
     "data": [
         "data/ir_sequence.xml",
+        "security/ivess_webservice_security.xml",
         "security/ir.model.access.csv",
     ],
     "demo": [],
