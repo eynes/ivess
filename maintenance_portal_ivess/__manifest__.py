@@ -18,6 +18,7 @@
         'hr_maintenance',
     ],
     'data': [
+        'security/ir.model.access.csv',
         'views/maintenance_views.xml',
         'views/maintenance_portal_templates.xml',
     ],
