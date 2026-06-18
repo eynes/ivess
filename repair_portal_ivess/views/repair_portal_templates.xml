@@ -1,0 +1,609 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         Entrada en la página principal del portal (/my/home)
+    ============================================================ -->
+    <template id="portal_my_home_repair"
+              name="Portal My Home: Reparaciones"
+              inherit_id="portal.portal_my_home"
+              customize_show="True">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/repair_portal_ivess/static/src/img/water-dispenser.svg'"/>
+                <t t-set="title">Reparación Frio Calor</t>
+                <t t-set="text">Ver órdenes de reparación de Frio Calor</t>
+                <t t-set="url">/my/repairs</t>
+                <t t-set="placeholder_count">repair_count</t>
+            </t>
+        </xpath>
+    </template>
+
+
+    <!-- ============================================================
+         Vista escaneo de barcode: /my/repairs/scan
+    ============================================================ -->
+    <template id="portal_repair_scan" name="Escanear Número de Serie">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/repairs">Órdenes de Reparación</a>
+                            </li>
+                            <li class="breadcrumb-item active">Escanear N° de Serie</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="row justify-content-center mt-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-body text-center py-5 px-4">
+
+                            <i class="fa fa-barcode mb-3" style="font-size: 64px; color: #875a7b;"/>
+                            <h4 class="mb-2">Escanear N° de Serie</h4>
+                            <p class="text-muted mb-4">
+                                Use la cámara o escriba el número de serie del equipo.
+                                El sistema abrirá su orden de reparación automáticamente.
+                            </p>
+
+                            <t t-if="not_found">
+                                <div class="alert alert-warning mb-4" role="alert">
+                                    <i class="fa fa-exclamation-triangle me-1"/>
+                                    No se encontró ninguna orden de reparación para
+                                    <strong><t t-esc="barcode"/></strong>.
+                                </div>
+                            </t>
+
+                            <button type="button" id="repair-scan-camera-btn"
+                                    class="btn btn-primary btn-lg w-100 mb-3">
+                                <i class="fa fa-camera me-2"/>
+                                Escanear con cámara
+                            </button>
+
+                            <form action="/my/repairs/scan" method="get" id="repair_scan_form">
+                                <div class="input-group">
+                                    <input
+                                        id="repair_barcode_input"
+                                        type="text"
+                                        name="barcode"
+                                        class="form-control form-control-lg text-center"
+                                        placeholder="O escribir N° de serie..."
+                                        autocomplete="off"
+                                    />
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fa fa-search"/>
+                                    </button>
+                                </div>
+                            </form>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script type="text/javascript">
+                (function () {
+                    var input = document.getElementById('repair_barcode_input');
+                    if (!input) return;
+                    input.focus();
+                    /* Los lectores HID envían los caracteres muy rápido y terminan con Enter.
+                       Al presionar Enter, enviamos el formulario inmediatamente. */
+                    input.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            document.getElementById('repair_scan_form').submit();
+                        }
+                    });
+                })();
+            </script>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Vista lista: /my/repairs
+    ============================================================ -->
+    <template id="portal_my_repairs" name="Mis Órdenes de Reparación">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Órdenes de Reparación</t>
+            </t>
+
+            <div class="text-end mb-2">
+                <a href="/my/repairs/scan" class="btn btn-outline-primary btn-sm">
+                    <i class="fa fa-barcode me-1"/> Escanear N° de Serie
+                </a>
+            </div>
+
+            <t t-if="not repairs">
+                <div class="alert alert-warning mt-3">
+                    No hay órdenes de reparación disponibles.
+                </div>
+            </t>
+
+            <t t-if="repairs">
+                <div class="card mt-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Referencia</th>
+                                    <!--<th>Producto</th>-->
+                                    <th>N° de Serie</th>
+                                    <th>Etapa</th>
+                                    <!--<th>Estado</th>-->
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="repairs" t-as="repair">
+                                    <tr>
+                                        <td>
+                                            <a t-attf-href="/my/repairs/#{repair.id}">
+                                                <t t-esc="repair.name"/>
+                                            </a>
+                                        </td>
+                                        <!--<td><t t-esc="repair.product_id.display_name"/></td>-->
+                                        <td><t t-esc="repair.lot_id.name or '—'"/></td>
+                                        <td>
+                                            <span t-attf-class="badge rounded-pill text-bg-#{stage_badge.get(repair.frio_calor_stage, 'secondary')}">
+                                                <t t-esc="stage_labels.get(repair.frio_calor_stage, repair.frio_calor_stage)"/>
+                                            </span>
+                                        </td>
+                                        <!--<td>
+                                            <span t-attf-class="badge rounded-pill text-bg-#{
+                                                'success' if repair.state == 'done' else
+                                                'danger' if repair.state == 'cancel' else
+                                                'primary'}">
+                                                <t t-esc="dict(repair._fields['state'].selection).get(repair.state, repair.state)"/>
+                                            </span>
+                                        </td>-->
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div t-if="pager" class="o_portal_pager text-center mt-3">
+                    <t t-call="portal.pager"/>
+                </div>
+            </t>
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Vista detalle: /my/repairs/<id>
+    ============================================================ -->
+    <template id="portal_repair_detail" name="Detalle de Orden de Reparación">
+        <t t-call="portal.portal_layout">
+            <t t-set="o_portal_fullwidth_alert">
+                <t t-if="repair.is_outsourced">
+                    <div class="alert alert-warning mb-0" role="alert">
+                        <i class="fa fa-lock me-1"/> Esta orden está actualmente <strong>tercerizada</strong>. El cambio de etapa no está disponible hasta que sea recibida.
+                    </div>
+                </t>
+            </t>
+
+            <!-- Encabezado con breadcrumb -->
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/repairs">Órdenes de Reparación</a>
+                            </li>
+                            <li class="breadcrumb-item active" aria-current="page">
+                                <t t-esc="repair.name"/>
+                            </li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Tarjeta principal -->
+            <div class="card mt-2">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fa fa-wrench me-2"/>
+                        <t t-esc="repair.name"/>
+                    </h5>
+                    <span t-attf-class="badge rounded-pill text-bg-#{
+                        'success' if repair.state == 'done' else
+                        'danger' if repair.state == 'cancel' else
+                        'primary'}">
+                        <t t-esc="dict(repair._fields['state'].selection).get(repair.state, repair.state)"/>
+                    </span>
+                </div>
+
+                <div class="card-body text-center py-5">
+                    <!-- Etapa actual -->
+                    <p class="text-muted mb-2">Etapa actual</p>
+                    <span t-attf-class="badge rounded-pill text-bg-#{stage_badge.get(repair.frio_calor_stage, 'secondary')} fs-5 px-4 py-2">
+                        <t t-esc="stage_labels.get(repair.frio_calor_stage, repair.frio_calor_stage)"/>
+                    </span>
+
+                    <!-- Resultado prueba inicial -->
+                    <t t-if="repair.frio_calor_stage == 'prueba_inicial'">
+                        <div class="mt-3">
+                            <form t-attf-action="/my/repairs/#{repair.id}/set_initial_test_result" method="post"
+                                  class="d-flex justify-content-center align-items-center gap-2">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <label class="form-label mb-0 text-muted small">Resultado:</label>
+                                <select name="resultado" class="form-select form-select-sm" style="max-width:200px">
+                                    <option value="no_definido" t-att-selected="repair.prueba_inicial_resultado == 'no_definido' or None">No definido</option>
+                                    <option value="aprobado" t-att-selected="repair.prueba_inicial_resultado == 'aprobado' or None">Aprobado</option>
+                                    <option value="desaprobado" t-att-selected="repair.prueba_inicial_resultado == 'desaprobado' or None">Desaprobado</option>
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                    <i class="fa fa-save me-1"/> Guardar
+                                </button>
+                            </form>
+                        </div>
+                    </t>
+                    <t t-elif="repair.prueba_inicial_resultado and repair.prueba_inicial_resultado != 'no_definido'">
+                        <div class="mt-2">
+                            <small class="text-muted">Prueba inicial: </small>
+                            <span t-attf-class="badge text-bg-#{'success' if repair.prueba_inicial_resultado == 'aprobado' else 'danger'}">
+                                <t t-esc="dict([('aprobado','Aprobado'),('desaprobado','Desaprobado')]).get(repair.prueba_inicial_resultado, repair.prueba_inicial_resultado)"/>
+                            </span>
+                        </div>
+                    </t>
+
+                    <!-- Botones de navegación de etapa -->
+                    <t t-if="repair.frio_calor_stage not in ('repair', 'finalizado', 'pintura') and not repair.is_outsourced">
+                    <div>
+                        <div class="d-flex justify-content-center gap-3 mt-4">
+                            <!-- Revertir (toggle collapse) / Siguiente -->
+                            <t t-if="can_go_prev and prev_stages">
+                                <button type="button" class="btn btn-outline-secondary btn-sm"
+                                        data-bs-toggle="collapse"
+                                        t-attf-data-bs-target="#revert-collapse-#{repair.id}"
+                                        aria-expanded="false">
+                                    <i class="fa fa-chevron-left me-1"/> Revertir Etapa
+                                </button>
+                            </t>
+                            <form t-attf-action="/my/repairs/#{repair.id}/next_stage" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit"
+                                        class="btn btn-primary"
+                                        t-att-disabled="(not can_go_next or (repair.frio_calor_stage == 'prueba_inicial' and repair.prueba_inicial_resultado == 'no_definido')) or None">
+                                    Siguiente Etapa <i class="fa fa-chevron-right ms-1"/>
+                                </button>
+                            </form>
+                        </div>
+                        <!-- Selector de etapa destino (se despliega al presionar Revertir Etapa) -->
+                        <t t-if="can_go_prev and prev_stages">
+                            <div class="collapse mt-2" t-attf-id="revert-collapse-#{repair.id}">
+                                <form t-attf-action="/my/repairs/#{repair.id}/revert_to_stage" method="post"
+                                      class="d-flex justify-content-center align-items-center gap-2">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <select name="target_stage" class="form-select form-select-sm" style="max-width:250px;min-width:160px">
+                                        <t t-foreach="prev_stages" t-as="ps">
+                                            <option t-att-value="ps['key']"><t t-esc="ps['label']"/></option>
+                                        </t>
+                                    </select>
+                                    <button type="submit" class="btn btn-outline-danger btn-sm text-nowrap">
+                                        <i class="fa fa-check me-1"/> Confirmar
+                                    </button>
+                                </form>
+                            </div>
+                        </t>
+                    </div>
+                    </t>
+                    <!-- Acciones de flujo: reparación y tercerización -->
+                    <div class="d-flex justify-content-center gap-2 mt-3 pt-3 border-top flex-wrap">
+                        <!-- Requiere Pintura: solo desde 'armado' -->
+                        <t t-if="repair.frio_calor_stage == 'armado' and not repair.is_outsourced">
+                            <form t-attf-action="/my/repairs/#{repair.id}/send_to_pintura" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-warning btn-sm">
+                                    <i class="fa fa-paint-brush me-1"/> Requiere Pintura
+                                </button>
+                            </form>
+                        </t>
+                        <!-- Volver de Pintura: solo desde 'pintura' -->
+                        <t t-if="repair.frio_calor_stage == 'pintura'">
+                            <form t-attf-action="/my/repairs/#{repair.id}/back_from_pintura" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fa fa-arrow-left me-1"/> Volver a Embolsado
+                                </button>
+                            </form>
+                        </t>
+                        <!-- Finalizar reparación: solo desde 'armado' -->
+                        <t t-if="repair.frio_calor_stage == 'armado' and not repair.is_outsourced">
+                            <form t-attf-action="/my/repairs/#{repair.id}/repair_end" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-success btn-sm">
+                                    <i class="fa fa-check-circle me-1"/> Finalizar reparación
+                                </button>
+                            </form>
+                        </t>
+                        <!-- Enviar a reparación: cuando NO está en repair, finalizado, NI tercerizado -->
+                        <t t-if="repair.frio_calor_stage not in ('repair', 'finalizado') and not repair.is_outsourced">
+                            <form t-attf-action="/my/repairs/#{repair.id}/init_repair" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    <i class="fa fa-wrench me-1"/> Enviar a reparación
+                                </button>
+                            </form>
+                        </t>
+                        <!-- Volver de reparación: solo cuando está en repair -->
+                        <t t-if="repair.frio_calor_stage == 'repair'">
+                            <form t-attf-action="/my/repairs/#{repair.id}/back_from_repair" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fa fa-arrow-left me-1"/> Volver de reparación
+                                </button>
+                            </form>
+                        </t>
+                        <!-- Tercerizar: cuando NO está tercerizado NI finalizado -->
+                        <t t-if="not repair.is_outsourced and repair.frio_calor_stage != 'finalizado'">
+                            <form t-attf-action="/my/repairs/#{repair.id}/outsource" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-outline-warning btn-sm">
+                                    <i class="fa fa-share-square me-1"/> Tercerizar
+                                </button>
+                            </form>
+                        </t>
+                        <!-- Recibir de tercero: cuando está tercerizado -->
+                        <t t-if="repair.is_outsourced">
+                            <form t-attf-action="/my/repairs/#{repair.id}/receive_from_third_party" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-outline-success btn-sm">
+                                    <i class="fa fa-sign-in me-1"/> Recibir de tercero
+                                </button>
+                            </form>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- Información adicional -->
+                <div class="card-footer">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <small class="text-muted d-block">Producto</small>
+                            <span><t t-esc="repair.product_id.display_name"/></span>
+                        </div>
+                        <div class="col-md-4">
+                            <small class="text-muted d-block">N° de Serie</small>
+                            <span><t t-esc="repair.lot_id.name or '—'"/></span>
+                        </div>
+                        <div class="col-md-4">
+                            <small class="text-muted d-block">Responsable</small>
+                            <span><t t-esc="repair.user_id.name or '—'"/></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Piezas -->
+            <t t-if="repair.frio_calor_stage == 'repair' and not repair.is_outsourced">
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fa fa-puzzle-piece me-2"/>Piezas</h6>
+                    </div>
+
+                    <t t-if="parts">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Producto</th>
+                                        <!--<th class="text-end">Demanda</th>-->
+                                        <th class="text-end">Cantidad</th>
+                                        <th>UdM</th>
+                                        <th>Lote / N° de Serie</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="parts" t-as="move">
+                                        <tr>
+                                            <td>
+                                                <span t-attf-class="badge rounded-pill text-bg-#{line_type_badge.get(move.repair_line_type, 'secondary')}">
+                                                    <t t-esc="line_type_labels.get(move.repair_line_type, move.repair_line_type)"/>
+                                                </span>
+                                            </td>
+                                            <td><t t-esc="move.product_id.display_name"/></td>
+                                            <!--<td class="text-end"><t t-esc="move.product_uom_qty"/></td>-->
+                                            <td class="text-end">
+                                                <t t-if="repair.frio_calor_stage == 'repair' and not repair.is_outsourced">
+                                                    <form t-attf-action="/my/repairs/#{repair.id}/update_part_qty" method="post" class="d-inline-flex align-items-center gap-1">
+                                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                        <input type="hidden" name="move_id" t-att-value="move.id"/>
+                                                        <input type="number" name="quantity"
+                                                               t-att-value="move.quantity or move.product_uom_qty"
+                                                               class="form-control form-control-sm text-end"
+                                                               style="width:80px"
+                                                               min="0" step="0.01"/>
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary p-1" title="Guardar">
+                                                            <i class="fa fa-save"/>
+                                                        </button>
+                                                    </form>
+                                                </t>
+                                                <t t-else=""><t t-esc="move.quantity"/></t>
+                                            </td>
+                                            <td><t t-esc="move.product_uom.name"/></td>
+                                            <td>
+                                                <t t-if="move.lot_ids">
+                                                    <t t-foreach="move.lot_ids" t-as="lot">
+                                                        <span class="badge text-bg-light border me-1">
+                                                            <t t-esc="lot.name"/>
+                                                        </span>
+                                                    </t>
+                                                </t>
+                                                <t t-else="">—</t>
+                                            </td>
+                                            <td>
+                                                <form t-attf-action="/my/repairs/#{repair.id}/delete_part" method="post" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                    <input type="hidden" name="move_id" t-att-value="move.id"/>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger p-1" title="Eliminar">
+                                                        <i class="fa fa-trash"/>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </t>
+
+                    <!-- Formulario agregar pieza: solo visible en etapa reparación -->
+                    <t t-if="repair.frio_calor_stage == 'repair' and not repair.is_outsourced">
+                        <t t-if="add_error == 'no_product'">
+                            <div class="alert alert-warning mx-3 mt-3 mb-0" role="alert">
+                                <i class="fa fa-exclamation-triangle me-1"/> Seleccione un producto de la lista desplegable.
+                            </div>
+                        </t>
+                        <t t-elif="add_error == 'create_failed'">
+                            <div class="alert alert-danger mx-3 mt-3 mb-0" role="alert">
+                                <i class="fa fa-times-circle me-1"/> No se pudo agregar la pieza. Verifique que el producto esté correctamente configurado.
+                            </div>
+                        </t>
+                        <t t-elif="add_error">
+                            <div class="alert alert-warning mx-3 mt-3 mb-0" role="alert">
+                                <i class="fa fa-exclamation-triangle me-1"/> Datos inválidos. Intente nuevamente.
+                            </div>
+                        </t>
+                        <div class="card-footer border-top pt-3">
+                            <h6 class="mb-3 text-muted"><i class="fa fa-plus-circle me-1"/>Agregar pieza</h6>
+                            <form t-attf-action="/my/repairs/#{repair.id}/add_part" method="post" id="add_part_form">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <input type="hidden" name="product_id" id="part_product_id"/>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label form-label-sm mb-1">Tipo</label>
+                                        <select name="repair_line_type" class="form-select form-select-sm">
+                                            <option value="add">Agregar</option>
+                                            <option value="remove">Retirar</option>
+                                            <option value="recycle">Reciclar</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label form-label-sm mb-1">Producto</label>
+                                        <div id="product_search_wrapper">
+                                            <input
+                                                id="part_product_input"
+                                                type="text"
+                                                class="form-control form-control-sm"
+                                                placeholder="Buscar producto..."
+                                                autocomplete="off"
+                                            />
+                                        </div>
+                                        <div id="product_dropdown"
+                                             class="dropdown-menu p-0 shadow"
+                                             style="display:none; max-height:220px; overflow-y:auto;"/>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label form-label-sm mb-1">Cantidad</label>
+                                        <input type="number" name="product_uom_qty"
+                                               class="form-control form-control-sm"
+                                               value="1" min="0.01" step="0.01"/>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="submit" class="btn btn-sm btn-primary w-100"
+                                                id="add_part_submit" disabled="disabled">
+                                            <i class="fa fa-plus me-1"/>Agregar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <script type="text/javascript">
+                            (function () {
+                                var input = document.getElementById('part_product_input');
+                                var hiddenId = document.getElementById('part_product_id');
+                                var dropdown = document.getElementById('product_dropdown');
+                                var submitBtn = document.getElementById('add_part_submit');
+                                var timer;
+
+                                /* Mover el dropdown al body para escapar cualquier
+                                   overflow:hidden de los contenedores padre. */
+                                document.body.appendChild(dropdown);
+                                dropdown.style.position = 'fixed';
+                                dropdown.style.zIndex = '9999';
+
+                                function positionDropdown() {
+                                    var r = input.getBoundingClientRect();
+                                    dropdown.style.top = r.bottom + 'px';
+                                    dropdown.style.left = r.left + 'px';
+                                    dropdown.style.width = r.width + 'px';
+                                }
+
+                                function showDropdown(products) {
+                                    dropdown.innerHTML = '';
+                                    if (!products.length) {
+                                        var empty = document.createElement('div');
+                                        empty.className = 'px-3 py-2 text-muted small';
+                                        empty.textContent = 'Sin resultados';
+                                        dropdown.appendChild(empty);
+                                    } else {
+                                        products.forEach(function (p) {
+                                            var item = document.createElement('a');
+                                            item.className = 'dropdown-item small py-2';
+                                            item.href = '#';
+                                            item.textContent = p.name + (p.uom ? ' (' + p.uom + ')' : '');
+                                            item.addEventListener('click', function (e) {
+                                                e.preventDefault();
+                                                input.value = p.name;
+                                                hiddenId.value = p.id;
+                                                submitBtn.disabled = false;
+                                                dropdown.style.display = 'none';
+                                            });
+                                            dropdown.appendChild(item);
+                                        });
+                                    }
+                                    positionDropdown();
+                                    dropdown.style.display = 'block';
+                                }
+
+                                input.addEventListener('input', function () {
+                                    hiddenId.value = '';
+                                    submitBtn.disabled = true;
+                                    clearTimeout(timer);
+                                    var q = this.value.trim();
+                                    if (q.length &lt; 2) { dropdown.style.display = 'none'; return; }
+                                    timer = setTimeout(function () {
+                                        fetch('/my/repairs/products/search', {
+                                            method: 'POST',
+                                            headers: {'Content-Type': 'application/json'},
+                                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', id: 1, params: {query: q}}),
+                                        }).then(function (r) { return r.json(); })
+                                          .then(function (d) { showDropdown(d.result || []); })
+                                          .catch(function () { dropdown.style.display = 'none'; });
+                                    }, 300);
+                                });
+
+                                window.addEventListener('scroll', function () {
+                                    if (dropdown.style.display !== 'none') positionDropdown();
+                                }, { passive: true });
+
+                                document.addEventListener('click', function (e) {
+                                    if (e.target !== input &amp;&amp; !dropdown.contains(e.target)) {
+                                        dropdown.style.display = 'none';
+                                    }
+                                });
+                            })();
+                        </script>
+                    </t>
+                </div>
+            </t>
+
+        </t>
+    </template>
+
+</odoo>

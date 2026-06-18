@@ -1,0 +1,38 @@
+<odoo>
+
+    <record id="logistic_custom_ivess_view_order_tree" model="ir.ui.view">
+        <field name="name">logistic.custom.ivess.view.order.tree</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_tree"/>
+        <field name="arch" type="xml">
+            <field name="amount_total" position="after">
+                <field name="delivery_route_id"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="quotation_logistic_custom_ivess_view_order_tree" model="ir.ui.view">
+        <field name="name">quotation.logistic.custom.ivess.view.order.tree</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_quotation_tree_with_onboarding"/>
+        <field name="arch" type="xml">
+            <field name="amount_total" position="after">
+                <field name="delivery_route_id"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_sale_order_form_inherit_delivery_route" model="ir.ui.view">
+        <field name="name">view.sale.order.form.inherit.delivery.route</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='source_id']" position="after">
+                <field name="delivery_route_id"/>
+            </xpath>
+            <!--<xpath expr="//field[@name='order_line']/tree" position="inside">
+                <field name="replacement_reason_id" optional="show"/>
+            </xpath> sacar este comentario-->
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,42 @@
+<odoo>
+    <record id="view_replacement_reason_tree" model="ir.ui.view">
+        <field name="name">replacement.reason.tree</field>
+        <field name="model">replacement.reason</field>
+        <field name="arch" type="xml">
+            <list string="Replacement Reasons">
+                <field name="code"/>
+                <field name="reason"/>
+                <field name="sequence"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_replacement_reason_form" model="ir.ui.view">
+        <field name="name">replacement.reason.form</field>
+        <field name="model">replacement.reason</field>
+        <field name="arch" type="xml">
+            <form string="Replacement Reason">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="reason"/>
+                            <field name="sequence"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_replacement_reason" model="ir.actions.act_window">
+        <field name="name">Replacement Reasons</field>
+        <field name="res_model">replacement.reason</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create and manage reasons for product replacements.
+            </p>
+        </field>
+    </record>
+</odoo>

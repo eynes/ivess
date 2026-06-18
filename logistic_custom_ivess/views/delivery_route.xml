@@ -1,0 +1,87 @@
+<odoo>
+    <record id="view_delivery_route_form" model="ir.ui.view">
+        <field name="name">delivery.route.form</field>
+        <field name="model">delivery.route</field>
+        <field name="arch" type="xml">
+            <form string="Delivery Route">
+                <header>
+                    <button name="action_set_in_progress" type="object" string="In Progress" invisible="state not in ('draft')" class="btn-primary"/>
+                    <button name="action_set_closed" type="object" string="Close" invisible="state not in ('in_progress')" class="btn-success"  confirm="Esta seguro que desea cerrar la ruta?"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state not in ('closed')" class="btn-secondary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="state not in ('draft', 'in_progress')" placeholder="Nombre"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="create_from_wizard" invisible="1"/>
+                            <field name="template_delivery_route_id" required="True" readonly="state not in ('draft', 'in_progress')"/>
+                            <!--<field name="allowed_truck_domain" invisible="1"/>-->
+                            <field name="truck_id" required="True" readonly="state not in ('draft', 'in_progress')"/> <!--domain="[('id', 'in', allowed_truck_ids)]"-->
+                            <field name="delivery_number_id"/>
+                            <!--<field name="allowed_person_domain" invisible="1"/>-->
+                            <field name="delivery_person_id" required="True" readonly="state not in ('draft', 'in_progress')"/> <!--domain="[('id', 'in', allowed_person_ids)]"-->
+                            <field name="delivery_date" readonly="state not in ('draft', 'in_progress')"/>
+                            <field name="delivery_type" readonly="state not in ('draft', 'in_progress')"/>
+                            <field name="allow_reordering" invisible="1"/>
+                            <field name="allow_closing_with_rake" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Clients to Visit">
+                            <field name="delivery_route_line_ids" readonly="state in ('closed')">
+                                <list editable="bottom" delete="false" class="tree-view-auto-columns">
+                                    <field name="sequence" widget="handle" column_invisible="parent.allow_reordering == False"/>
+                                    <field name="client_id" widget="many2one_link" optional="show" domain="[('id', 'in', allowed_client)]"/>
+                                    <field name="customer_code" style="width:5% !important;" optional="show" force_save="1"/>
+                                    <field name="client_address"  optional="show"/>
+                                    <field name="possible_customer_withdrawal" optional="show"/>
+                                    <field name="reason_customer_withdrawal" required="possible_customer_withdrawal == True"
+                                          readonly="possible_customer_withdrawal == False"/>
+                                    <field name="visit_status_id" optional="show" column_invisible="parent.state in ('draft')"/>
+                                    <field name="requires_reason" optional="hide"/>
+                                    <field name="no_purchase_reason_id"  widget="many2one" optional="show" column_invisible="parent.state in ('draft')" readonly="requires_reason == False" required="requires_reason == True"/>
+                                    <field name="parent_delivery_type" force_save="1" column_invisible="1"/>
+                                    <field name="parent_delivery_person" force_save="1" column_invisible="1"/>
+                                    <field name="allowed_client" column_invisible="1" force_save="1"/>
+                                    <field name="route_id" column_invisible="1"/>
+                                    <button name="unlink" icon="fa-trash" title="Unlink" type="object" column_invisible="parent.state not in ('draft')"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page name="config_page" string="Configuración">
+                            <group>
+                                <field name="allow_cash_sale"/>
+                                <field name="allow_manual_address"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_delivery_route_tree" model="ir.ui.view">
+        <field name="name">delivery.route.tree</field>
+        <field name="model">delivery.route</field>
+        <field name="arch" type="xml">
+            <list string="Delivery Routes"> <field name="name"/>
+                <field name="truck_id"/>
+                <field name="delivery_person_id"/>
+                <field name="delivery_date"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_delivery_route" model="ir.actions.act_window">
+        <field name="name">Delivery Routes</field>
+        <field name="res_model">delivery.route</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,17 @@
+<odoo>
+    <data>
+        <record id="email_template_form_view_inherit_stock_request" model="ir.ui.view">
+            <field name="name">mail.template.form.inherit.stock.request</field>
+            <field name="model">mail.template</field>
+            <field name="inherit_id" ref="mail.email_template_form"/>
+            <field name="arch" type="xml">
+
+                <xpath expr="//field[@name='subject']" position="before">
+                    <field name="is_default_for_stock_request"
+                           invisible="model != 'stock.request.order'"/>
+                </xpath>
+
+            </field>
+        </record>
+    </data>
+</odoo>

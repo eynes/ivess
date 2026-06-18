@@ -1,0 +1,700 @@
+# -*- coding: utf-8 -*-
+import logging
+import re
+from datetime import datetime as _dt
+from odoo import http
+from odoo.http import request
+from odoo.addons.portal.controllers.portal import CustomerPortal, pager as portal_pager
+
+_logger = logging.getLogger(__name__)
+
+_MAINTENANCE_PER_PAGE = 20
+_WORKSHOP_PER_PAGE = 20
+
+_MAINTENANCE_TYPE_LABELS = {
+    'corrective': 'Correctivo',
+    'preventive': 'Preventivo',
+}
+_MAINTENANCE_TYPE_OPTIONS = list(_MAINTENANCE_TYPE_LABELS.items())
+
+_PRIORITY_LABELS = {
+    '0': 'Muy baja',
+    '1': 'Baja',
+    '2': 'Normal',
+    '3': 'Alta',
+}
+_PRIORITY_OPTIONS = list(_PRIORITY_LABELS.items())
+
+_PRIORITY_BADGE = {
+    '0': 'secondary',
+    '1': 'info',
+    '2': 'warning',
+    '3': 'danger',
+}
+
+_KANBAN_STATE_LABELS = {
+    'normal': 'En curso',
+    'blocked': 'Bloqueado',
+    'done': 'Listo para siguiente etapa',
+}
+_KANBAN_STATE_OPTIONS = list(_KANBAN_STATE_LABELS.items())
+
+_KANBAN_STATE_BADGE = {
+    'normal': 'primary',
+    'blocked': 'danger',
+    'done': 'success',
+}
+
+_MAINTENANCE_DOMAIN = [('is_internal_maintenance', '=', True)]
+_WORKSHOP_DOMAIN = [('is_workshop', '=', True)]
+
+_HTML_TAG_RE = re.compile(r'<[^>]+>')
+
+
+def _strip_html(html_content):
+    if not html_content:
+        return ''
+    return _HTML_TAG_RE.sub('', html_content).strip()
+
+
+class MaintenancePortalController(CustomerPortal):
+
+    def _prepare_home_portal_values(self, counters):
+        values = super()._prepare_home_portal_values(counters)
+        MaintenanceRequest = request.env['maintenance.request'].sudo()
+        if 'maintenance_count' in counters:
+            values['maintenance_count'] = MaintenanceRequest.search_count(_MAINTENANCE_DOMAIN)
+        if 'workshop_count' in counters:
+            values['workshop_count'] = MaintenanceRequest.search_count(_WORKSHOP_DOMAIN)
+        return values
+
+    # ── Shared helpers ─────────────────────────────────────────────────────────
+
+    def _maint_edit_context(self):
+        """Values needed to render the edit form select controls."""
+        stages = request.env['maintenance.stage'].sudo().search([], order='sequence')
+        teams = request.env['maintenance.team'].sudo().search([], order='name')
+        users = request.env['res.users'].sudo().search(
+            [('share', '=', False), ('active', '=', True)],
+            order='name', limit=200,
+        )
+        equipment = request.env['maintenance.equipment'].sudo().search([], order='name', limit=200)
+        workcenters = request.env['mrp.workcenter'].sudo().search([], order='name', limit=100)
+        return {
+            'stages': stages,
+            'teams': teams,
+            'users': users,
+            'equipment_list': equipment,
+            'workcenters': workcenters,
+            'maintenance_type_options': _MAINTENANCE_TYPE_OPTIONS,
+            'priority_options': _PRIORITY_OPTIONS,
+            'kanban_state_options': _KANBAN_STATE_OPTIONS,
+            'maintenance_for_options': [('equipment', 'Equipo'), ('workcenter', 'Centro de trabajo')],
+        }
+
+    def _maint_detail_values(self, maint_request):
+        """Common read-only display values for detail views."""
+        return {
+            'maint_request': maint_request,
+            'priority_labels': _PRIORITY_LABELS,
+            'priority_badge': _PRIORITY_BADGE,
+            'maintenance_type_labels': _MAINTENANCE_TYPE_LABELS,
+            'kanban_state_labels': _KANBAN_STATE_LABELS,
+            'kanban_state_badge': _KANBAN_STATE_BADGE,
+        }
+
+    def _maint_write_from_post(self, maint_request, post):
+        """Parse POST data and write to maint_request. Returns error key or None."""
+        vals = {}
+
+        name = (post.get('name') or '').strip()
+        if name:
+            vals['name'] = name
+
+        if post.get('maintenance_type') in ('corrective', 'preventive'):
+            vals['maintenance_type'] = post['maintenance_type']
+
+        if post.get('priority') in ('0', '1', '2', '3'):
+            vals['priority'] = post['priority']
+
+        if post.get('kanban_state') in ('normal', 'blocked', 'done'):
+            vals['kanban_state'] = post['kanban_state']
+
+        # Optional M2O — can be cleared
+        for field in ('stage_id', 'user_id', 'equipment_id', 'closure_reason_id'):
+            raw = (post.get(field) or '').strip()
+            try:
+                val = int(raw) if raw else 0
+                vals[field] = val if val else False
+            except ValueError:
+                pass
+
+        # Required M2O — only write if a valid ID is provided
+        raw = (post.get('maintenance_team_id') or '').strip()
+        if raw:
+            try:
+                val = int(raw)
+                if val:
+                    vals['maintenance_team_id'] = val
+            except ValueError:
+                pass
+
+        for field in ('schedule_date', 'schedule_end'):
+            raw = (post.get(field) or '').strip()
+            if raw:
+                try:
+                    vals[field] = _dt.strptime(raw, '%Y-%m-%dT%H:%M')
+                except ValueError:
+                    pass
+            else:
+                vals[field] = False
+
+        desc = (post.get('description') or '').strip()
+        if desc:
+            if not desc.startswith('<'):
+                desc = f'<p>{desc}</p>'
+            vals['description'] = desc
+        else:
+            vals['description'] = False
+
+        origin = (post.get('request_origin') or '').strip()
+        vals['request_origin'] = origin or False
+
+        if post.get('maintenance_for') in ('equipment', 'workcenter'):
+            vals['maintenance_for'] = post['maintenance_for']
+
+        for field in ('workcenter_id', 'production_id'):
+            raw = (post.get(field) or '').strip()
+            try:
+                val = int(raw) if raw else 0
+                vals[field] = val if val else False
+            except ValueError:
+                pass
+
+        if not vals:
+            return None
+        try:
+            with request.env.cr.savepoint():
+                maint_request.write(vals)
+        except Exception as e:
+            _logger.exception("Portal maint write failed id=%s: %s", maint_request.id, e)
+            return 'save_failed'
+        return None
+
+    def _maint_create_from_post(self, post):
+        """Create a maintenance.request from workshop portal POST data."""
+        name = (post.get('name') or '').strip()
+        if not name:
+            return None
+
+        team_raw = (post.get('maintenance_team_id') or '').strip()
+        try:
+            team_id = int(team_raw) if team_raw else 0
+        except ValueError:
+            team_id = 0
+        if not team_id:
+            return None
+
+        vals = {
+            'name': name,
+            'maintenance_team_id': team_id,
+            'company_id': request.env.company.id,
+        }
+
+        # employee_id: find the employee linked to the portal user
+        emp_raw = (post.get('employee_id') or '').strip()
+        try:
+            emp_id = int(emp_raw) if emp_raw else 0
+            if emp_id:
+                vals['employee_id'] = emp_id
+        except ValueError:
+            pass
+
+        if post.get('maintenance_type') in ('corrective', 'preventive'):
+            vals['maintenance_type'] = post['maintenance_type']
+        if post.get('priority') in ('0', '1', '2', '3'):
+            vals['priority'] = post['priority']
+
+        # equipment_id is required for workshop creation
+        equip_raw = (post.get('equipment_id') or '').strip()
+        try:
+            equip_id = int(equip_raw) if equip_raw else 0
+        except ValueError:
+            equip_id = 0
+        if not equip_id:
+            return None
+        vals['equipment_id'] = equip_id
+
+        for field in ('stage_id', 'user_id', 'workcenter_id', 'production_id'):
+            raw = (post.get(field) or '').strip()
+            try:
+                val = int(raw) if raw else 0
+                if val:
+                    vals[field] = val
+            except ValueError:
+                pass
+
+        if post.get('maintenance_for') in ('equipment', 'workcenter'):
+            vals['maintenance_for'] = post['maintenance_for']
+
+        for field in ('schedule_date', 'schedule_end'):
+            raw = (post.get(field) or '').strip()
+            if raw:
+                try:
+                    vals[field] = _dt.strptime(raw, '%Y-%m-%dT%H:%M')
+                except ValueError:
+                    pass
+
+        desc = (post.get('description') or '').strip()
+        if desc:
+            if not desc.startswith('<'):
+                desc = f'<p>{desc}</p>'
+            vals['description'] = desc
+
+        origin = (post.get('request_origin') or '').strip()
+        if origin:
+            vals['request_origin'] = origin
+
+        if post.get('recurring_maintenance') == 'on':
+            vals['recurring_maintenance'] = True
+            try:
+                vals['repeat_interval'] = max(1, int(post.get('repeat_interval') or 1))
+            except ValueError:
+                vals['repeat_interval'] = 1
+            if post.get('repeat_unit') in ('day', 'week', 'month', 'year'):
+                vals['repeat_unit'] = post['repeat_unit']
+            if post.get('repeat_type') in ('forever', 'until'):
+                vals['repeat_type'] = post['repeat_type']
+                if post['repeat_type'] == 'until' and post.get('repeat_until'):
+                    vals['repeat_until'] = post['repeat_until']  # 'YYYY-MM-DD'
+
+        try:
+            with request.env.cr.savepoint():
+                maint_request = request.env['maintenance.request'].sudo().with_context(
+                    allowed_company_ids=[request.env.company.id],
+                ).create(vals)
+        except Exception as e:
+            _logger.exception("Portal workshop create failed: %s", e)
+            return None
+
+        return maint_request
+
+    def _maint_close_request(self, maint_request, post):
+        """Set closure_reason_id and move to the first done stage."""
+        closure_raw = (post.get('closure_reason_id') or '').strip()
+        try:
+            closure_id = int(closure_raw) if closure_raw else 0
+        except ValueError:
+            closure_id = 0
+        if not closure_id:
+            return
+        repaired_stage = request.env['maintenance.stage'].sudo().search(
+            [('done', '=', True)], order='sequence asc', limit=1
+        )
+        if not repaired_stage:
+            return
+        vals = {'closure_reason_id': closure_id, 'stage_id': repaired_stage.id}
+        try:
+            with request.env.cr.savepoint():
+                maint_request.write(vals)
+        except Exception as e:
+            _logger.exception("Portal close_request failed id=%s: %s", maint_request.id, e)
+
+    def _maint_add_material(self, maint_request, post):
+        """Add a material line to a maintenance.request."""
+        try:
+            product_id = int(post.get('product_id') or 0)
+            product_uom_qty = float(post.get('product_uom_qty') or 1)
+            if product_uom_qty <= 0:
+                product_uom_qty = 1.0
+        except (ValueError, TypeError):
+            return
+        if not product_id:
+            return
+        product = request.env['product.product'].sudo().browse(product_id)
+        if not product.exists():
+            return
+        description = (post.get('description') or product.name or '').strip()
+        try:
+            with request.env.cr.savepoint():
+                request.env['maintenance.request.material'].sudo().create({
+                    'request_id': maint_request.id,
+                    'product_id': product.id,
+                    'description': description,
+                    'product_uom_qty': product_uom_qty,
+                    'quantity': product_uom_qty,
+                    'product_uom': product.uom_id.id,
+                    'company_id': maint_request.company_id.id,
+                })
+        except Exception as e:
+            _logger.exception("Portal add_material failed request=%s: %s", maint_request.id, e)
+
+    def _maint_update_material_qty(self, maint_request, post):
+        """Update product_uom_qty and quantity on a material line."""
+        try:
+            material_id = int(post.get('material_id') or 0)
+            quantity = float(post.get('quantity') or 0)
+            if quantity < 0:
+                quantity = 0.0
+        except (ValueError, TypeError):
+            return
+        if not material_id:
+            return
+        material = request.env['maintenance.request.material'].sudo().browse(material_id)
+        if not material.exists() or material.request_id.id != maint_request.id:
+            return
+        if material.stock_move_id and material.stock_move_id.state == 'done':
+            return
+        try:
+            with request.env.cr.savepoint():
+                material.write({'quantity': quantity, 'product_uom_qty': quantity})
+        except Exception as e:
+            _logger.exception("Portal update_material_qty failed mat=%s: %s", material_id, e)
+
+    def _maint_delete_material(self, maint_request, material_id):
+        """Delete a material line if it belongs to this request and its move isn't done."""
+        material = request.env['maintenance.request.material'].sudo().browse(material_id)
+        if not material.exists() or material.request_id.id != maint_request.id:
+            return
+        if material.stock_move_id and material.stock_move_id.state == 'done':
+            return
+        try:
+            with request.env.cr.savepoint():
+                material.unlink()
+        except Exception as e:
+            _logger.exception("Portal delete_material failed mat=%s: %s", material_id, e)
+
+    # ── Órdenes de Mantenimiento  —  /my/maintenance ──────────────────────────
+
+    @http.route(
+        ['/my/maintenance', '/my/maintenance/page/<int:page>'],
+        type='http', auth='user', website=True,
+    )
+    def portal_my_maintenance(self, page=1, **kw):
+        MaintenanceRequest = request.env['maintenance.request'].sudo()
+        total = MaintenanceRequest.search_count(_MAINTENANCE_DOMAIN)
+        pager = portal_pager(
+            url='/my/maintenance',
+            total=total,
+            page=page,
+            step=_MAINTENANCE_PER_PAGE,
+        )
+        requests_list = MaintenanceRequest.search(
+            _MAINTENANCE_DOMAIN,
+            order='request_date desc, id desc',
+            limit=_MAINTENANCE_PER_PAGE,
+            offset=pager['offset'],
+        )
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'maintenance_requests': requests_list,
+            'pager': pager,
+            'page_name': 'maintenance',
+            'priority_labels': _PRIORITY_LABELS,
+            'priority_badge': _PRIORITY_BADGE,
+            'maintenance_type_labels': _MAINTENANCE_TYPE_LABELS,
+        })
+        return request.render('maintenance_portal_ivess.portal_my_maintenance', values)
+
+    @http.route(
+        ['/my/maintenance/<int:request_id>'],
+        type='http', auth='user', website=True,
+    )
+    def portal_maintenance_detail(self, request_id, **kw):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/maintenance')
+        closure_reasons = request.env['maintenance.closure.reason'].sudo().search([], order='name')
+        values = self._prepare_portal_layout_values()
+        values.update(self._maint_detail_values(maint_request))
+        values.update({
+            'page_name': 'maintenance_detail',
+            'back_url': '/my/maintenance',
+            'back_label': 'Órdenes de Mantenimiento',
+            'edit_url': f'/my/maintenance/{request_id}/edit',
+            'close_url': f'/my/maintenance/{request_id}/close',
+            'add_material_url': f'/my/maintenance/{request_id}/add_material',
+            'update_material_url': f'/my/maintenance/{request_id}/update_material_qty',
+            'del_material_base': f'/my/maintenance/{request_id}/delete_material',
+            'product_search_url': '/my/maintenance/products/search',
+            'closure_reasons': closure_reasons,
+        })
+        return request.render('maintenance_portal_ivess.portal_maintenance_detail', values)
+
+    @http.route(
+        ['/my/maintenance/<int:request_id>/edit'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_maintenance_edit(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/maintenance')
+        if request.httprequest.method == 'POST':
+            self._maint_write_from_post(maint_request, post)
+            return request.redirect(f'/my/maintenance/{request_id}')
+        values = self._prepare_portal_layout_values()
+        values.update(self._maint_edit_context())
+        values.update({
+            'maint_request': maint_request,
+            'page_name': 'maintenance_edit',
+            'back_url': f'/my/maintenance/{request_id}',
+            'back_label': 'Órdenes de Mantenimiento',
+            'action_url': f'/my/maintenance/{request_id}/edit',
+            'description_text': _strip_html(maint_request.description),
+        })
+        return request.render('maintenance_portal_ivess.portal_maintenance_edit', values)
+
+    @http.route(
+        ['/my/maintenance/<int:request_id>/add_material'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_maintenance_add_material(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/maintenance')
+        self._maint_add_material(maint_request, post)
+        return request.redirect(f'/my/maintenance/{request_id}')
+
+    @http.route(
+        ['/my/maintenance/<int:request_id>/delete_material/<int:material_id>'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_maintenance_delete_material(self, request_id, material_id, **kw):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/maintenance')
+        self._maint_delete_material(maint_request, material_id)
+        return request.redirect(f'/my/maintenance/{request_id}')
+
+    @http.route(
+        ['/my/maintenance/<int:request_id>/update_material_qty'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_maintenance_update_material_qty(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/maintenance')
+        self._maint_update_material_qty(maint_request, post)
+        return request.redirect(f'/my/maintenance/{request_id}')
+
+    @http.route(
+        ['/my/maintenance/<int:request_id>/close'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_maintenance_close(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/maintenance')
+        self._maint_close_request(maint_request, post)
+        return request.redirect(f'/my/maintenance/{request_id}')
+
+    @http.route(
+        ['/my/maintenance/new'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_maintenance_new(self, **post):
+        if request.httprequest.method == 'POST':
+            new_req = self._maint_create_from_post(post)
+            if new_req:
+                return request.redirect(f'/my/maintenance/{new_req.id}')
+            return request.redirect('/my/maintenance/new')
+
+        current_employee = request.env['hr.employee'].sudo().search(
+            [('user_id', '=', request.env.uid)], limit=1,
+        )
+        maintenance_team = request.env['maintenance.team'].sudo().search(
+            [('name', 'ilike', 'Mantenimiento interno')], limit=1,
+        )
+        values = self._prepare_portal_layout_values()
+        values.update(self._maint_edit_context())
+        values.update({
+            'page_name': 'maintenance_new',
+            'back_url': '/my/maintenance',
+            'back_label': 'Órdenes de Mantenimiento',
+            'action_url': '/my/maintenance/new',
+            'current_employee': current_employee,
+            'default_team': maintenance_team,
+        })
+        return request.render('maintenance_portal_ivess.portal_maintenance_new', values)
+
+    # ── Servicios de Taller  —  /my/workshop ─────────────────────────────────
+
+    @http.route(
+        ['/my/workshop', '/my/workshop/page/<int:page>'],
+        type='http', auth='user', website=True,
+    )
+    def portal_my_workshops(self, page=1, **kw):
+        MaintenanceRequest = request.env['maintenance.request'].sudo()
+        total = MaintenanceRequest.search_count(_WORKSHOP_DOMAIN)
+        pager = portal_pager(
+            url='/my/workshop',
+            total=total,
+            page=page,
+            step=_WORKSHOP_PER_PAGE,
+        )
+        requests_list = MaintenanceRequest.search(
+            _WORKSHOP_DOMAIN,
+            order='request_date desc, id desc',
+            limit=_WORKSHOP_PER_PAGE,
+            offset=pager['offset'],
+        )
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'maintenance_requests': requests_list,
+            'pager': pager,
+            'page_name': 'workshops',
+            'priority_labels': _PRIORITY_LABELS,
+            'priority_badge': _PRIORITY_BADGE,
+            'maintenance_type_labels': _MAINTENANCE_TYPE_LABELS,
+        })
+        return request.render('maintenance_portal_ivess.portal_my_workshops', values)
+
+    @http.route(
+        ['/my/workshop/<int:request_id>'],
+        type='http', auth='user', website=True,
+    )
+    def portal_workshop_detail(self, request_id, **kw):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/workshop')
+        closure_reasons = request.env['maintenance.closure.reason'].sudo().search([], order='name')
+        values = self._prepare_portal_layout_values()
+        values.update(self._maint_detail_values(maint_request))
+        values.update({
+            'page_name': 'workshop_detail',
+            'back_url': '/my/workshop',
+            'back_label': 'Servicios de Taller',
+            'edit_url': f'/my/workshop/{request_id}/edit',
+            'close_url': f'/my/workshop/{request_id}/close',
+            'add_material_url': f'/my/workshop/{request_id}/add_material',
+            'update_material_url': f'/my/workshop/{request_id}/update_material_qty',
+            'del_material_base': f'/my/workshop/{request_id}/delete_material',
+            'product_search_url': '/my/maintenance/products/search',
+            'closure_reasons': closure_reasons,
+        })
+        return request.render('maintenance_portal_ivess.portal_workshop_detail', values)
+
+    @http.route(
+        ['/my/workshop/<int:request_id>/close'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_workshop_close(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/workshop')
+        self._maint_close_request(maint_request, post)
+        return request.redirect(f'/my/workshop/{request_id}')
+
+    @http.route(
+        ['/my/workshop/new'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_workshop_new(self, **post):
+        if request.httprequest.method == 'POST':
+            new_req = self._maint_create_from_post(post)
+            if new_req:
+                return request.redirect(f'/my/workshop/{new_req.id}')
+            return request.redirect('/my/workshop/new')
+
+        taller_team = request.env['maintenance.team'].sudo().search(
+            [('name', 'ilike', 'Taller Mecánico')], limit=1,
+        )
+        current_employee = request.env['hr.employee'].sudo().search(
+            [('user_id', '=', request.env.uid)], limit=1,
+        )
+
+        values = self._prepare_portal_layout_values()
+        values.update(self._maint_edit_context())
+        values.update({
+            'page_name': 'workshop_new',
+            'back_url': '/my/workshop',
+            'back_label': 'Servicios de Taller',
+            'action_url': '/my/workshop/new',
+            'default_team': taller_team,
+            'current_employee': current_employee,
+        })
+        return request.render('maintenance_portal_ivess.portal_workshop_new', values)
+
+    @http.route(
+        ['/my/workshop/<int:request_id>/edit'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_workshop_edit(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/workshop')
+        if request.httprequest.method == 'POST':
+            self._maint_write_from_post(maint_request, post)
+            return request.redirect(f'/my/workshop/{request_id}')
+        values = self._prepare_portal_layout_values()
+        values.update(self._maint_edit_context())
+        values.update({
+            'maint_request': maint_request,
+            'page_name': 'workshop_edit',
+            'back_url': f'/my/workshop/{request_id}',
+            'back_label': 'Servicios de Taller',
+            'action_url': f'/my/workshop/{request_id}/edit',
+            'description_text': _strip_html(maint_request.description),
+        })
+        return request.render('maintenance_portal_ivess.portal_workshop_edit', values)
+
+    @http.route(
+        ['/my/workshop/<int:request_id>/add_material'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_workshop_add_material(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/workshop')
+        self._maint_add_material(maint_request, post)
+        return request.redirect(f'/my/workshop/{request_id}')
+
+    @http.route(
+        ['/my/workshop/<int:request_id>/delete_material/<int:material_id>'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_workshop_delete_material(self, request_id, material_id, **kw):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/workshop')
+        self._maint_delete_material(maint_request, material_id)
+        return request.redirect(f'/my/workshop/{request_id}')
+
+    @http.route(
+        ['/my/workshop/<int:request_id>/update_material_qty'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_workshop_update_material_qty(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/workshop')
+        self._maint_update_material_qty(maint_request, post)
+        return request.redirect(f'/my/workshop/{request_id}')
+
+    # ── JSON: búsqueda de productos para materiales ───────────────────────────
+
+    @http.route(
+        ['/my/maintenance/products/search'],
+        type='json', auth='user', website=True,
+    )
+    def portal_maintenance_products_search(self, query=''):
+        if len((query or '').strip()) < 2:
+            return []
+        products = request.env['product.product'].sudo().search(
+            [('name', 'ilike', query.strip()), ('type', 'in', ['consu', 'product'])],
+            limit=15, order='name',
+        )
+        return [{'id': p.id, 'name': p.display_name, 'uom': p.uom_id.name} for p in products]
+
+    @http.route(
+        ['/my/maintenance/productions/search'],
+        type='json', auth='user', website=True,
+    )
+    def portal_maintenance_productions_search(self, query=''):
+        if len((query or '').strip()) < 2:
+            return []
+        productions = request.env['mrp.production'].sudo().search(
+            [('name', 'ilike', query.strip()), ('state', 'not in', ['cancel'])],
+            limit=15, order='id desc',
+        )
+        return [{'id': p.id, 'name': p.display_name} for p in productions]

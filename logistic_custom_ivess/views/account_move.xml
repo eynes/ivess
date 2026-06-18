@@ -1,0 +1,58 @@
+<odoo>
+    <!--<record id="view_account_move_out_tree_inherit_delivery_route" model="ir.ui.view">
+        <field name="name">account.move.out.tree.inherit.delivery.route</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_out_invoice_tree"/> Facturas de cliente
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <field name="delivery_route_ids" widget="many2many_tags" string="Repartos"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_account_move_cd_tree_inherit_delivery_route" model="ir.ui.view">
+        <field name="name">account.move.cd.tree.inherit.delivery.route</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_out_credit_note_tree"/> Notas de crédito clientes
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <field name="delivery_route_ids" widget="many2many_tags" string="Repartos"/>
+            </xpath>
+        </field>
+    </record> -->
+
+   <!--<record id="custom_view_invoice_tree_inherit" model="ir.ui.view">
+        <field name="name">account.move.tree.inherit.optional_field</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="arch" type="xml">
+        <xpath expr="//tree/field[@name='state']" position="after">
+            <field name="delivery_route_ids" widget="many2many_tags" optional="show"/>
+        </xpath>
+        </field>
+    </record> SACAR ESTE COMENTARIO-->
+
+    <record id="view_move_form_inherit_add_m2m" model="ir.ui.view">
+        <field name="name">account.move.form.inherit.add.m2m</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/> <!-- Formulario general -->
+        <field name="arch" type="xml">
+        <xpath expr="//page[@name='other_info']" position="inside">
+            <div>
+                <separator string="Repartos"/>
+                <group>
+                </group>
+                <field name="delivery_route_ids" nolabel="1" invisible="move_type not in ['out_invoice', 'out_refund', 'out_receipt']">
+                    <list>
+                        <field name="name"/>
+                        <field name="truck_id"/>
+                        <field name="delivery_person_id"/>
+                        <field name="delivery_date"/>
+                        <field name="state" />
+                    </list>
+                </field>
+            </div>
+        </xpath>
+        </field>
+    </record>
+</odoo>

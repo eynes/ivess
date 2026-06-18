@@ -1,0 +1,15 @@
+<odoo>
+    <record id="view_partner_form_inherit_custom_validated_supplier" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.custom.validated.supplier</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <group name="purchase" position="inside">
+                <field name="validated_supplier" groups="validated_partner_custom.group_modify_validated_supplier"/>
+            </group>
+            <xpath expr="//field[@name='property_supplier_payment_term_id']" position="attributes">
+                <attribute name="groups" separator="," add="purchase.group_purchase_user"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

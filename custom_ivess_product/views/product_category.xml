@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="product_category_form_view_ivess_inherit" model="ir.ui.view">
+        <field name="name">product.category.ivess.form</field>
+        <field name="model">product.category</field>
+        <field name="inherit_id" ref="product.product_category_form_view" />
+        <field name="arch" type="xml">
+            <field name="parent_id" position="after">
+                <group>
+                    <field name="new_sequence_id"/>
+                    <field name="repaired_sequence_id"/>
+                </group>
+            </field>
+        </field>
+    </record>
+</odoo>
