@@ -284,16 +284,65 @@
                         </div>
                     </t>
 
-                    <!-- Descripción -->
+                    <!-- Notas (descripción interna) -->
                     <t t-if="maint_request.description">
                         <hr/>
-                        <h6 class="text-muted mb-2">Descripción</h6>
+                        <h6 class="text-muted mb-2">Notas</h6>
                         <div class="border rounded p-3 bg-light">
                             <t t-out="maint_request.description"/>
                         </div>
                     </t>
+
+                    <!-- Motivo de cierre (si ya está terminado) -->
+                    <t t-if="maint_request.stage_id.done and maint_request.closure_reason_id">
+                        <hr/>
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa fa-check-circle text-success"/>
+                            <small class="text-muted">Motivo de cierre:</small>
+                            <strong><t t-esc="maint_request.closure_reason_id.name"/></strong>
+                        </div>
+                    </t>
                 </div>
             </div>
+
+            <!-- Marcar como terminado -->
+            <t t-if="not maint_request.stage_id.done">
+                <div class="card mt-3 border-success">
+                    <div class="card-header" style="background-color:#d1e7dd">
+                        <h6 class="mb-0 text-success">
+                            <i class="fa fa-check-circle me-2"/>Marcar como terminado
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form t-att-action="close_url" method="post">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label small fw-semibold">
+                                        Motivo de cierre <span class="text-danger">*</span>
+                                    </label>
+                                    <select name="closure_reason_id" class="form-select"
+                                            required="required" id="maint_closure_select">
+                                        <option value="">— Seleccionar motivo —</option>
+                                        <t t-foreach="closure_reasons" t-as="cr">
+                                            <option t-att-value="cr.id"
+                                                    t-att-selected="'selected' if maint_request.closure_reason_id.id == cr.id else None">
+                                                <t t-esc="cr.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-success w-100"
+                                            id="maint_btn_close" disabled="disabled">
+                                        <i class="fa fa-check me-1"/> Marcar como terminado
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </t>
 
             <!-- Materiales -->
             <div class="card mt-3" style="overflow: visible">
@@ -469,6 +518,17 @@
                         suggestions.style.display = 'none';
                     }
                 });
+            })();
+            </script>
+
+            <script>
+            (function () {
+                var sel = document.getElementById('maint_closure_select');
+                var btn = document.getElementById('maint_btn_close');
+                if (!sel || !btn) return;
+                function update() { btn.disabled = !sel.value; }
+                sel.addEventListener('change', update);
+                update();
             })();
             </script>
 
@@ -672,10 +732,10 @@
                             </div>
                         </div>
 
-                        <!-- Descripción -->
+                        <!-- Notas -->
                         <div class="row g-3 mb-3">
                             <div class="col-12">
-                                <label class="form-label fw-semibold">Descripción</label>
+                                <label class="form-label fw-semibold">Notas</label>
                                 <textarea name="description" class="form-control" rows="5"
                                           placeholder="Descripción de la tarea..."><t t-esc="description_text"/></textarea>
                             </div>
@@ -1021,13 +1081,62 @@
 
                     <t t-if="maint_request.description">
                         <hr/>
-                        <h6 class="text-muted mb-2">Descripción</h6>
+                        <h6 class="text-muted mb-2">Notas</h6>
                         <div class="border rounded p-3 bg-light">
                             <t t-out="maint_request.description"/>
                         </div>
                     </t>
+
+                    <!-- Motivo de cierre (si ya está terminado) -->
+                    <t t-if="maint_request.stage_id.done and maint_request.closure_reason_id">
+                        <hr/>
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa fa-check-circle text-success"/>
+                            <small class="text-muted">Motivo de cierre:</small>
+                            <strong><t t-esc="maint_request.closure_reason_id.name"/></strong>
+                        </div>
+                    </t>
                 </div>
             </div>
+
+            <!-- Marcar como terminado -->
+            <t t-if="not maint_request.stage_id.done">
+                <div class="card mt-3 border-success">
+                    <div class="card-header" style="background-color:#d1e7dd">
+                        <h6 class="mb-0 text-success">
+                            <i class="fa fa-check-circle me-2"/>Marcar como terminado
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form t-att-action="close_url" method="post">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label small fw-semibold">
+                                        Motivo de cierre <span class="text-danger">*</span>
+                                    </label>
+                                    <select name="closure_reason_id" class="form-select"
+                                            required="required" id="ws_closure_select">
+                                        <option value="">— Seleccionar motivo —</option>
+                                        <t t-foreach="closure_reasons" t-as="cr">
+                                            <option t-att-value="cr.id"
+                                                    t-att-selected="'selected' if maint_request.closure_reason_id.id == cr.id else None">
+                                                <t t-esc="cr.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-success w-100"
+                                            id="ws_btn_close" disabled="disabled">
+                                        <i class="fa fa-check me-1"/> Marcar como terminado
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </t>
 
             <!-- Materiales -->
             <div class="card mt-3" style="overflow: visible">
@@ -1122,7 +1231,7 @@
                                 </div>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small mb-1">Descripción</label>
+                                <label class="form-label small mb-1">Notas</label>
                                 <input type="text" name="description" id="ws_mat_description"
                                        class="form-control form-control-sm" placeholder="Opcional"/>
                             </div>
@@ -1202,6 +1311,17 @@
                         suggestions.style.display = 'none';
                     }
                 });
+            })();
+            </script>
+
+            <script>
+            (function () {
+                var sel = document.getElementById('ws_closure_select');
+                var btn = document.getElementById('ws_btn_close');
+                if (!sel || !btn) return;
+                function update() { btn.disabled = !sel.value; }
+                sel.addEventListener('change', update);
+                update();
             })();
             </script>
 
@@ -1402,7 +1522,7 @@
 
                         <div class="row g-3 mb-3">
                             <div class="col-12">
-                                <label class="form-label fw-semibold">Descripción</label>
+                                <label class="form-label fw-semibold">Notas</label>
                                 <textarea name="description" class="form-control" rows="5"
                                           placeholder="Descripción de la tarea..."><t t-esc="description_text"/></textarea>
                             </div>
@@ -1622,10 +1742,10 @@
                             </div>
                         </div>
 
-                        <!-- Descripción -->
+                        <!-- Notas -->
                         <div class="row g-3 mb-3">
                             <div class="col-12">
-                                <label class="form-label fw-semibold">Descripción</label>
+                                <label class="form-label fw-semibold">Notas</label>
                                 <textarea name="description" class="form-control" rows="4"
                                           placeholder="Detalle el trabajo a realizar..."/>
                             </div>
@@ -1881,10 +2001,10 @@
                             </div>
                         </div>
 
-                        <!-- Descripción -->
+                        <!-- Notas -->
                         <div class="row g-3 mb-3">
                             <div class="col-12">
-                                <label class="form-label fw-semibold">Descripción</label>
+                                <label class="form-label fw-semibold">Notas</label>
                                 <textarea name="description" class="form-control" rows="4"
                                           placeholder="Detalle el trabajo a realizar..."/>
                             </div>

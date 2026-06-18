@@ -121,7 +121,7 @@ class MaintenancePortalController(CustomerPortal):
             vals['kanban_state'] = post['kanban_state']
 
         # Optional M2O — can be cleared
-        for field in ('stage_id', 'user_id', 'equipment_id'):
+        for field in ('stage_id', 'user_id', 'equipment_id', 'closure_reason_id'):
             raw = (post.get(field) or '').strip()
             try:
                 val = int(raw) if raw else 0
@@ -279,6 +279,27 @@ class MaintenancePortalController(CustomerPortal):
 
         return maint_request
 
+    def _maint_close_request(self, maint_request, post):
+        """Set closure_reason_id and move to the first done stage."""
+        closure_raw = (post.get('closure_reason_id') or '').strip()
+        try:
+            closure_id = int(closure_raw) if closure_raw else 0
+        except ValueError:
+            closure_id = 0
+        if not closure_id:
+            return
+        repaired_stage = request.env['maintenance.stage'].sudo().search(
+            [('done', '=', True)], order='sequence asc', limit=1
+        )
+        if not repaired_stage:
+            return
+        vals = {'closure_reason_id': closure_id, 'stage_id': repaired_stage.id}
+        try:
+            with request.env.cr.savepoint():
+                maint_request.write(vals)
+        except Exception as e:
+            _logger.exception("Portal close_request failed id=%s: %s", maint_request.id, e)
+
     def _maint_add_material(self, maint_request, post):
         """Add a material line to a maintenance.request."""
         try:
@@ -383,6 +404,7 @@ class MaintenancePortalController(CustomerPortal):
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
+        closure_reasons = request.env['maintenance.closure.reason'].sudo().search([], order='name')
         values = self._prepare_portal_layout_values()
         values.update(self._maint_detail_values(maint_request))
         values.update({
@@ -390,10 +412,12 @@ class MaintenancePortalController(CustomerPortal):
             'back_url': '/my/maintenance',
             'back_label': 'Órdenes de Mantenimiento',
             'edit_url': f'/my/maintenance/{request_id}/edit',
+            'close_url': f'/my/maintenance/{request_id}/close',
             'add_material_url': f'/my/maintenance/{request_id}/add_material',
             'update_material_url': f'/my/maintenance/{request_id}/update_material_qty',
             'del_material_base': f'/my/maintenance/{request_id}/delete_material',
             'product_search_url': '/my/maintenance/products/search',
+            'closure_reasons': closure_reasons,
         })
         return request.render('maintenance_portal_ivess.portal_maintenance_detail', values)
 
@@ -451,6 +475,17 @@ class MaintenancePortalController(CustomerPortal):
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
         self._maint_update_material_qty(maint_request, post)
+        return request.redirect(f'/my/maintenance/{request_id}')
+
+    @http.route(
+        ['/my/maintenance/<int:request_id>/close'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_maintenance_close(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/maintenance')
+        self._maint_close_request(maint_request, post)
         return request.redirect(f'/my/maintenance/{request_id}')
 
     @http.route(
@@ -522,6 +557,7 @@ class MaintenancePortalController(CustomerPortal):
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/workshop')
+        closure_reasons = request.env['maintenance.closure.reason'].sudo().search([], order='name')
         values = self._prepare_portal_layout_values()
         values.update(self._maint_detail_values(maint_request))
         values.update({
@@ -529,12 +565,25 @@ class MaintenancePortalController(CustomerPortal):
             'back_url': '/my/workshop',
             'back_label': 'Servicios de Taller',
             'edit_url': f'/my/workshop/{request_id}/edit',
+            'close_url': f'/my/workshop/{request_id}/close',
             'add_material_url': f'/my/workshop/{request_id}/add_material',
             'update_material_url': f'/my/workshop/{request_id}/update_material_qty',
             'del_material_base': f'/my/workshop/{request_id}/delete_material',
             'product_search_url': '/my/maintenance/products/search',
+            'closure_reasons': closure_reasons,
         })
         return request.render('maintenance_portal_ivess.portal_workshop_detail', values)
+
+    @http.route(
+        ['/my/workshop/<int:request_id>/close'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_workshop_close(self, request_id, **post):
+        maint_request = request.env['maintenance.request'].sudo().browse(request_id)
+        if not maint_request.exists():
+            return request.redirect('/my/workshop')
+        self._maint_close_request(maint_request, post)
+        return request.redirect(f'/my/workshop/{request_id}')
 
     @http.route(
         ['/my/workshop/new'],
