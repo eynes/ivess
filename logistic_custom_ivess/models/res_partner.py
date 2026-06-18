@@ -113,8 +113,11 @@ class ResPartner(models.Model):
     average_hour = fields.Float(
         string="Average Hour"
     )
-    visit_hour = fields.Float(
-        string="Horario de Visita",
+    visit_hour_from = fields.Float(
+        string="Horario de Visita Desde",
+    )
+    visit_hour_to = fields.Float(
+        string="Horario de Visita Hasta",
     )
     is_important_client = fields.Boolean(
         string="Cliente Importante",
@@ -162,15 +165,19 @@ class ResPartner(models.Model):
         records._assign_customer_code()
         return records
 
-    @api.constrains('visit_hour')
+    @api.constrains('visit_hour_from', 'visit_hour_to')
     def _check_visit_hour(self):
         for record in self:
-            if not record.visit_hour:
+            if not record.visit_hour_from and not record.visit_hour_to:
                 continue
-            hours = int(record.visit_hour)
-            minutes = round((record.visit_hour - hours) * 60)
-            if record.visit_hour < 0 or hours > 23 or minutes > 59:
-                raise ValidationError(_("El horario de visita debe ser un horario válido (entre 00:00 y 23:59)."))
+            if record.visit_hour_from < 7.0:
+                raise ValidationError(_("El horario de visita debe comenzar a partir de las 07:00."))
+            if record.visit_hour_to > 19.0:
+                raise ValidationError(_("El horario de visita no puede finalizar después de las 19:00."))
+            if record.visit_hour_from >= record.visit_hour_to:
+                raise ValidationError(_("El horario 'Desde' debe ser anterior al horario 'Hasta'."))
+            if record.visit_hour_to - record.visit_hour_from < 3.0:
+                raise ValidationError(_("La diferencia entre el horario 'Desde' y 'Hasta' debe ser de al menos 3 horas."))
 
     @api.constrains('date_from', 'date_to')
     def _check_dates(self):

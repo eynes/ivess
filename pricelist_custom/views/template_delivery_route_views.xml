@@ -6,7 +6,7 @@
         <field name="inherit_id" ref="logistic_custom_ivess.view_template_delivery_route_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='delivery_number_id']" position="after">
-                <field name="pricelist_id"/>
+                <field name="pricelist_id" required="1"/>
             </xpath>
         </field>
     </record>

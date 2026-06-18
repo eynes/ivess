@@ -8,5 +8,5 @@ class DeliveryRouteRegion(models.Model):
     name = fields.Char(string="Nombre", required=True)
     supervisor_id = fields.Many2one(
         'res.partner',
-        string='Supervisor',
+        string='Regional',
     )
