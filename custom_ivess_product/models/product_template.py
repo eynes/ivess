@@ -17,6 +17,11 @@ class ProductTemplate(models.Model):
         default=False,
         tracking=True,
     )
+    is_frio_calor = fields.Boolean(
+        string="Es Frio/Calor",
+        default=False,
+        tracking=True,
+    )
     allows_replacement = fields.Boolean(string="Allows Replacement")
     is_regular_app = fields.Boolean(string="Is Regular (APP)")
     show_in_app = fields.Boolean(string="Mostrar en App")

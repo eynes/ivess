@@ -25,6 +25,7 @@
         'views/product_product.xml',
         'views/res_users.xml',
         'views/mail_template.xml',
+        'views/stock_lot.xml',
         'security/ir.model.access.csv',
     ],
     'assets': {

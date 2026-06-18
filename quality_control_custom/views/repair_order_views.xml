@@ -9,7 +9,7 @@
 
             <xpath expr="//field[@name='state']" position="before">
                 <field name="frio_calor_stage" optional="show" widget="badge" 
-                decoration-success="frio_calor_stage == 'armado'" 
+                decoration-success="frio_calor_stage in ('armado', 'finalizado')"
                 decoration-info="frio_calor_stage == 'prueba_inicial'"
                 decoration-primary="frio_calor_stage in ('hidrolavadora','pileta')" 
                 decoration-muted="frio_calor_stage == 'pintura'"
@@ -62,7 +62,7 @@
                             type="object"
                             class="btn btn-link btn-sm px-1"
                             title="Revertir Etapa"
-                            invisible="frio_calor_stage in ('prueba_inicial', 'repair') or is_outsourced">
+                            invisible="frio_calor_stage in ('prueba_inicial', 'repair', 'finalizado') or is_outsourced">
                         <i class="fa fa-chevron-left"/> Revertir Etapa
                     </button>
                     <field name="frio_calor_stage" widget="selection_badge" readonly="1"/>
@@ -82,7 +82,7 @@
                             type="object"
                             class="btn btn-link btn-sm px-1"
                             title="Avanzar Etapa"
-                            invisible="frio_calor_stage in ('armado', 'repair') or is_outsourced or prueba_inicial_resultado == 'no_definido'">
+                            invisible="frio_calor_stage in ('armado', 'repair', 'finalizado') or is_outsourced or prueba_inicial_resultado == 'no_definido'">
                         <i class="fa fa-chevron-right"/><br/>Siguiente Etapa
                     </button>
                 </div>
