@@ -29,6 +29,8 @@
         'views/repair_order_views.xml',
         'views/res_company_views.xml',
         'views/repair_barcode_scanner_views.xml',
+        'views/stock_picking_type_views.xml',
+        'views/stock_picking_views.xml',
     ],
     'assets': {
         'web.assets_backend': [
