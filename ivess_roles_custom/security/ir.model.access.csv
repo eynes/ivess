@@ -29,14 +29,13 @@ cabr_res_partner_adm_compras,res.partner / Administrador Compras,base.model_res_
 cabr_res_partner_usr_inv,res.partner / Usuario Inventario,base.model_res_partner,stock.group_stock_user,1,0,0,0
 cabr_res_partner_usr_adm,res.partner / Usuario Administracion,base.model_res_partner,ivess_roles_custom.group_admin_user,1,1,0,0
 cabr_res_partner_adm_total,res.partner / Administrador TOTAL,base.model_res_partner,base.group_system,1,1,1,1
-cabr_product_tmpl_usr_compras,product.template / Usuario Compras,product.model_product_template,purchase.group_purchase_user,1,1,1,0
 cabr_product_tmpl_adm_compras,product.template / Administrador Compras,product.model_product_template,purchase.group_purchase_manager,1,0,0,0
-cabr_product_tmpl_usr_inv,product.template / Usuario Inventario,product.model_product_template,stock.group_stock_user,1,1,1,0
+cabr_product_tmpl_usr_inv,product.template / Usuario Inventario,product.model_product_template,stock.group_stock_user,1,0,0,0
 cabr_product_tmpl_adm_inv,product.template / Administrador Inventario,product.model_product_template,stock.group_stock_manager,1,1,1,1
 cabr_product_tmpl_adm_total,product.template / Administrador TOTAL,product.model_product_template,base.group_system,1,1,1,1
-cabr_product_product_usr_compras,product.product / Usuario Compras,product.model_product_product,purchase.group_purchase_user,1,1,1,0
+cabr_product_product_usr_compras,product.product / Usuario Compras,product.model_product_product,purchase.group_purchase_user,1,0,0,0
 cabr_product_product_adm_compras,product.product / Administrador Compras,product.model_product_product,purchase.group_purchase_manager,1,0,0,0
-cabr_product_product_usr_inv,product.product / Usuario Inventario,product.model_product_product,stock.group_stock_user,1,1,1,0
+cabr_product_product_usr_inv,product.product / Usuario Inventario,product.model_product_product,stock.group_stock_user,1,0,0,0
 cabr_product_product_adm_inv,product.product / Administrador Inventario,product.model_product_product,stock.group_stock_manager,1,1,1,1
 cabr_product_product_adm_total,product.product / Administrador TOTAL,product.model_product_product,base.group_system,1,1,1,1
 cabr_product_supplierinfo_usr_compras,product.supplierinfo / Usuario Compras,purchase.model_product_supplierinfo,purchase.group_purchase_user,1,1,1,0

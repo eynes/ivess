@@ -37,4 +37,29 @@
         ]"/>
     </record>
 
+    <!--
+        Ajustes de inventario: restringir a Administrador Inventario y system.
+        El Usuario Inventario (stock_user) no debe acceder a este menú.
+    -->
+    <record id="stock.menu_stock_adjustments" model="ir.ui.menu">
+        <field name="group_ids" eval="[
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+    </record>
+
+    <record id="stock.menu_action_inventory_tree" model="ir.ui.menu">
+        <field name="group_ids" eval="[
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+    </record>
+
+    <record id="stock.menu_stock_scrap" model="ir.ui.menu">
+        <field name="group_ids" eval="[
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+    </record>
+
 </odoo>
