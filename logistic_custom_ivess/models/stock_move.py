@@ -18,11 +18,6 @@ class StockMove(models.Model):
         store=True,
         string='Es Retornable',
     )
-    allow_free_of_charge = fields.Boolean(
-        related='product_id.product_tmpl_id.allow_free_of_charge',
-        string='Permite Sin Cargo',
-    )
-    
     is_frio_calor = fields.Boolean(
         related='product_id.product_tmpl_id.is_frio_calor',
         store=True,

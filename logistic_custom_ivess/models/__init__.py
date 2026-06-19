@@ -13,6 +13,7 @@ from . import res_partner_distribution
 from . import res_partner_water_consumption
 from . import res_partner
 from . import sale_order
+from . import sale_order_line
 from . import template_delivery_route
 from . import visit_status
 from . import water_container

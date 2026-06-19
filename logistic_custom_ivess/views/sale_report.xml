@@ -7,7 +7,7 @@
         <field name="inherit_id" ref="sale.sale_report_view_tree"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='currency_id']" position="before">
-                <field name="allow_free_of_charge" optional="show"/>
+                <field name="free_of_charge" optional="show"/>
                 <field name="location_id" optional="show"/>
             </xpath>
         </field>
