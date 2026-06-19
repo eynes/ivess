@@ -269,7 +269,7 @@ class RepairOrder(models.Model):
         for order in self:
             if order.repair_equipment_type == 'frio_calor':
                 order.check_unique_repair_order()
-        super().action_validate()
+        return super().action_validate()
 
     def action_send_to_pintura(self):
         for order in self:
