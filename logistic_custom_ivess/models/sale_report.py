@@ -4,12 +4,12 @@ from odoo import fields, models
 class SaleReport(models.Model):
     _inherit = 'sale.report'
 
-    allow_free_of_charge = fields.Boolean(string='Allow Free Of Charge', readonly=True)
+    free_of_charge = fields.Boolean(string='Sin Cargo', readonly=True)
     location_id = fields.Many2one('stock.location', string='Location', readonly=True)
 
     def _select_additional_fields(self):
         result = super()._select_additional_fields()
-        result['allow_free_of_charge'] = 't.allow_free_of_charge'
+        result['free_of_charge'] = 'l.free_of_charge'
         result['location_id'] = """(
             SELECT sp.location_id
             FROM stock_picking sp
@@ -22,4 +22,4 @@ class SaleReport(models.Model):
         return result
 
     def _group_by_sale(self):
-        return super()._group_by_sale() + ', t.allow_free_of_charge'
+        return super()._group_by_sale() + ', l.free_of_charge'

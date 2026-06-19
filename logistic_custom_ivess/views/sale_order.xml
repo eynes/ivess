@@ -30,9 +30,9 @@
             <xpath expr="//field[@name='source_id']" position="after">
                 <field name="delivery_route_id"/>
             </xpath>
-            <!--<xpath expr="//field[@name='order_line']/tree" position="inside">
-                <field name="replacement_reason_id" optional="show"/>
-            </xpath> sacar este comentario-->
+            <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="before">
+                <field name="free_of_charge" optional="show"/>
+            </xpath>
         </field>
     </record>
 </odoo>

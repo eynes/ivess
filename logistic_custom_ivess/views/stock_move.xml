@@ -11,7 +11,6 @@
                        domain="[('partner_id', '=', parent.partner_id)]"/>
                 <field name="container_state" optional="show"
                        invisible="not is_returnable"/>
-                <field name="allow_free_of_charge" optional="show"/>
             </xpath>
         </field>
     </record>
