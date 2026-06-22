@@ -38,3 +38,8 @@ access_product_pricelist_item_bot,product.pricelist.item.bot,product.model_produ
 access_res_partner_special_price_bot,res.partner.special.price.bot,pricelist_custom.model_res_partner_special_price,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_localities_report_bot,ivess.localities.report.bot,model_ivess_localities_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+
+access_ivess_limit_free_of_charge_report_bot,ivess.limit.free.of.charge.report.bot,model_ivess_limit_free_of_charge_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_delivery_route_bot,delivery.route.bot,logistic_custom_ivess.model_delivery_route,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_sale_order_bot,sale.order.bot,sale.model_sale_order,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_sale_order_line_bot,sale.order.line.bot,sale.model_sale_order_line,ivess_webservice.group_ivess_webservice_user,1,0,0,0
