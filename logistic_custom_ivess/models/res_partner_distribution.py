@@ -23,3 +23,25 @@ class PartnerDistributions(models.Model):
         tracking=True,
     )
     partner_id = fields.Many2one('res.partner', string='Partner', tracking=True)
+    
+    message_type = fields.Selection(
+        selection=[
+            ('LL', 'Llamado'),
+            ('CI', 'Carta Interna'),
+        ],
+        string='Tipo de Mensaje',
+    )
+    message_text = fields.Text(
+        string='Mensaje',
+    )
+
+    def action_open_message_wizard(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Mensaje',
+            'res_model': 'res.partner.message.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'active_id': self.id},
+        }

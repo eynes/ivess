@@ -5,10 +5,7 @@
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
             <div name="button_box" position="inside">
-                <button class="oe_stat_button" type="object" name="action_open_message_wizard" icon="fa-envelope">
-                    <span class="o_stat_text">Mensaje</span>
-                </button>
-                <button class="oe_stat_button" type="object" name="action_open_water_containers" icon="fa-cube">
+<button class="oe_stat_button" type="object" name="action_open_water_containers" icon="fa-cube">
                     <field string="Envases" name="qty_water_containers" widget="statinfo"/>
                 </button>
                 <button class="oe_stat_button" type="object" name="action_open_frio_calor_containers" icon="fa-thermometer">
@@ -52,6 +49,8 @@
                                 <field name="distribution"/>
                                 <field name="visit_day"/>
                                 <field name="frequency"/>
+                                <field name="message_type" optional="show"/>
+                                <button name="action_open_message_wizard" type="object" icon="fa-envelope" title="Editar Mensaje"/>
                             </list>
                         </field>
                         <field name="average_hour" widget="float_time"/>

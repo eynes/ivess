@@ -5,7 +5,7 @@ class ResPartnerMessageWizard(models.TransientModel):
     _name = 'res.partner.message.wizard'
     _description = 'Partner Message Wizard'
 
-    partner_id = fields.Many2one('res.partner', required=True)
+    partner_distribution_id = fields.Many2one('partner.distribution', required=True)
     message_type = fields.Selection(
         selection=[
             ('LL', 'Llamado'),
@@ -19,16 +19,16 @@ class ResPartnerMessageWizard(models.TransientModel):
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
-        partner_id = self.env.context.get('active_id')
-        if partner_id:
-            res['partner_id'] = partner_id
-            partner = self.env['res.partner'].browse(partner_id)
-            res['message_type'] = partner.message_type or False
-            res['message_text'] = partner.message_text or False
+        distribution_id = self.env.context.get('active_id')
+        if distribution_id:
+            res['partner_distribution_id'] = distribution_id
+            distribution = self.env['partner.distribution'].browse(distribution_id)
+            res['message_type'] = distribution.message_type or False
+            res['message_text'] = distribution.message_text or False
         return res
 
     def action_confirm(self):
-        self.partner_id.write({
+        self.partner_distribution_id.write({
             'message_type': self.message_type,
             'message_text': self.message_text,
         })
