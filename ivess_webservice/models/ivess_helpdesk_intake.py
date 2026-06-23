@@ -19,7 +19,8 @@ class IvessHelpdeskIntake(models.Model):
         if not equipment:
             return {"error": f"Equipo '{patente}' no encontrado"}
 
-        ticket = self._create_helpdesk_ticket(team, equipment, patente, items, intake_user)
+        payload = self._format_payload(kwargs)
+        ticket = self._create_helpdesk_ticket(team, equipment, patente, items, intake_user, payload)
         return {"ticket_id": ticket.id, "ticket_name": ticket.name}
 
     def _get_workshop_team(self):
@@ -34,6 +35,10 @@ class IvessHelpdeskIntake(models.Model):
             limit=1,
         )
 
+    def _format_payload(self, data):
+        lines = "\n".join(f"{k}: {v}" for k, v in data.items())
+        return f"<pre style='font-size:12px;white-space:pre;overflow-x:auto;margin:0;font-family:monospace'>{lines}</pre>"
+
     def _build_item_lines(self, items):
         return [
             (0, 0, {"name": k, "value": str(v)})
@@ -41,7 +46,7 @@ class IvessHelpdeskIntake(models.Model):
             for k, v in item.items()
         ]
 
-    def _create_helpdesk_ticket(self, team, equipment, patente, items, intake_user=""):
+    def _create_helpdesk_ticket(self, team, equipment, patente, items, intake_user="", payload=None):
         sequence = self.env["ir.sequence"].next_by_code("ivess.helpdesk.intake.cs")
         return self.env["helpdesk.ticket"].create({
             "name": sequence,
@@ -51,4 +56,5 @@ class IvessHelpdeskIntake(models.Model):
             "team_id": team.id,
             "item_ids": self._build_item_lines(items),
             "intake_user": intake_user,
+            "intake_payload": payload,
         })
