@@ -29,6 +29,8 @@ class IvessRoadmapReport(models.Model):
     )
     name = fields.Char(readonly=True)
     avg_hour = fields.Float(readonly=True)
+    partner_latitude = fields.Float(readonly=True)
+    partner_longitude = fields.Float(readonly=True)
     street = fields.Char(readonly=True)
     street2 = fields.Char(readonly=True)
     street_number = fields.Char(readonly=True)
@@ -42,6 +44,7 @@ class IvessRoadmapReport(models.Model):
     property_payment_term_id = fields.Many2one("account.payment.term", readonly=True)
     property_account_position_id = fields.Many2one("account.fiscal.position", readonly=True)
     vat = fields.Char(readonly=True)
+    final_balance = fields.Float(readonly=True)
     state = fields.Selection(
         [
             ("active", "Activo"),
@@ -66,6 +69,8 @@ class IvessRoadmapReport(models.Model):
                     tdr.day                             AS day,
                     rp.name                             AS name,
                     rp.average_hour                     AS avg_hour,
+                    rp.partner_latitude                 AS partner_latitude,
+                    rp.partner_longitude                AS partner_longitude,
                     rp.street                           AS street,
                     rp.street2                          AS street2,
                     rp.num                              AS street_number,
@@ -77,6 +82,7 @@ class IvessRoadmapReport(models.Model):
                     rp.phone                            AS phone,
                     tdr.delivery_number_id              AS delivery_number_id,
                     rp.vat                              AS vat,
+                    rp.final_balance                    AS final_balance,
                     rp.state                            AS state,
                     rp.date_to                          AS date_to,
                     rp.date_from                        AS date_from
@@ -136,6 +142,8 @@ class IvessRoadmapReport(models.Model):
             "day",
             "name",
             "avg_hour",
+            "partner_latitude",
+            "partner_longitude",
             "street",
             "street2",
             "street_number",
@@ -147,6 +155,7 @@ class IvessRoadmapReport(models.Model):
             "phone",
             "delivery_number_id",
             "vat",
+            "final_balance",
             "state",
             "date_to",
             "date_from",
@@ -160,6 +169,8 @@ class IvessRoadmapReport(models.Model):
                     "customer_code": code,
                     "name": rec["name"],
                     "avg_hour": _format_float_time(rec["avg_hour"]),
+                    "partner_latitude": rec["partner_latitude"],
+                    "partner_longitude": rec["partner_longitude"],
                     "street": rec["street"],
                     "street2": rec["street2"],
                     "street_number": rec["street_number"],
@@ -172,6 +183,7 @@ class IvessRoadmapReport(models.Model):
                     "property_payment_term_id": False,
                     "property_account_position_id": False,
                     "vat": rec["vat"],
+                    "final_balance": rec["final_balance"],
                     "state": rec["state"],
                     "date_to": rec["date_to"],
                     "date_from": rec["date_from"],
