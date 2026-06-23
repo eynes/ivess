@@ -5,6 +5,9 @@
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
             <div name="button_box" position="inside">
+                <button class="oe_stat_button" type="object" name="action_open_message_wizard" icon="fa-envelope">
+                    <span class="o_stat_text">Mensaje</span>
+                </button>
                 <button class="oe_stat_button" type="object" name="action_open_water_containers" icon="fa-cube">
                     <field string="Envases" name="qty_water_containers" widget="statinfo"/>
                 </button>

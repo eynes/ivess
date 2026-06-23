@@ -45,6 +45,7 @@
         'views/purchase_order.xml',
         'views/sale_report.xml',
         'views/menuitems.xml',
+        'wizard/res_partner_message_wizard.xml',
     ],
     'demo': [],
     'test': [],

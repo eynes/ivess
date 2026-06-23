@@ -122,6 +122,18 @@ class ResPartner(models.Model):
     is_important_client = fields.Boolean(
         string="Cliente Importante",
     )
+    message_type = fields.Selection(
+        selection=[
+            ('LL', 'Llamado'),
+            ('CI', 'Carta Interna'),
+        ],
+        string='Tipo de Mensaje',
+        tracking=True
+    )
+    message_text = fields.Text(
+        string='Mensaje',
+        tracking=True
+        )
 
     @api.depends('customer_rank')
     def _compute_is_customer(self):
@@ -415,3 +427,14 @@ class ResPartner(models.Model):
         action['domain'] = [('partner_id', '=', self.id)]
         action['context'] = {'default_partner_id': self.id}
         return action
+
+    def action_open_message_wizard(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Mensaje al Cliente',
+            'res_model': 'res.partner.message.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'active_id': self.id},
+        }
