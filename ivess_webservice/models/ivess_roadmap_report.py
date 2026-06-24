@@ -57,6 +57,9 @@ class IvessRoadmapReport(models.Model):
     )
     date_to = fields.Date(readonly=True)
     date_from = fields.Date(readonly=True)
+    frio_calor_count = fields.Integer(readonly=True)
+    consumption_liters = fields.Float(readonly=True)
+    overdue_balance = fields.Float(readonly=True)
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -85,7 +88,29 @@ class IvessRoadmapReport(models.Model):
                     rp.final_balance                    AS final_balance,
                     rp.state                            AS state,
                     rp.date_to                          AS date_to,
-                    rp.date_from                        AS date_from
+                    rp.date_from                        AS date_from,
+                    (
+                        SELECT COUNT(*)
+                        FROM water_container wc
+                        WHERE wc.partner_id = rp.id
+                        AND wc.is_frio_calor = TRUE
+                    )                                   AS frio_calor_count,
+                    (
+                        SELECT rpwc.consumption_liters
+                        FROM res_partner_water_consumption rpwc
+                        WHERE rpwc.partner_id = rp.id
+                        AND rpwc.month = EXTRACT(MONTH FROM CURRENT_DATE)
+                        AND rpwc.year  = EXTRACT(YEAR  FROM CURRENT_DATE)
+                    )                                   AS consumption_liters,
+                    (
+                        SELECT COALESCE(SUM(am.amount_total_in_currency_signed), 0)
+                        FROM account_move am
+                        WHERE am.partner_id = rp.id
+                        AND am.move_type IN ('out_invoice', 'out_refund')
+                        AND am.state = 'posted'
+                        AND am.amount_residual != 0
+                        AND am.invoice_date_due <= CURRENT_DATE - INTERVAL '90 days'
+                    )                                   AS overdue_balance
                 FROM delivery_route_line drl
                 JOIN template_delivery_route tdr ON drl.template_route_id = tdr.id
                 JOIN res_partner rp ON drl.client_id = rp.id
@@ -159,6 +184,9 @@ class IvessRoadmapReport(models.Model):
             "state",
             "date_to",
             "date_from",
+            "frio_calor_count",
+            "consumption_liters",
+            "overdue_balance",
         ])
 
         grouped = {}
@@ -187,6 +215,9 @@ class IvessRoadmapReport(models.Model):
                     "state": rec["state"],
                     "date_to": rec["date_to"],
                     "date_from": rec["date_from"],
+                    "frio_calor_count": rec["frio_calor_count"],
+                    "consumption_liters": rec["consumption_liters"],
+                    "overdue_balance": rec["overdue_balance"],
                     "routes": [],
                 }
             grouped[code]["routes"].append({
