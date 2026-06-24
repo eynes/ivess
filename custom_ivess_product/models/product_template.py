@@ -22,6 +22,9 @@ class ProductTemplate(models.Model):
         default=False,
         tracking=True,
     )
+    litros_min_bonificacion = fields.Integer(
+        string="Litros mínimos para bonificación"
+    )
     allows_replacement = fields.Boolean(string="Allows Replacement")
     is_regular_app = fields.Boolean(string="Is Regular (APP)")
     show_in_app = fields.Boolean(string="Mostrar en App")
