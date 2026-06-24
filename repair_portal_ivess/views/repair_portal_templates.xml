@@ -258,6 +258,19 @@
                         </div>
                     </t>
 
+                    <!-- Botón Comenzar: visible cuando la etapa aún no fue iniciada -->
+                    <t t-if="not repair.stage_started and repair.frio_calor_stage != 'finalizado' and not repair.is_outsourced">
+                        <div class="mt-4">
+                            <form t-attf-action="/my/repairs/#{repair.id}/start_stage" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-success btn-lg px-5"
+                                        onclick="return confirm('¿Confirmar inicio de la etapa actual?')">
+                                    <i class="fa fa-play me-2"/> Comenzar
+                                </button>
+                            </form>
+                        </div>
+                    </t>
+
                     <!-- Botones de navegación de etapa -->
                     <t t-if="repair.frio_calor_stage not in ('repair', 'finalizado', 'pintura') and not repair.is_outsourced">
                     <div>
@@ -348,21 +361,58 @@
                         </t>
                         <!-- Tercerizar: cuando NO está tercerizado NI finalizado -->
                         <t t-if="not repair.is_outsourced and repair.frio_calor_stage != 'finalizado'">
-                            <form t-attf-action="/my/repairs/#{repair.id}/outsource" method="post">
-                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit" class="btn btn-outline-warning btn-sm">
-                                    <i class="fa fa-share-square me-1"/> Tercerizar
-                                </button>
-                            </form>
+                            <button type="button"
+                                    class="btn btn-outline-warning btn-sm"
+                                    data-bs-toggle="collapse"
+                                    t-attf-data-bs-target="#outsource-collapse-#{repair.id}"
+                                    aria-expanded="false">
+                                <i class="fa fa-share-square me-1"/> Tercerizar
+                            </button>
+                            <div class="collapse w-100 mt-2" t-attf-id="outsource-collapse-#{repair.id}">
+                                <form t-attf-action="/my/repairs/#{repair.id}/outsource" method="post"
+                                      class="d-flex justify-content-center align-items-center gap-2">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <select name="reason_id" class="form-select form-select-sm" style="max-width:220px" required="required">
+                                        <option value="">— Seleccionar razón —</option>
+                                        <t t-foreach="outsource_reasons" t-as="reason">
+                                            <option t-att-value="reason.id">
+                                                <t t-esc="reason.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                    <button type="submit" class="btn btn-warning btn-sm text-nowrap"
+                                            t-att-disabled="not outsource_reasons or None">
+                                        <i class="fa fa-check me-1"/> Confirmar
+                                    </button>
+                                </form>
+                            </div>
                         </t>
                         <!-- Recibir de tercero: cuando está tercerizado -->
                         <t t-if="repair.is_outsourced">
-                            <form t-attf-action="/my/repairs/#{repair.id}/receive_from_third_party" method="post">
-                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit" class="btn btn-outline-success btn-sm">
-                                    <i class="fa fa-sign-in me-1"/> Recibir de tercero
-                                </button>
-                            </form>
+                            <button type="button"
+                                    class="btn btn-outline-success btn-sm"
+                                    data-bs-toggle="collapse"
+                                    t-attf-data-bs-target="#receive-collapse-#{repair.id}"
+                                    aria-expanded="false">
+                                <i class="fa fa-sign-in me-1"/> Recibir de tercero
+                            </button>
+                            <div class="collapse w-100 mt-2" t-attf-id="receive-collapse-#{repair.id}">
+                                <form t-attf-action="/my/repairs/#{repair.id}/receive_from_third_party" method="post"
+                                      class="d-flex justify-content-center align-items-center gap-2">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <select name="target_stage" class="form-select form-select-sm" style="max-width:220px" required="required">
+                                        <t t-foreach="receive_stages" t-as="stage">
+                                            <option t-att-value="stage[0]"
+                                                    t-att-selected="stage[0] == 'hidrolavadora' or None">
+                                                <t t-esc="stage[1]"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                    <button type="submit" class="btn btn-success btn-sm text-nowrap">
+                                        <i class="fa fa-check me-1"/> Confirmar
+                                    </button>
+                                </form>
+                            </div>
                         </t>
                     </div>
                 </div>
