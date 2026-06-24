@@ -95,6 +95,12 @@ class DeliveryRoute(models.Model):
         store=True,
         readonly=True,
     )
+    supervisor_regional_id = fields.Many2one(
+        'res.partner',
+        string='Supervisor Regional',
+        related='region_id.supervisor_id',
+        store=True,
+    )
     conductor_id = fields.Many2one(
         'res.partner',
         string='Conductor',

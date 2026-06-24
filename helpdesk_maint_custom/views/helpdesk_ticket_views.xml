@@ -57,6 +57,9 @@
                             <field name="value"/>
                         </list>
                     </field>
+                    <group string="Payload de ingreso" invisible="team_type != 'workshop'">
+                        <field name="intake_payload" nolabel="1" readonly="1"/>
+                    </group>
                 </page>
             </xpath>
         </field>

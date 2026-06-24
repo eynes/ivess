@@ -28,6 +28,7 @@
                             <field name="conductor_id"/>
                             <field name="ayudante_id"/>
                             <field name="region_id"/>
+                            <field name="supervisor_regional_id"/>
                             <field name="delivery_date" readonly="state not in ('draft', 'in_progress')"/>
                             <field name="delivery_type" readonly="state not in ('draft', 'in_progress')"/>
                             <field name="allow_reordering" invisible="1"/>
@@ -84,6 +85,7 @@
                 <field name="conductor_id"/>
                 <field name="ayudante_id"/>
                 <field name="region_id"/>
+                <field name="supervisor_regional_id"/>
                 <field name="delivery_date"/>
                 <field name="state"/>
             </list>

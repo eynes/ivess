@@ -7,6 +7,9 @@ from odoo.exceptions import UserError
 class ResPartner(models.Model):
     _inherit = "res.partner"
 
+    requiere_comprobante = fields.Boolean(
+        string="Requiere Comprobante",
+    )
     unbilled_balance = fields.Monetary(
         string="Unbilled Balance",
         compute="_compute_balances",
