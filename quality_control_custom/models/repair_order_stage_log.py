@@ -20,7 +20,7 @@ class RepairOrderStageLog(models.Model):
         string='Etapa',
         required=True,
     )
-    date_start = fields.Datetime(string='Inicio', required=True)
+    date_start = fields.Datetime(string='Inicio')
     date_end = fields.Datetime(string='Fin')
     duration = fields.Float(
         string='Duración (hs)',
@@ -48,6 +48,9 @@ class RepairOrderStageLog(models.Model):
     @api.depends('date_start', 'date_end')
     def _compute_duration_display(self):
         for rec in self:
+            if not rec.date_start:
+                rec.duration_display = _('No iniciado')
+                continue
             if not rec.date_end:
                 rec.duration_display = _('En curso')
                 continue

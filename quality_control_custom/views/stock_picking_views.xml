@@ -15,6 +15,10 @@
                     <field name="repair_order_count" widget="statinfo" string="Reparaciones"/>
                 </button>
             </xpath>
+
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="outsource_reason_id" readonly="1" invisible="not outsource_reason_id"/>
+            </xpath>
         </field>
     </record>
 

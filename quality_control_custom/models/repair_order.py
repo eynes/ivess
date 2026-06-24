@@ -78,12 +78,41 @@ class RepairOrder(models.Model):
         readonly=True,
         copy=False,
     )
+    outsource_reason_id = fields.Many2one(
+        comodel_name='repair.outsource.reason',
+        string="Razón de tercerización",
+        readonly=True,
+        copy=False,
+    )
 
     stage_log_ids = fields.One2many(
         'repair.order.stage.log',
         'repair_id',
         string='Historial de Etapas',
     )
+
+    stage_started = fields.Boolean(
+        compute='_compute_stage_started',
+        string="Etapa iniciada",
+    )
+
+    @api.depends('stage_log_ids.date_start', 'stage_log_ids.date_end', 'repair_equipment_type', 'frio_calor_stage')
+    def _compute_stage_started(self):
+        for order in self:
+            if order.repair_equipment_type != 'frio_calor':
+                order.stage_started = True
+                continue
+            open_log = order.stage_log_ids.filtered(lambda l: not l.date_end)
+            order.stage_started = bool(open_log and open_log[0].date_start)
+
+    def action_start_current_stage(self):
+        self.ensure_one()
+        open_log = self.stage_log_ids.filtered(lambda l: not l.date_end and not l.date_start)
+        if not open_log:
+            return
+        open_log[0].date_start = fields.Datetime.now()
+        stage_name = dict(FRIO_CALOR_STAGES).get(self.frio_calor_stage, self.frio_calor_stage)
+        self.message_post(body=_("Etapa '%s' iniciada.", stage_name))
 
     def _get_stage_sequence(self):
         """Retorna la secuencia de etapas según requires_painting."""
@@ -201,58 +230,85 @@ class RepairOrder(models.Model):
         }
 
     def action_outsource(self):
-        for order in self:
-            stage_label = dict(FRIO_CALOR_STAGES).get(order.frio_calor_stage, order.frio_calor_stage)
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Tercerizar'),
+            'res_model': 'repair.outsource.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_repair_id': self.id},
+        }
 
-            internal_picking_type = self.env['stock.picking.type'].search([
-                ('code', '=', 'internal'),
-                ('company_id', 'in', [order.company_id.id, False]),
-            ], limit=1)
-            if not internal_picking_type:
-                raise UserError(_("No se encontró un tipo de operación de traslado interno."))
+    def _do_outsource(self, reason=None):
+        self.ensure_one()
+        order = self
+        stage_label = dict(FRIO_CALOR_STAGES).get(order.frio_calor_stage, order.frio_calor_stage)
 
-            dest_location = order.company_id.tercerizacion_location_id
-            if not dest_location:
-                raise UserError(_(
-                    "No se configuró la ubicación de tercerización para la empresa '%s'. "
-                    "Configúrela en la ficha de la empresa."
-                ) % order.company_id.name)
+        internal_picking_type = self.env['stock.picking.type'].search([
+            ('code', '=', 'internal'),
+            ('company_id', 'in', [order.company_id.id, False]),
+        ], limit=1)
+        if not internal_picking_type:
+            raise UserError(_("No se encontró un tipo de operación de traslado interno."))
 
-            source_location = order.location_id or internal_picking_type.default_location_src_id
-            move_vals = {
+        dest_location = order.company_id.tercerizacion_location_id
+        if not dest_location:
+            raise UserError(_(
+                "No se configuró la ubicación de tercerización para la empresa '%s'. "
+                "Configúrela en la ficha de la empresa."
+            ) % order.company_id.name)
+
+        source_location = order.location_id or internal_picking_type.default_location_src_id
+        picking = self.env['stock.picking'].create({
+            'picking_type_id': internal_picking_type.id,
+            'location_id': source_location.id,
+            'location_dest_id': dest_location.id,
+            'origin': _("Tercerización etapa: %s - %s - %s") % (stage_label, order.name, dest_location.display_name),
+            'outsource_reason_id': reason.id if reason else False,
+            'move_ids': [(0, 0, {
                 'product_id': order.product_id.id,
                 'product_uom_qty': order.product_qty,
                 'product_uom': order.product_uom.id,
                 'location_id': source_location.id,
                 'location_dest_id': dest_location.id,
-            }
-            picking = self.env['stock.picking'].create({
-                'picking_type_id': internal_picking_type.id,
-                'location_id': source_location.id,
-                'location_dest_id': dest_location.id,
-                'origin': _("Tercerización etapa: %s - %s - %s") % (stage_label, order.name, dest_location.display_name),
-                'move_ids': [(0, 0, move_vals)],
-            })
-            picking.action_confirm()
+            })],
+        })
+        picking.action_confirm()
 
-            order.with_context(_outsource_action=True).write({
-                'is_outsourced': True,
-                'outsource_transfer_id': picking.id,
-            })
-            order.message_post(
-                body=_("La orden fue tercerizada desde la etapa '%s'. Se generó el traslado %s hacia %s.", stage_label, picking.name, dest_location.display_name),
-            )
+        order.with_context(_outsource_action=True).write({
+            'is_outsourced': True,
+            'outsource_transfer_id': picking.id,
+            'outsource_reason_id': reason.id if reason else False,
+        })
+        order.message_post(
+            body=_("La orden fue tercerizada desde la etapa '%s'. Se generó el traslado %s hacia %s.", stage_label, picking.name, dest_location.display_name),
+        )
 
     def action_receive_from_third_party(self):
-        for order in self:
-            order.with_context(
-                _outsource_action=True,
-                _frio_calor_stage_advance=True,
-            ).write({
-                'is_outsourced': False,
-                'frio_calor_stage': 'hidrolavadora',
-            })
-            order.message_post(body=_("La orden fue recibida del tercero. Etapa reiniciada a 'Limpieza con hidrolavadora'."))
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Recibir de tercero'),
+            'res_model': 'repair.receive.third.party.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_repair_id': self.id},
+        }
+
+    def _do_receive_from_third_party(self, target_stage):
+        self.ensure_one()
+        self.with_context(
+            _outsource_action=True,
+            _frio_calor_stage_advance=True,
+        ).write({
+            'is_outsourced': False,
+            'frio_calor_stage': target_stage,
+        })
+        stage_name = dict(FRIO_CALOR_STAGES).get(target_stage, target_stage)
+        self.message_post(body=_(
+            "La orden fue recibida del tercero. Etapa reiniciada a '%s'.", stage_name
+        ))
 
     def action_init_repair(self):
         for order in self:
@@ -299,14 +355,12 @@ class RepairOrder(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
-        now = fields.Datetime.now()
         for record in records:
             if record.repair_equipment_type == 'frio_calor':
                 record.check_unique_repair_order()
                 self.env['repair.order.stage.log'].create({
                     'repair_id': record.id,
                     'stage': record.frio_calor_stage,
-                    'date_start': now,
                     'user_id': self.env.context.get('_portal_user_id', self.env.user.id),
                 })
         return records
@@ -350,12 +404,11 @@ class RepairOrder(models.Model):
                         ('repair_id', '=', order.id),
                         ('date_end', '=', False),
                     ], limit=1)
-                    if open_log:
+                    if open_log and open_log.date_start:
                         open_log.write({'date_end': now})
                     self.env['repair.order.stage.log'].create({
                         'repair_id': order.id,
                         'stage': order.frio_calor_stage,
-                        'date_start': now,
                         'user_id': self.env.context.get('_portal_user_id', self.env.user.id),
                     })
 
