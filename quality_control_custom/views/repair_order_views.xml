@@ -31,11 +31,18 @@
                 <field name="repair_equipment_type" invisible="1"/>
                 <field name="requires_painting" invisible="1"/>
                 <field name="frio_calor_stage" invisible="1"/>
+                <field name="stage_started" invisible="1"/>
             </xpath>
 
 
             <!-- Botones en el header (tercerizar/recibir) -->
             <xpath expr="//button[@name='action_validate']" position="before">
+                <button name="action_start_current_stage"
+                        type="object"
+                        string="Comenzar"
+                        class="oe_highlight"
+                        confirm="¿Confirmar inicio de la etapa actual?"
+                        invisible="repair_equipment_type != 'frio_calor' or stage_started or frio_calor_stage == 'finalizado' or is_outsourced"/>
                 <button name="action_outsource"
                         type="object"
                         string="Tercerizar"
@@ -137,6 +144,7 @@
             <xpath expr="//field[@name='tag_ids']" position="after">
                 <field name="quality_check_id" readonly="1" invisible="not quality_check_id"/>
                 <field name="outsource_transfer_id" readonly="1" invisible="not outsource_transfer_id"/>
+                <field name="outsource_reason_id" readonly="1" invisible="not is_outsourced"/>
             </xpath>
 
             <!-- Readonly en campos críticos cuando está tercerizado -->

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from odoo import api, models, fields, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -90,6 +90,13 @@ class StockPicking(models.Model):
         related='picking_type_id.is_frio_calor',
         readonly=True,
         store=True,
+    )
+
+    outsource_reason_id = fields.Many2one(
+        comodel_name='repair.outsource.reason',
+        string="Razón de tercerización",
+        readonly=True,
+        copy=False,
     )
 
     repair_order_ids = fields.One2many(

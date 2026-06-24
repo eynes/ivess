@@ -11,6 +11,9 @@ from odoo.addons.quality_control_custom.models.repair_order import (
     FRIO_CALOR_STAGE_ORDER,
     FRIO_CALOR_STAGE_ORDER_NO_PAINT,
 )
+from odoo.addons.quality_control_custom.wizard.repair_receive_third_party_wizard import (
+    _RECEIVE_STAGE_SELECTION,
+)
 
 _STAGE_LABELS = dict(FRIO_CALOR_STAGES)
 
@@ -183,6 +186,8 @@ class RepairPortalController(CustomerPortal):
         parts = repair.move_ids.filtered(lambda m: m.repair_line_type)
 
         values = self._prepare_portal_layout_values()
+        outsource_reasons = request.env['repair.outsource.reason'].sudo().search([])
+
         values.update({
             'repair': repair,
             'page_name': 'repair_detail',
@@ -195,6 +200,8 @@ class RepairPortalController(CustomerPortal):
             'line_type_labels': _REPAIR_LINE_TYPE_LABELS,
             'line_type_badge': _REPAIR_LINE_TYPE_BADGE,
             'add_error': add_error,
+            'outsource_reasons': outsource_reasons,
+            'receive_stages': _RECEIVE_STAGE_SELECTION,
         })
         return request.render('repair_portal_ivess.portal_repair_detail', values)
 
@@ -250,12 +257,28 @@ class RepairPortalController(CustomerPortal):
         ['/my/repairs/<int:repair_id>/outsource'],
         type='http', auth='user', website=True, methods=['POST'],
     )
-    def portal_repair_outsource(self, repair_id):
+    def portal_repair_outsource(self, repair_id, **post):
         repair = request.env['repair.order'].sudo().browse(repair_id)
-        if not repair.exists() or repair.is_outsourced:
+        if (not repair.exists()
+                or repair.is_outsourced
+                or repair.frio_calor_stage == 'finalizado'):
             return request.redirect(f'/my/repairs/{repair_id}')
+
+        reason = None
         try:
-            repair.with_context(_portal_user_id=request.env.uid).action_outsource()
+            reason_id = int(post.get('reason_id') or 0)
+            if reason_id:
+                reason = request.env['repair.outsource.reason'].sudo().browse(reason_id)
+                if not reason.exists():
+                    reason = None
+        except (ValueError, TypeError):
+            reason = None
+
+        if not reason:
+            return request.redirect(f'/my/repairs/{repair_id}')
+
+        try:
+            repair.with_context(_portal_user_id=request.env.uid)._do_outsource(reason)
         except UserError:
             pass
         return request.redirect(f'/my/repairs/{repair_id}')
@@ -264,12 +287,18 @@ class RepairPortalController(CustomerPortal):
         ['/my/repairs/<int:repair_id>/receive_from_third_party'],
         type='http', auth='user', website=True, methods=['POST'],
     )
-    def portal_repair_receive_from_third_party(self, repair_id):
+    def portal_repair_receive_from_third_party(self, repair_id, **post):
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or not repair.is_outsourced:
             return request.redirect(f'/my/repairs/{repair_id}')
+
+        valid_keys = {item[0] for item in _RECEIVE_STAGE_SELECTION}
+        target_stage = (post.get('target_stage') or '').strip()
+        if target_stage not in valid_keys:
+            target_stage = 'hidrolavadora'
+
         try:
-            repair.with_context(_portal_user_id=request.env.uid).action_receive_from_third_party()
+            repair.with_context(_portal_user_id=request.env.uid)._do_receive_from_third_party(target_stage)
         except UserError:
             pass
         return request.redirect(f'/my/repairs/{repair_id}')
@@ -314,6 +343,23 @@ class RepairPortalController(CustomerPortal):
             repair.with_context(_portal_user_id=request.env.uid).action_repair_end()
         except UserError:
             pass
+        return request.redirect(f'/my/repairs/{repair_id}')
+
+    @http.route(
+        ['/my/repairs/<int:repair_id>/start_stage'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_start_stage(self, repair_id, **kw):
+        repair = request.env['repair.order'].sudo().browse(repair_id)
+        if (not repair.exists()
+                or repair.stage_started
+                or repair.is_outsourced
+                or repair.frio_calor_stage == 'finalizado'):
+            return request.redirect(f'/my/repairs/{repair_id}')
+        try:
+            repair.with_context(_portal_user_id=request.env.uid).action_start_current_stage()
+        except Exception as e:
+            _logger.exception("Portal start_stage failed repair_id=%s: %s", repair_id, e)
         return request.redirect(f'/my/repairs/{repair_id}')
 
     @http.route(
