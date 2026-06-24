@@ -22,17 +22,36 @@ class StockPicking(models.Model):
             )
             for move in returnable_moves:
                 product_tmpl = move.product_id.product_tmpl_id
-                container = WaterContainer.search([
-                    ('partner_id', '=', partner.id),
-                    ('product_id', '=', product_tmpl.id),
-                    ('state', '=', move.container_state)
-                ], limit=1)
-                if not container:
-                    container = WaterContainer.create({
-                        'partner_id': partner.id,
-                        'product_id': product_tmpl.id,
-                        'state': move.container_state,
-                    })
+                lots = move.lot_ids or self.env['stock.lot']
+                container = None
+                if lots:
+                    for lot in lots:
+                        container = WaterContainer.search([
+                            ('partner_id', '=', partner.id),
+                            ('product_id', '=', product_tmpl.id),
+                            ('state', '=', move.container_state),
+                            ('lot_id', '=', lot.id),
+                        ], limit=1)
+                        if not container:
+                            container = WaterContainer.create({
+                                'partner_id': partner.id,
+                                'product_id': product_tmpl.id,
+                                'state': move.container_state,
+                                'lot_id': lot.id,
+                            })
+                else:
+                    container = WaterContainer.search([
+                        ('partner_id', '=', partner.id),
+                        ('product_id', '=', product_tmpl.id),
+                        ('state', '=', move.container_state),
+                        ('lot_id', '=', False),
+                    ], limit=1)
+                    if not container:
+                        container = WaterContainer.create({
+                            'partner_id': partner.id,
+                            'product_id': product_tmpl.id,
+                            'state': move.container_state,
+                        })
                 move.water_container_id = container
             if picking.picking_type_code == 'outgoing':
                 frio_calor_moves = picking.move_ids.filtered(
@@ -40,10 +59,21 @@ class StockPicking(models.Model):
                 )
                 for move in frio_calor_moves:
                     product_tmpl = move.product_id.product_tmpl_id
-                    for _ in range(int(move.quantity)):
-                        WaterContainer.create({
-                            'partner_id': partner.id,
-                            'product_id': product_tmpl.id,
-                            'state': 'asignado',
-                            'frio_calor_picking_id': picking.id,
-                        })
+                    lots = move.lot_ids
+                    if lots:
+                        for lot in lots:
+                            WaterContainer.create({
+                                'partner_id': partner.id,
+                                'product_id': product_tmpl.id,
+                                'state': 'asignado',
+                                'frio_calor_picking_id': picking.id,
+                                'lot_id': lot.id,
+                            })
+                    else:
+                        for _ in range(int(move.quantity)):
+                            WaterContainer.create({
+                                'partner_id': partner.id,
+                                'product_id': product_tmpl.id,
+                                'state': 'asignado',
+                                'frio_calor_picking_id': picking.id,
+                            })
