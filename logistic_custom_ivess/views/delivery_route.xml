@@ -9,6 +9,7 @@
                     <button name="action_set_in_progress" type="object" string="In Progress" invisible="state not in ('sincronizado')" class="btn-primary"/>
                     <button name="action_set_closed" type="object" string="Close" invisible="state not in ('in_progress')" class="btn-success" confirm="Esta seguro que desea cerrar la ruta?"/>
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state not in ('closed')" class="btn-secondary"/>
+                    <button name="action_create_bis" type="object" string="Crear ruta Bis" class="btn-secondary"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,sincronizado,in_progress,closed"/>
                 </header>
                 <sheet>
@@ -20,7 +21,7 @@
                     <group>
                         <group>
                             <field name="create_from_wizard" invisible="1"/>
-                            <field name="template_delivery_route_id" required="True" readonly="state not in ('draft', 'in_progress')"/>
+                            <field name="template_delivery_route_id" readonly="state not in ('draft', 'in_progress')"/>
                             <!--<field name="allowed_truck_domain" invisible="1"/>-->
                             <field name="truck_id" required="True" readonly="state not in ('draft', 'in_progress')"/> <!--domain="[('id', 'in', allowed_truck_ids)]"-->
                             <field name="delivery_number_id"/>
