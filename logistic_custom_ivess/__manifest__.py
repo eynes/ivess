@@ -45,6 +45,7 @@
         'views/purchase_order.xml',
         'views/sale_report.xml',
         'views/menuitems.xml',
+        'wizard/delivery_route_bis_wizard.xml',
     ],
     'demo': [],
     'test': [],

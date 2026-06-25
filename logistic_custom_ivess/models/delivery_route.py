@@ -81,13 +81,31 @@ class DeliveryRoute(models.Model):
     create_from_wizard = fields.Boolean(
         string='Create from wizard',
     )
+    delivery_number_override_id = fields.Many2one(
+        'delivery.route.number',
+        string='Reparto Override',
+        copy=True,
+    )
     delivery_number_id = fields.Many2one(
+        'delivery.route.number',
         string="Reparto",
-        related="template_delivery_route_id.delivery_number_id",
-        # required=True,
+        compute='_compute_delivery_number_id',
+        inverse='_inverse_delivery_number_id',
         store=True,
         tracking=True,
     )
+
+    @api.depends('template_delivery_route_id.delivery_number_id', 'delivery_number_override_id')
+    def _compute_delivery_number_id(self):
+        for rec in self:
+            rec.delivery_number_id = (
+                rec.delivery_number_override_id
+                or rec.template_delivery_route_id.delivery_number_id
+            )
+
+    def _inverse_delivery_number_id(self):
+        for rec in self:
+            rec.delivery_number_override_id = rec.delivery_number_id
     supervisor_id = fields.Many2one(
         'res.partner',
         string='Supervisor',
@@ -203,7 +221,8 @@ class DeliveryRoute(models.Model):
                     template = self.env['template.delivery.route'].browse(vals['template_delivery_route_id'])
                     vals['delivery_route_line_ids'] = [(5, 0, 0)] + self._prepare_route_lines_from_template(template)
                 else:
-                    vals['truck_id'] = False
+                    if 'truck_id' not in vals:
+                        vals['truck_id'] = False
                     vals['delivery_route_line_ids'] = [(5, 0, 0)]  # Borra las líneas si se borra el template
         return super().write(vals)
 
@@ -341,6 +360,15 @@ class DeliveryRoute(models.Model):
             'no_purchase_reason_id': False,
         })
         self.state = 'draft'
+
+    def action_create_bis(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'delivery.route.bis.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_route_id': self.id},
+        }
 
     @api.model
     def cron_generate_routes_from_templates(self):
