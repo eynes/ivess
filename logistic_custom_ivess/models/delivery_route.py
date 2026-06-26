@@ -539,6 +539,19 @@ class DeliveryRouteLine(models.Model):
                 rec.client_id.category_id = [(3, reason.id)]
 
             rec.route_message_post()
+
+        if not self.env.context.get('no_sync_distribution'):
+            template_lines = self.filtered(lambda r: r.template_route_id and not r.route_id)
+            distributions_to_unlink = self.env['partner.distribution']
+            for rec in template_lines:
+                distributions_to_unlink |= self.env['partner.distribution'].search([
+                    ('distribution', '=', rec.template_route_id.id),
+                    ('partner_id', '=', rec.client_id.id),
+                ])
+            res = super().unlink()
+            distributions_to_unlink.with_context(no_sync_distribution=True).unlink()
+            return res
+
         return super().unlink()
 
     @api.onchange('possible_customer_withdrawal')
