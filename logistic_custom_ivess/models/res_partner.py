@@ -125,7 +125,7 @@ class ResPartner(models.Model):
     mobile_number = fields.Char(
         string="Numero de Celular",
     )
-    direction_observations = fields.Text(
+    address_details = fields.Text(
         string="Observaciones de Dirección",
     )
 
