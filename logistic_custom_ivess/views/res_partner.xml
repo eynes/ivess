@@ -27,6 +27,10 @@
                     </div>
                 </div>
             </xpath>
+            <xpath expr="//span[@name='address_name']" position="before">
+                <field name="mobile_number" class="w-100" widget="phone" placeholder="Celular" help="Número de teléfono móvil"/>
+                <field name="address_details" help="Observaciones sobre la dirección del cliente para facilitar la identificación"/>
+            </xpath>
             <xpath expr="//field[@name='express_id']" position="before">
                 <field name="state" />
                 <field name="date_from" invisible="state not in ['holidays','dont_pass']"/>

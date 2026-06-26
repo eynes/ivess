@@ -115,6 +115,12 @@ class ResPartner(models.Model):
     is_important_client = fields.Boolean(
         string="Cliente Importante",
     )
+    mobile_number = fields.Char(
+        string="Numero de Celular",
+    )
+    address_details = fields.Text(
+        string="Observaciones de Dirección",
+    )
 
     @api.depends('customer_rank')
     def _compute_is_customer(self):
