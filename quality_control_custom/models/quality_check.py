@@ -22,7 +22,8 @@ class QualityCheck(models.Model):
                 check.picking_id.picking_type_id
                 or check.point_id.picking_type_ids[:1]
             )
-            if picking_type.is_frio_calor:
+            if check.point_id and check.point_id.is_frio_calor and not check.repair_id:
+                check.check_unique_repair_order()
                 check._create_auto_repair_order(picking_type)
         return res
 
@@ -35,7 +36,8 @@ class QualityCheck(models.Model):
                 check.picking_id.picking_type_id
                 or check.point_id.picking_type_ids[:1]
             )
-            if picking_type.is_frio_calor:
+            if check.point_id and check.point_id.is_frio_calor and not check.repair_id:
+                check.check_unique_repair_order()
                 check._create_auto_repair_order(picking_type)
         return res
 
@@ -114,3 +116,17 @@ class QualityCheck(models.Model):
             'view_mode': 'form',
             'target': 'current',
         }
+
+    def check_unique_repair_order(self):
+        ro_model = self.env['repair.order']
+        for check in self:
+            if check.point_id and check.point_id.is_frio_calor:
+                for lot in check.lot_ids:
+                    if ro_model.search_count([
+                        ('lot_id', '=', lot.id),
+                        ('state', 'not in', ['cancelled', 'done']),
+                    ]) > 0:
+                        raise UserError(_(
+                            "El producto a reparar '%s' ya tiene una orden de reparación asociada en proceso para el número de serie '%s'.",
+                            check.product_id.name, lot.name,
+                        ))

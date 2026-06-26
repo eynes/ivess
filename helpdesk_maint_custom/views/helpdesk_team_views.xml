@@ -5,6 +5,9 @@
         <field name="inherit_id" ref="helpdesk.helpdesk_team_view_form"/>
         <field name="model">helpdesk.team</field>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='company_id'][@groups='base.group_multi_company']" position="after">
+                <field name="team_type" placeholder="Tipo de helpdesk"/>
+            </xpath>
             <field name="use_product_repairs" position="after">
                 <setting help="Create maintenance orders from tickets">
                     <field name="use_maintenance_orders"/>

@@ -1,0 +1,57 @@
+<odoo>
+    <!-- List View -->
+    <record id="view_frio_calor_container_tree" model="ir.ui.view">
+        <field name="name">frio.calor.container.tree</field>
+        <field name="model">water.container</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="partner_id"/>
+                <field name="product_id"/>
+                <field name="quantity"/>
+                <field name="lot_id"/>
+                <field name="assignment_date"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_frio_calor_container_form" model="ir.ui.view">
+        <field name="name">frio.calor.container.form</field>
+        <field name="model">water.container</field>
+        <field name="arch" type="xml">
+            <form string="Equipo Frio/Calor">
+                <sheet>
+                    <group>
+                        <field name="partner_id" readonly="1"/>
+                        <field name="product_id"/>
+                        <field name="lot_id"/>
+                        <field name="assignment_date" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_frio_calor_container" model="ir.actions.act_window">
+        <field name="name">Equipos Frio/Calor</field>
+        <field name="res_model">water.container</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_frio_calor', '=', True)]</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_frio_calor_container_tree')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_frio_calor_container_form')}),
+        ]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay equipos Frio/Calor registrados
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_frio_calor_container_main"
+              name="Equipos Frio/Calor"
+              parent="crm.crm_menu_config"
+              sequence="20"
+              action="action_frio_calor_container"/>
+</odoo>

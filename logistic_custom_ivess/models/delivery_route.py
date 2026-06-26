@@ -1,9 +1,20 @@
+from markupsafe import Markup
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 import logging
 from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
+
+WEEKDAY_MAPPING = {
+    'monday': 0,
+    'tuesday': 1,
+    'wednesday': 2,
+    'thursday': 3,
+    'friday': 4,
+    'saturday': 5,
+    'sunday': 6,
+}
 
 class DeliveryRoute(models.Model):
     _name = 'delivery.route'
@@ -32,7 +43,7 @@ class DeliveryRoute(models.Model):
     )
     template_delivery_route_id = fields.Many2one(
         'template.delivery.route',
-        string="Template delivery route",
+        string="Recorrido",
     )
     delivery_person_id = fields.Many2one(
         'res.users',
@@ -59,6 +70,7 @@ class DeliveryRoute(models.Model):
     state = fields.Selection(
         [
             ('draft', 'Draft'),
+            ('sincronizado', 'Sincronizado'),
             ('in_progress', 'In Progress'),
             ('closed', 'Closed')
         ],
@@ -69,12 +81,64 @@ class DeliveryRoute(models.Model):
     create_from_wizard = fields.Boolean(
         string='Create from wizard',
     )
+    delivery_number_override_id = fields.Many2one(
+        'delivery.route.number',
+        string='Reparto Override',
+        copy=True,
+    )
     delivery_number_id = fields.Many2one(
-        string="Delivery route number",
-        related="template_delivery_route_id.delivery_number_id",
-        # required=True,
+        'delivery.route.number',
+        string="Reparto",
+        compute='_compute_delivery_number_id',
+        inverse='_inverse_delivery_number_id',
         store=True,
         tracking=True,
+    )
+
+    @api.depends('template_delivery_route_id.delivery_number_id', 'delivery_number_override_id')
+    def _compute_delivery_number_id(self):
+        for rec in self:
+            rec.delivery_number_id = (
+                rec.delivery_number_override_id
+                or rec.template_delivery_route_id.delivery_number_id
+            )
+
+    def _inverse_delivery_number_id(self):
+        for rec in self:
+            rec.delivery_number_override_id = rec.delivery_number_id
+    supervisor_id = fields.Many2one(
+        'res.partner',
+        string='Supervisor',
+        related='delivery_number_id.supervisor_id',
+        store=True,
+        readonly=True,
+    )
+    supervisor_regional_id = fields.Many2one(
+        'res.partner',
+        string='Supervisor Regional',
+        related='region_id.supervisor_id',
+        store=True,
+    )
+    conductor_id = fields.Many2one(
+        'res.partner',
+        string='Conductor',
+        related='delivery_number_id.conductor_id',
+        store=True,
+        readonly=True,
+    )
+    ayudante_id = fields.Many2one(
+        'res.partner',
+        string='Ayudante',
+        related='delivery_number_id.ayudante_id',
+        store=True,
+        readonly=True,
+    )
+    region_id = fields.Many2one(
+        'delivery.route.region',
+        string='Regional',
+        related='delivery_number_id.region_id',
+        store=True,
+        readonly=True,
     )
     allow_price_editing = fields.Boolean(
         string="Allow Price Editing",
@@ -157,7 +221,8 @@ class DeliveryRoute(models.Model):
                     template = self.env['template.delivery.route'].browse(vals['template_delivery_route_id'])
                     vals['delivery_route_line_ids'] = [(5, 0, 0)] + self._prepare_route_lines_from_template(template)
                 else:
-                    vals['truck_id'] = False
+                    if 'truck_id' not in vals:
+                        vals['truck_id'] = False
                     vals['delivery_route_line_ids'] = [(5, 0, 0)]  # Borra las líneas si se borra el template
         return super().write(vals)
 
@@ -166,6 +231,9 @@ class DeliveryRoute(models.Model):
     #         user = self.delivery_person_id
     #         return user not in self.truck_id.user_assigned_ids
     #     return False
+
+    def action_set_synchronized(self):
+        self.state = 'sincronizado'
 
     def action_set_in_progress(self):
         # if not self.delivery_route_line_ids:
@@ -178,11 +246,91 @@ class DeliveryRoute(models.Model):
         for record in self:
             record._validate_state()
             record._validate_rake_restriction()
-        self.write({'state': 'closed'})
+            record.write({'state': 'closed'})
+            created, updated = record._generate_next_week_route()
+            record._post_next_routes_chatter(created, updated)
+
+    def _post_next_routes_chatter(self, created, updated):
+        lines = []
+        for route in created.sorted('delivery_date'):
+            lines.append(Markup('• %s (%s) — creada') % (route.name, route.delivery_date.strftime('%d/%m/%Y')))
+        for route in updated.sorted('delivery_date'):
+            lines.append(Markup('• %s (%s) — actualizada') % (route.name, route.delivery_date.strftime('%d/%m/%Y')))
+        if lines:
+            self.message_post(body=Markup('Rutas generadas al cerrar:<br/>') + Markup('<br/>').join(lines))
+
+    def _generate_next_week_route(self):
+        """Al cerrar la ruta, genera una ruta por cada fecha siguiente según la frecuencia de cada cliente."""
+        created = self.env['delivery.route']
+        updated = self.env['delivery.route']
+
+        if not self.template_delivery_route_id or not self.delivery_date:
+            return created, updated
+
+        template = self.template_delivery_route_id
+
+        # Agrupar clientes por su próxima fecha de visita usando las líneas de la ruta cerrada
+        date_clients = {}
+        for line in self.delivery_route_line_ids:
+            client = line.client_id
+            dist = client.distributions_ids.filtered(lambda d: d.distribution.id == template.id)
+            frequency = dist[:1].frequency or client.frequency or 'weekly'
+            visit_day = dist[:1].visit_day or template.day
+            next_date = self._compute_next_visit_date(frequency, visit_day)
+            date_clients.setdefault(next_date, []).append(client.id)
+
+        for next_date, client_ids in date_clients.items():
+            existing_route = self.env['delivery.route'].search([
+                ('delivery_date', '=', next_date),
+                ('template_delivery_route_id', '=', template.id),
+            ], limit=1)
+
+            if existing_route:
+                route = existing_route
+                updated |= route
+            else:
+                route = self.env['delivery.route'].with_context(create_from_wizard=True).create({
+                    'name': "{} {}".format(template.name, next_date),
+                    'template_delivery_route_id': template.id,
+                    'delivery_date': next_date,
+                    'truck_id': self.truck_id.id,
+                    'delivery_number_id': template.delivery_number_id.id,
+                    'create_from_wizard': True,
+                })
+                created |= route
+
+            existing_client_ids = route.delivery_route_line_ids.mapped('client_id').ids
+            new_lines = [
+                {'route_id': route.id, 'client_id': cid}
+                for cid in client_ids
+                if cid not in existing_client_ids
+            ]
+            if new_lines:
+                self.env['delivery.route.line'].create(new_lines)
+
+        return created, updated
+
+    def _compute_next_visit_date(self, frequency, visit_day):
+        """Retorna la próxima fecha de visita según la frecuencia y el día de visita del cliente."""
+        current_date = self.delivery_date
+        weekday_index = WEEKDAY_MAPPING.get(visit_day, current_date.weekday())
+
+        if frequency == 'biweekly':
+            base_date = current_date + timedelta(days=14)
+        elif frequency == 'monthly':
+            next_month_first = (current_date.replace(day=1) + timedelta(days=32)).replace(day=1)
+            days_ahead = (weekday_index - next_month_first.weekday()) % 7
+            return next_month_first + timedelta(days=days_ahead)
+        else:  # weekly
+            base_date = current_date + timedelta(days=7)
+
+        # Ajustar al día de visita correcto a partir de base_date
+        days_ahead = (weekday_index - base_date.weekday()) % 7
+        return base_date + timedelta(days=days_ahead)
 
     def _validate_state(self):
         if self.state != 'in_progress':
-            raise ValidationError("Solo se pueden cerrar registros en estado 'En Progreso'.")
+            raise ValidationError(_("Solo se pueden cerrar registros en estado 'En Progreso'."))
 
     def _validate_rake_restriction(self):
         if not self.allow_closing_with_rake:
@@ -213,6 +361,15 @@ class DeliveryRoute(models.Model):
         })
         self.state = 'draft'
 
+    def action_create_bis(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'delivery.route.bis.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_route_id': self.id},
+        }
+
     @api.model
     def cron_generate_routes_from_templates(self):
         """Crea rutas automáticamente para cada plantilla activa usando el wizard."""
@@ -240,14 +397,14 @@ class DeliveryRouteLine(models.Model):
 
     route_id = fields.Many2one(
         'delivery.route',
-        string='Delivery Route',
+        string='Ruta',
         # required=True,
         ondelete='cascade',
         copy=False,
     )
     template_route_id = fields.Many2one(
         'template.delivery.route',
-        string='Template Delivery Route',
+        string='Recorrido',
         # required=True,
         ondelete='cascade',
         copy=False,
@@ -286,12 +443,6 @@ class DeliveryRouteLine(models.Model):
         store=True,
         readonly=True
     )
-    parent_delivery_person = fields.Many2one(
-        comodel_name='res.users',
-        related='route_id.delivery_person_id',
-        store=True,
-        readonly=True,
-    )
     allowed_client = fields.Many2many(
         comodel_name='res.partner',
         compute='_compute_allowed_client',
@@ -306,6 +457,32 @@ class DeliveryRouteLine(models.Model):
         'res.partner.category',
         domain=[('parent_id.name','=','Posible Baja')],
         string="Reason of Withdrawal", tracking=True
+    )
+    visit_hour_from = fields.Float(
+        string='Hora de Visita Desde',
+        related='client_id.visit_hour_from',
+        store=True,
+        readonly=True,
+    )
+    visit_hour_to = fields.Float(
+        string='Hora de Visita Hasta',
+        related='client_id.visit_hour_to',
+        store=True,
+        readonly=True,
+    )
+    effective_visit_hour = fields.Float(
+        string='Hora Efectiva de Visita',
+    )
+    sale_order_id = fields.Many2one(
+        'sale.order',
+        string='SO Relacionada',
+    )
+    stock_picking_id = fields.Many2one(
+        'stock.picking',
+        string='Remito Relacionado',
+    )
+    origin = fields.Char(
+        string='Origen',
     )
 
     @api.model_create_multi
@@ -362,6 +539,19 @@ class DeliveryRouteLine(models.Model):
                 rec.client_id.category_id = [(3, reason.id)]
 
             rec.route_message_post()
+
+        if not self.env.context.get('no_sync_distribution'):
+            template_lines = self.filtered(lambda r: r.template_route_id and not r.route_id)
+            distributions_to_unlink = self.env['partner.distribution']
+            for rec in template_lines:
+                distributions_to_unlink |= self.env['partner.distribution'].search([
+                    ('distribution', '=', rec.template_route_id.id),
+                    ('partner_id', '=', rec.client_id.id),
+                ])
+            res = super().unlink()
+            distributions_to_unlink.with_context(no_sync_distribution=True).unlink()
+            return res
+
         return super().unlink()
 
     @api.onchange('possible_customer_withdrawal')
@@ -399,17 +589,12 @@ class DeliveryRouteLine(models.Model):
     'template_route_id',
     'template_route_id.day',
     'parent_delivery_type',
-    'parent_delivery_person',
     )
     def _compute_allowed_client(self):
         partner_obj = self.env['res.partner']
         for rec in self:
             rec.allowed_client = partner_obj.browse()
-            if rec.route_id and rec.parent_delivery_type == 'common' and rec.parent_delivery_person:
-                # users = self.env['res.users'].search([('partner_id', '=', rec.parent_delivery_person.id)])
-                rec.allowed_client = partner_obj.search([('user_id', '=', rec.parent_delivery_person.id)], limit=None)
-
-            elif rec.template_route_id:
+            if rec.template_route_id:
                 rec.allowed_client = partner_obj.search([('visit_day', '=', rec.template_route_id.day)], limit=None)
 
     @api.depends(

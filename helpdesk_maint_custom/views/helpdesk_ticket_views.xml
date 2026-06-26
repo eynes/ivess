@@ -1,5 +1,70 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <odoo>
+    <!-- Additional Information tab (must come first so the DB view is updated before other views validate) -->
+    <record id="helpdesk_ticket_view_form_inherit_maint" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.form.inherit.maint</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <field name="team_type" invisible="1"/>
+                <page string="Additional Information" name="maint_additional_info"
+                    invisible="team_type not in ('maintenance', 'workshop')">
+                    <group col="2" invisible="team_type != 'maintenance'">
+                        <group string="Classification">
+                            <field name="ticket_source"/>
+                            <field name="topic"/>
+                            <field name="department_id"/>
+                            <field name="line"/>
+                            <field name="maintenance_type"/>
+                        </group>
+                        <group string="Dates and Signature">
+                            <field name="due_date"/>
+                            <field name="require_signature"/>
+                            <field
+                                name="signature"
+                                widget="signature"
+                                invisible="not require_signature"
+                            />
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="warehouse_id"/>
+                        </group>
+                    </group>
+                    <group string="Internal Note" invisible="team_type != 'maintenance'">
+                        <field name="internal_note" nolabel="1"/>
+                    </group>
+                    <group col="2" invisible="team_type != 'workshop'">
+                        <group string="Datos del Vehículo">
+                            <field name="intake_user"/>
+                            <field name="dispatch"/>
+                            <field name="driver_name"/>
+                            <field name="vehicle_model"/>
+                            <field name="equipment_id"/>
+                        </group>
+                        <group string="Ubicación y Auxilio">
+                            <field name="vehicle_location"/>
+                            <field name="breakdown_reason"/>
+                            <field name="maps_location"/>
+                        </group>
+                    </group>
+                    <field name="item_ids" string="Ítems" invisible="team_type != 'workshop'"
+                        nolabel="1">
+                        <list editable="bottom">
+                            <field name="name"/>
+                            <field name="value"/>
+                        </list>
+                    </field>
+                    <group string="Payload de ingreso" invisible="team_type != 'workshop'">
+                        <field name="intake_payload" nolabel="1" readonly="1"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
     <!-- Stat button: "Maintenance Orders" -->
     <record id="helpdesk_ticket_view_form_inherit_maint_stat_btn" model="ir.ui.view">
         <field name="name">helpdesk.ticket.form.inherit.maint.stat.btn</field>
@@ -30,40 +95,6 @@
                     invisible="not use_maintenance_orders"
                     data-hotkey="m"/>
             </field>
-        </field>
-    </record>
-
-    <!-- Additional Information tab -->
-    <record id="helpdesk_ticket_view_form_inherit_maint" model="ir.ui.view">
-        <field name="name">helpdesk.ticket.form.inherit.maint</field>
-        <field name="inherit_id" ref="helpdesk.helpdesk_ticket_view_form"/>
-        <field name="model">helpdesk.ticket</field>
-        <field name="arch" type="xml">
-            <xpath expr="//notebook" position="inside">
-                <page string="Additional Information" name="maint_additional_info">
-                    <group col="2">
-                        <group string="Classification">
-                            <field name="ticket_source"/>
-                            <field name="topic"/>
-                            <field name="department_id"/>
-                            <field name="line"/>
-                            <field name="maintenance_type"/>
-                        </group>
-                        <group string="Dates and Signature">
-                            <field name="due_date"/>
-                            <field name="require_signature"/>
-                            <field
-                                name="signature"
-                                widget="signature"
-                                invisible="not require_signature"
-                            />
-                        </group>
-                    </group>
-                    <group string="Internal Note">
-                        <field name="internal_note" nolabel="1"/>
-                    </group>
-                </page>
-            </xpath>
         </field>
     </record>
 </odoo>

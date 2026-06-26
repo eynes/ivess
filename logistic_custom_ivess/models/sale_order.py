@@ -7,7 +7,7 @@ class SaleOrder(models.Model):
 
     delivery_route_id = fields.Many2one(
         'delivery.route', 
-        string="Delivery Route"
+        string="Ruta"
     )
 
     def write(self, vals):
@@ -84,6 +84,12 @@ class SaleOrder(models.Model):
             if total_liters:
                 month, year = order._get_month_year_from_date()
                 order._update_or_create_partner_water_consumption(month, year, total_liters)
+            product_tmpl_ids = order.order_line.product_id.product_tmpl_id.ids
+            if product_tmpl_ids:
+                self.env['water.container']._reactivate_for_partner_products(
+                    order.partner_id.id,
+                    product_tmpl_ids,
+                )
         return res
 
     def _calculate_total_liters(self):

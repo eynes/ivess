@@ -18,9 +18,6 @@
                         </group>
                     </group>
                     <notebook>
-                        <page string="Usuarios Asignados">
-                            <field name="user_assigned_ids"/>
-                        </page>
                         <page string="Clientes a Visitar">
                             <field name="delivery_route_line_ids">
                                 <list editable="bottom">
@@ -29,6 +26,8 @@
                                     <field name="client_id" widget="many2one_link" optional="show" domain="[('id', 'in', allowed_client)]"/>
                                     <field name="customer_code"/>
                                     <field name="client_address"/>
+                                    <field name="visit_hour_from"/>
+                                    <field name="visit_hour_to"/>
                                 </list>
                             </field>
                         </page>
@@ -49,12 +48,12 @@
         </field>
     </record>
     <record id="action_template_delivery_route" model="ir.actions.act_window">
-        <field name="name">Repartos</field>
+        <field name="name">Plantillas</field>
         <field name="res_model">template.delivery.route</field>
         <field name="view_mode">list,form</field>
     </record>
     <menuitem id="menu_tempalte_delivery_route"
-            name="Repartos"
+            name="Plantillas"
             parent="sale.menu_sale_config"
             sequence="23"
             action="action_template_delivery_route" />

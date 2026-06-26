@@ -1,2 +1,6 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_maintenance_request_material_user,maintenance.request.material user,model_maintenance_request_material,base.group_user,1,1,1,1
+access_maintenance_equipment_infraction_user,maintenance.equipment.infraction user,model_maintenance_equipment_infraction,base.group_user,1,1,1,1
+access_helpdesk_ticket_item_user,helpdesk.ticket.item user,model_helpdesk_ticket_item,base.group_user,1,1,1,1
+access_maintenance_request_group_maintenance,maintenance.request group_maintenance,maintenance.model_maintenance_request,helpdesk_maint_custom.group_helpdesk_maintenance,1,1,1,1
+access_maintenance_request_group_workshop,maintenance.request group_workshop,maintenance.model_maintenance_request,helpdesk_maint_custom.group_helpdesk_workshop,1,1,1,1

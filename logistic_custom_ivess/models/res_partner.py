@@ -1,23 +1,26 @@
 import logging
 
-from dateutil.utils import today
-
-from odoo import models, fields, _, api
+from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
-from collections import defaultdict
 
 _logger = logging.getLogger(__name__)
-
-FREQUENCY_MAPPING = {
-    'weekly': 1,
-    'biweekly': 2,
-    'monthly': 4,
-}
 
 
 class ResPartner(models.Model):
     _inherit = 'res.partner'
 
+    is_customer = fields.Boolean(
+        string='Es Cliente',
+        compute='_compute_is_customer',
+        inverse='_inverse_is_customer',
+        store=True,
+    )
+    is_supplier = fields.Boolean(
+        string='Es Proveedor',
+        compute='_compute_is_supplier',
+        inverse='_inverse_is_supplier',
+        store=True,
+    )
     distribution = fields.Many2one('template.delivery.route', tracking=True)
     visit_day = fields.Selection(
         related='distribution.day',
@@ -57,6 +60,10 @@ class ResPartner(models.Model):
         'Qty water containers',
         compute="_compute_qty_containers"
     )
+    qty_frio_calor = fields.Integer(
+        'Qty equipos Frio/Calor',
+        compute='_compute_qty_frio_calor',
+    )
     water_consumption_ids = fields.One2many(
         'res.partner.water.consumption',
         'partner_id',
@@ -86,8 +93,6 @@ class ResPartner(models.Model):
         string="Customer Code",
         readonly=True,
         copy=False,
-        compute="_compute_customer_code",
-        store=True
     )
     partner_type_id = fields.Many2one(
         comodel_name="client.type",
@@ -98,15 +103,74 @@ class ResPartner(models.Model):
         string="Canal de Alta",
         tracking=True,
     )
+    average_hour = fields.Float(
+        string="Average Hour"
+    )
+    visit_hour_from = fields.Float(
+        string="Horario de Visita Desde",
+    )
+    visit_hour_to = fields.Float(
+        string="Horario de Visita Hasta",
+    )
+    is_important_client = fields.Boolean(
+        string="Cliente Importante",
+    )
+
+    @api.depends('customer_rank')
+    def _compute_is_customer(self):
+        for rec in self:
+            rec.is_customer = rec.customer_rank > 0
+
+    def _inverse_is_customer(self):
+        for rec in self:
+            if rec.is_customer and rec.customer_rank == 0:
+                rec.customer_rank = 1
+            elif not rec.is_customer:
+                rec.customer_rank = 0
+
+    @api.depends('supplier_rank')
+    def _compute_is_supplier(self):
+        for rec in self:
+            rec.is_supplier = rec.supplier_rank > 0
+
+    def _inverse_is_supplier(self):
+        for rec in self:
+            if rec.is_supplier and rec.supplier_rank == 0:
+                rec.supplier_rank = 1
+            elif not rec.is_supplier:
+                rec.supplier_rank = 0
+
+    def _assign_customer_code(self):
+        for rec in self:
+            if not rec.is_customer or rec.customer_code:
+                continue
+            company_id = rec.company_id.id or self.env.company.id
+            sequence = self.env['ir.sequence'].search([
+                ('code', '=', 'res.partner.ivess'),
+                ('company_id', '=', company_id),
+            ], limit=1)
+            if sequence:
+                rec.customer_code = sequence.next_by_id()
 
     @api.model_create_multi
     def create(self, vals_list):
-        for vals in vals_list:
-            if vals.get('customer_rank', 0) >= 1:
-                sequence = self.env.company.customer_sequence_id
-                if sequence:
-                    vals['customer_code'] = sequence.next_by_id()
-        return super(ResPartner, self).create(vals_list)
+        records = super().create(vals_list)
+        records._assign_customer_code()
+        return records
+
+    @api.constrains('visit_hour_from', 'visit_hour_to')
+    def _check_visit_hour(self):
+        for record in self:
+            if not record.visit_hour_from and not record.visit_hour_to:
+                continue
+            if record.visit_hour_from < 7.0:
+                raise ValidationError(_("El horario de visita debe comenzar a partir de las 07:00."))
+            if record.visit_hour_to > 19.0:
+                raise ValidationError(_("El horario de visita no puede finalizar después de las 19:00."))
+            if record.visit_hour_from >= record.visit_hour_to:
+                raise ValidationError(_("El horario 'Desde' debe ser anterior al horario 'Hasta'."))
+            if record.visit_hour_to - record.visit_hour_from < 3.0:
+                raise ValidationError(_("La diferencia entre el horario 'Desde' y 'Hasta' debe ser de al menos 3 horas."))
 
     @api.constrains('date_from', 'date_to')
     def _check_dates(self):
@@ -114,10 +178,15 @@ class ResPartner(models.Model):
             if record.date_from and record.date_to and record.date_from > record.date_to:
                 raise ValidationError(_("The 'Date From' must be before or equal to 'Date To'."))
 
-    @api.depends('water_container_ids')
+    @api.depends('water_container_ids', 'water_container_ids.is_frio_calor')
     def _compute_qty_containers(self):
         for rec in self:
-            rec.qty_water_containers = len(rec.water_container_ids)
+            rec.qty_water_containers = len(rec.water_container_ids.filtered(lambda c: not c.is_frio_calor))
+
+    @api.depends('water_container_ids', 'water_container_ids.is_frio_calor')
+    def _compute_qty_frio_calor(self):
+        for rec in self:
+            rec.qty_frio_calor = len(rec.water_container_ids.filtered(lambda c: c.is_frio_calor))
 
     @api.depends(
         'water_consumption_ids',
@@ -151,104 +220,56 @@ class ResPartner(models.Model):
         for rec in self:
             rec.qty_water_consumption = len(rec.water_consumption_ids)
 
-    @api.depends('customer_rank')
-    def _compute_customer_code(self):
-        for record in self:
-            company_id = record.company_id.id or self.env.company.id
-            sequence = self.env['ir.sequence'].search([
-                ('code', '=', 'res.partner.ivess'),
-                ('company_id', '=', company_id)
-            ], limit=1)
-            if sequence:
-                record.customer_code = sequence.next_by_id()
-            else:
-                record.customer_code = "PENDIENTE"
-
-    def _get_customer_sequence_vals(self):
-        """
-        Retorna un diccionario con el número de secuencia si corresponde.
-        """
-        self.ensure_one() # Nos aseguramos de procesar de a uno
-        if self.customer_rank >= 1 and not self.customer_code:
-            company = self.company_id or self.env.company
-            seq_code = self.env['ir.sequence'].with_company(company).customer_sequence_id.next_by_id()
-            if seq_code:
-                return {'customer_code': seq_code}
-        return {}
-
     def write(self, vals):
-        old_distribution = {
-            'distribution': self.distribution.id if self.distribution and 'distribution' in vals else None}
-
         self._check_pending_water_containers_before_archiving(vals)
 
         if self.should_delete_related_lines(vals):
             self._delete_route_lines()
             self.empty_vals(vals)
 
-        # if 'customer_rank' in vals:
-        #     sequence_vals = self._get_customer_sequence_vals()
-        #     if sequence_vals:
-        #         vals.update(sequence_vals)
-
         res = super().write(vals)
 
-        if 'distribution' in vals or 'frequency' in vals:
-            if vals.get('distribution'):
-                self._process_new_template_delivery(vals.get('distribution'))
-            if old_distribution.get('distribution'):
-                self._process_old_template_delivery(old_distribution.get('distribution'))
+        if 'is_customer' in vals or 'customer_rank' in vals:
+            self._assign_customer_code()
 
-
-            self._reprocess_delivery_routes(vals.get('distribution'), old_distribution.get('distribution'),
-                                            vals.get('frequency'))
+        if vals.get('active') is False:
+            nonproductive = self.water_container_ids.filtered(lambda c: not c.is_nonproductive)
+            if nonproductive:
+                nonproductive.write({'is_nonproductive': True})
+                for c in nonproductive:
+                    c.message_post(body=_('Marcado como Improductivo: cliente dado de baja.'))
 
         return res
 
     def unlink(self):
         for partner in self:
             partner._check_pending_water_containers_before_archiving()
+            partner._delete_route_lines()
+            partner.distributions_ids.unlink()
         return super().unlink()
 
     def empty_vals(self, vals):
         vals.update({
-                'distribution': False,
-                'visit_day': False,
-                'frequency': False,
-                'state': 'discharge_review',
-            })
+            'distributions_ids': [(5, 0, 0)],
+            'state': 'discharge_review',
+        })
         return vals
 
     def _check_pending_water_containers_before_archiving(self, vals=None):
-        """Valida si hay envases pendientes al intentar archivar o eliminar."""
         if self.env.user.has_group('logistic_custom_ivess.group_allow_archive_debt_or_containers'):
             return
 
-        # Se ejecuta solo si se está desactivando el cliente (archivando)
         if vals is None or vals.get('active') is False:
-            pending_containers = self.check_water_container()
             unpaid_invoices = self.get_unpaid_invoice_count()
 
             errors = []
-            if pending_containers > 0:
-                errors.append(_("This customer has %s water containers pending return.") % pending_containers)
             if unpaid_invoices > 0:
                 errors.append(_("This customer has %s unpaid or partially paid invoice(s).") % unpaid_invoices)
 
             if errors:
                 raise UserError('\n'.join(errors))
 
-    def check_water_container(self):
-        self.ensure_one()
-        return self.env['water.container'].search_count(
-            [
-                ('partner_id', '=', self.id),
-                ('state_id.is_pending_return', '=', True)
-            ]
-        )
-
     def get_unpaid_invoice_count(self):
-        """Retorna la cantidad de facturas sin pagar o parcialmente pagadas del cliente."""
         self.ensure_one()
         return self.env['account.move'].search_count([
             ('partner_id', '=', self.id),
@@ -258,77 +279,11 @@ class ResPartner(models.Model):
         ])
 
     def should_delete_related_lines(self, vals):
-        """
-        Evalúa si deben eliminarse líneas relacionadas basado en los valores escritos.
-        Retorna:
-            bool: True si active es False o si state es 'discharge_review'
-        """
         return (
             'active' in vals and vals['active'] is False
         ) or (
             'state' in vals and vals['state'] == 'discharge_review'
         )
-
-    def _process_new_template_delivery(self, distribution):
-        TemplateDeliveryRoute = self.env['template.delivery.route']
-        DeliveryRouteLine = self.env['delivery.route.line']
-
-        template_id = TemplateDeliveryRoute.browse(distribution)
-        existing_client = template_id.delivery_route_line_ids.filtered(lambda l: l.client_id.id == self.id)
-
-        if not existing_client:
-            new_line = DeliveryRouteLine.create({'client_id': self.id})
-            template_id.delivery_route_line_ids = [(4, new_line.id)]
-
-    def _process_old_template_delivery(self, distribution):
-        DeliveryRouteLine = self.env['delivery.route.line']
-        domain = [('template_route_id', '=', distribution), ('client_id', '=', self.id)]
-        route_lines = DeliveryRouteLine.search(domain)
-        if route_lines:
-            route_lines.unlink()
-
-    def _unlink_old_route_lines(self, today):
-        DeliveryRouteLine = self.env['delivery.route.line']
-        domain_route_line = [('route_id.delivery_date', '>', today),
-                             ('client_id', '=', self.id)]
-        filtered_routes_lines = DeliveryRouteLine.search(domain_route_line)
-        filtered_routes_lines.unlink()
-
-    def _reprocess_delivery_routes(self, distribution, old_distribution, frequency):
-        DeliveryRouteLine = self.env['delivery.route.line']
-        DeliveryRoute = self.env['delivery.route']
-        today = fields.Date.today()
-
-        if old_distribution or frequency:
-            self._unlink_old_route_lines(today)
-
-        if not distribution and not frequency:
-            return
-
-        distribution = distribution or self.distribution.id
-        frequency = frequency or self.frequency
-
-        domain_route = [('delivery_date', '>', today), ('template_delivery_route_id', '=', distribution)]
-        filtered_routes = DeliveryRoute.search(domain_route, order="delivery_date")
-        route_dates = sorted(route.delivery_date for route in filtered_routes)
-
-        monthly_dates = defaultdict(list)
-        for date in route_dates:
-            monthly_dates[date.strftime("%Y-%m")].append(date)
-
-        interval = FREQUENCY_MAPPING.get(frequency, 1)
-
-        if frequency == 'monthly':
-            selected_dates = [dates[0] for dates in monthly_dates.values()]
-        else:
-            selected_dates = route_dates[::interval]
-
-        selected_routes = filtered_routes.filtered(lambda r: r.delivery_date in selected_dates)
-
-        for route in selected_routes:
-            new_line = DeliveryRouteLine.create({'client_id': self.id})
-            route.delivery_route_line_ids = [(4, new_line.id)]
-
 
     def _cron_check_partner_state(self):
         _logger.info("Cron - Checking partner states")
@@ -349,16 +304,6 @@ class ResPartner(models.Model):
             delete_route_lines.with_context(chatter_note=reason_msg).unlink()
 
     def get_lines_to_delete(self, today):
-        """
-            Obtiene las líneas de ruta (`delivery.route.line`) asociadas al partner que deberían ser eliminadas.
-
-            Se consideran dos tipos de líneas:
-            1. Líneas basadas en una ruta plantilla (`template_route_id`) que no tienen una ruta asignada (`route_id` vacío).
-            2. Líneas asignadas a rutas cuya fecha de entrega (`delivery_date`) sea mayor o igual a la fecha actual.
-
-            Returns:
-                recordset: Un conjunto de registros de `delivery.route.line` que cumplen con los criterios anteriores.
-        """
         DeliveryRouteLine = self.env['delivery.route.line']
         route_lines_template = DeliveryRouteLine.search([
                 ('client_id', '=', self.id),
@@ -374,7 +319,14 @@ class ResPartner(models.Model):
     def action_open_water_containers(self):
         self.ensure_one()
         action = self.env.ref('logistic_custom_ivess.action_water_container').sudo().read()[0]
-        action['domain'] = [('partner_id', '=', self.id)]
+        action['domain'] = [('partner_id', '=', self.id), ('is_frio_calor', '=', False)]
+        action['context'] = {'default_partner_id': self.id}
+        return action
+
+    def action_open_frio_calor_containers(self):
+        self.ensure_one()
+        action = self.env.ref('logistic_custom_ivess.action_frio_calor_container').sudo().read()[0]
+        action['domain'] = [('partner_id', '=', self.id), ('is_frio_calor', '=', True)]
         action['context'] = {'default_partner_id': self.id}
         return action
 

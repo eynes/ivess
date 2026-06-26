@@ -5,7 +5,37 @@ from odoo.exceptions import ValidationError
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
-    abbreviation = fields.Char(string="Abbreviation")
+    abbreviation = fields.Char(
+        string='Abbreviation',
+        size=10,
+        help=_('Short reference name (max 10 characters)'),
+    )
+    order = fields.Integer(string="Order")
+    is_returnable = fields.Boolean(
+        string="Is returnable",
+        required=True,
+        default=False,
+        tracking=True,
+    )
+    is_frio_calor = fields.Boolean(
+        string="Es Frio/Calor",
+        default=False,
+        tracking=True,
+    )
+    litros_min_bonificacion = fields.Integer(
+        string="Litros mínimos para bonificación"
+    )
+    allows_replacement = fields.Boolean(string="Allows Replacement")
+    is_regular_app = fields.Boolean(string="Is Regular (APP)")
+    show_in_app = fields.Boolean(string="Mostrar en App")
+
+    _sql_constraints = [
+        (
+            'unique_abbreviation',
+            'unique(abbreviation)',
+            _('Duplicate abbreviation.')
+        )
+    ]
 
     state = fields.Selection(
         selection=[
@@ -18,6 +48,19 @@ class ProductTemplate(models.Model):
         tracking=True,
         default='new',
     )
+
+    @api.constrains('abbreviation')
+    def _check_abbreviation(self):
+        for rec in self:
+            if rec.abbreviation:
+                if len(rec.abbreviation) > 10:
+                    raise ValidationError(_("The abbreviation cannot exceed 10 characters."))
+                duplicate = self.search([
+                    ('abbreviation', '=', rec.abbreviation),
+                    ('id', '!=', rec.id),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_("Duplicate abbreviation."))
 
     def create(self, vals):
         """

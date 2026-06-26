@@ -8,6 +8,7 @@ class HelpdeskTicket(models.Model):
     _inherit = "helpdesk.ticket"
 
     use_maintenance_orders = fields.Boolean(related='team_id.use_maintenance_orders')
+    team_type = fields.Selection(related='team_id.team_type')
     maintenance_order_ids = fields.One2many('maintenance.request', 'ticket_id', copy=False)
     maintenance_orders_count = fields.Integer(
         string='Maintenance Orders Count',
@@ -23,6 +24,26 @@ class HelpdeskTicket(models.Model):
         mapped = {ticket.id: count for ticket, count in data}
         for ticket in self:
             ticket.maintenance_orders_count = mapped.get(ticket.id, 0)
+
+    @api.model
+    def create(self, vals_list):
+        if isinstance(vals_list, dict):
+            vals_list = [vals_list]
+        tickets = super().create(vals_list)
+        for ticket in tickets:
+            if ticket.use_maintenance_orders:
+                ticket._auto_create_maintenance_order()
+        return tickets
+
+    def _auto_create_maintenance_order(self):
+        self.ensure_one()
+        clean_ctx = {k: v for k, v in self.env.context.items() if not k.startswith('default_')}
+        self.env['maintenance.request'].with_context(clean_ctx).create({
+            'name': self.name,
+            'ticket_id': self.id,
+            'company_id': self.company_id.id,
+            'description': self.description,
+        })
 
     def action_create_maintenance_order(self):
         self.ensure_one()
@@ -116,3 +137,20 @@ class HelpdeskTicket(models.Model):
         string="Maintenance Type",
         default='corrective'
     )
+
+    item_ids = fields.One2many("helpdesk.ticket.item", "ticket_id", string="Ítems")
+
+    # Workshop (Taller Mecánico) fields
+    intake_user = fields.Char(string="Usuario JMobile")
+    dispatch = fields.Char(string="Reparto")
+    webhub_dispatch = fields.Char(string="Reparto Webhub")
+    driver_name = fields.Char(string="Nombre")
+    vehicle_model = fields.Char(string="Modelo")
+    webhub_vehicle_model = fields.Char(string="Modelo Webhub")
+    equipment_id = fields.Many2one("maintenance.equipment", string="Equipo")
+    vehicle_location = fields.Char(string="Ubicación")
+    breakdown_reason = fields.Char(string="Motivo de auxilio")
+    maps_location = fields.Char(string="Ubicación Maps")
+    webhub_description = fields.Char(string="WebHub Descripción")
+    warehouse_id = fields.Many2one('stock.warehouse', string="Planta")
+    intake_payload = fields.Html(string="Payload de ingreso", readonly=True, sanitize=False)

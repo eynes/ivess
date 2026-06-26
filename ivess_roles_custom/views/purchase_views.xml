@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             PURCHASE ORDER FORM — restricciones de botones por grupo
+             Referencia CSV: filas 4 y 7
+             • button_confirm      → solo purchase_manager / system (fila 4)
+             • action_view_invoice → stat-button de facturas, solo managers (fila 7)
+        ══════════════════════════════════════════════════════════════════════ -->
+        <record id="view_purchase_order_form_cabr" model="ir.ui.view">
+            <field name="name">purchase.order.form.cabr</field>
+            <field name="model">purchase.order</field>
+            <field name="inherit_id" ref="purchase.purchase_order_form"/>
+            <field name="arch" type="xml">
+
+                <button name="button_confirm" position="attributes">
+                    <attribute name="groups">purchase.group_purchase_manager,base.group_system</attribute>
+                </button>
+
+                <button name="action_view_invoice" position="attributes">
+                    <attribute name="groups">purchase.group_purchase_manager,base.group_system</attribute>
+                </button>
+
+            </field>
+        </record>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             PURCHASE ORDER LIST (purchase_order_tree) — ocultar importe total
+             El Usuario Compras no necesita ver montos hasta que el manager confirme.
+        ══════════════════════════════════════════════════════════════════════ -->
+        <record id="view_purchase_order_tree_cabr" model="ir.ui.view">
+            <field name="name">purchase.order.tree.cabr</field>
+            <field name="model">purchase.order</field>
+            <field name="inherit_id" ref="purchase.purchase_order_tree"/>
+            <field name="arch" type="xml">
+
+                <field name="amount_total" position="attributes">
+                    <attribute name="groups">purchase.group_purchase_manager,base.group_system</attribute>
+                </field>
+
+            </field>
+        </record>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             PURCHASE ORDER VIEW TREE — restringir botón "Create Bills"
+             action_create_invoice vive en purchase_order_view_tree (header),
+             no en el form. Solo managers pueden crear facturas (fila 7).
+        ══════════════════════════════════════════════════════════════════════ -->
+        <record id="view_purchase_order_view_tree_cabr" model="ir.ui.view">
+            <field name="name">purchase.order.view.tree.cabr</field>
+            <field name="model">purchase.order</field>
+            <field name="inherit_id" ref="purchase.purchase_order_view_tree"/>
+            <field name="arch" type="xml">
+
+                <button name="action_create_invoice" position="attributes">
+                    <attribute name="groups">purchase.group_purchase_manager,base.group_system</attribute>
+                </button>
+
+            </field>
+        </record>
+
+    </data>
+</odoo>

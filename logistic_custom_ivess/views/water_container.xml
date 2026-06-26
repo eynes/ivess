@@ -6,11 +6,12 @@
         <field name="arch" type="xml">
             <list>
                 <field name="partner_id"/>
-                <field name="name"/>
-                <field name="container_type"/>
+                <field name="product_id"/>
+                <field name="quantity"/>
                 <field name="assignment_date"/>
                 <field name="return_date"/>
-                <field name="state_id"/>
+                <field name="state"/>
+                <field name="is_nonproductive"/>
             </list>
         </field>
     </record>
@@ -22,21 +23,30 @@
         <field name="arch" type="xml">
             <form string="Water Container">
                 <sheet>
+                    <div name="button_box" class="oe_button_box">
+                        <button name="action_open_outgoing_pickings"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-truck">
+                            <field name="count_outgoing_pickings" widget="statinfo" string="Entregas"/>
+                        </button>
+                        <button name="action_open_incoming_pickings"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-undo">
+                            <field name="count_incoming_pickings" widget="statinfo" string="Devoluciones"/>
+                        </button>
+                    </div>
                     <group>
                         <field name="partner_id" readonly="1"/>
-                        <field name="name" readonly="1"/>
-                        <field name="container_type" required="1"/>
+                        <field name="product_id"/>
+                        <field name="quantity" readonly="1"/>
                         <field name="assignment_date" required="1"/>
                         <field name="return_date"/>
-                        <field name="state_id" required="1"/>
-                        <field name="partner_id" invisible="1"/>
+                        <field name="state" required="1"/>
+                        <field name="is_nonproductive"/>
                     </group>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
             </form>
         </field>
     </record>
@@ -52,55 +62,6 @@
             </p>
         </field>
     </record>
-
-    <record id="view_water_container_state_tree" model="ir.ui.view">
-        <field name="name">water.container.state.tree</field>
-        <field name="model">water.container.state</field>
-        <field name="arch" type="xml">
-            <list string="Estados de Envases">
-                <field name="code"/>
-                <field name="name"/>
-                <field name="is_pending_return"/>
-            </list>
-        </field>
-    </record>
-
-    <!-- Vista Form -->
-    <record id="view_water_container_state_form" model="ir.ui.view">
-        <field name="name">water.container.state.form</field>
-        <field name="model">water.container.state</field>
-        <field name="arch" type="xml">
-            <form string="Estado de Envase">
-                <sheet>
-                    <group>
-                        <field name="code" readonly="1" invisible="code == 0"/>
-                        <field name="name"/>
-                        <field name="is_pending_return"/>
-                    </group>
-                </sheet>
-            </form>
-        </field>
-    </record>
-
-    <!-- Acción -->
-    <record id="action_water_container_state" model="ir.actions.act_window">
-        <field name="name">Estados de Envases</field>
-        <field name="res_model">water.container.state</field>
-        <field name="view_mode">list,form</field>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">
-                Crea los estados posibles para los envases.
-            </p>
-        </field>
-    </record>
-
-    <!-- Menu -->
-    <menuitem id="menu_water_container_state"
-              name="Estados de Envases"
-              parent="crm.crm_menu_config"
-              action="action_water_container_state"
-              sequence="20"/>
-
 
     <menuitem id="menu_water_container_main"
               name="Envases"
