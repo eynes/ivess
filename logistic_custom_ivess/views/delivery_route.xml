@@ -24,14 +24,14 @@
                             <field name="template_delivery_route_id" readonly="state not in ('draft', 'in_progress')"/>
                             <!--<field name="allowed_truck_domain" invisible="1"/>-->
                             <field name="truck_id" required="True" readonly="state not in ('draft', 'in_progress')"/> <!--domain="[('id', 'in', allowed_truck_ids)]"-->
-                            <field name="delivery_number_id"/>
+                            <field name="delivery_number_id" readonly="state not in ('draft', 'in_progress')"/>
                             <field name="supervisor_id"/>
                             <field name="conductor_id"/>
                             <field name="ayudante_id"/>
                             <field name="region_id"/>
                             <field name="supervisor_regional_id"/>
-                            <field name="delivery_date" readonly="state not in ('draft', 'in_progress')"/>
-                            <field name="delivery_type" readonly="state not in ('draft', 'in_progress')"/>
+                            <field name="delivery_date" readonly="state not in ('draft', 'sincronizado', 'in_progress')"/>
+                            <field name="delivery_type" readonly="state not in ('draft', 'in_progress', 'sincronizado')"/>
                             <field name="allow_reordering" invisible="1"/>
                             <field name="allow_closing_with_rake" invisible="1"/>
                         </group>

@@ -190,10 +190,15 @@ class DeliveryRoute(models.Model):
 
     @api.onchange('template_delivery_route_id')
     def _onchange_template_delivery_route_id(self):
-        if self.template_delivery_route_id:
-            self.truck_id = self.template_delivery_route_id.truck_id
-            # self.allow_price_editing = self.template_delivery_route_id.allow_price_editing
-            # self.allow_reordering = self.template_delivery_route_id.allow_reordering
+        template = self.template_delivery_route_id
+        if template:
+            self.truck_id = template.truck_id
+            self.delivery_route_line_ids = [(5, 0, 0)] + [
+                (0, 0, {'client_id': line.client_id.id})
+                for line in template.delivery_route_line_ids
+            ]
+        else:
+            self.delivery_route_line_ids = [(5, 0, 0)]
 
     def _prepare_route_lines_from_template(self, template):
         """Prepara las líneas de la ruta copiándolas desde el template."""
@@ -260,7 +265,9 @@ class DeliveryRoute(models.Model):
             self.message_post(body=Markup('Rutas generadas al cerrar:<br/>') + Markup('<br/>').join(lines))
 
     def _generate_next_week_route(self):
-        """Al cerrar la ruta, genera una ruta por cada fecha siguiente según la frecuencia de cada cliente."""
+        """Al cerrar la ruta, genera un único recorrido para la semana siguiente.
+        Solo incluye clientes cuya próxima visita cae en esa fecha (frecuencia semanal).
+        Clientes con otras frecuencias son gestionados por el cron mensual."""
         created = self.env['delivery.route']
         updated = self.env['delivery.route']
 
@@ -268,45 +275,48 @@ class DeliveryRoute(models.Model):
             return created, updated
 
         template = self.template_delivery_route_id
+        next_week_date = self.delivery_date + timedelta(days=7)
 
-        # Agrupar clientes por su próxima fecha de visita usando las líneas de la ruta cerrada
-        date_clients = {}
+        client_ids = []
         for line in self.delivery_route_line_ids:
             client = line.client_id
             dist = client.distributions_ids.filtered(lambda d: d.distribution.id == template.id)
+            if not dist:
+                dist = client.distributions_ids
             frequency = dist[:1].frequency or client.frequency or 'weekly'
-            visit_day = dist[:1].visit_day or template.day
-            next_date = self._compute_next_visit_date(frequency, visit_day)
-            date_clients.setdefault(next_date, []).append(client.id)
+            if frequency == 'weekly':
+                client_ids.append(client.id)
 
-        for next_date, client_ids in date_clients.items():
-            existing_route = self.env['delivery.route'].search([
-                ('delivery_date', '=', next_date),
-                ('template_delivery_route_id', '=', template.id),
-            ], limit=1)
+        if not client_ids:
+            return created, updated
 
-            if existing_route:
-                route = existing_route
-                updated |= route
-            else:
-                route = self.env['delivery.route'].with_context(create_from_wizard=True).create({
-                    'name': "{} {}".format(template.name, next_date),
-                    'template_delivery_route_id': template.id,
-                    'delivery_date': next_date,
-                    'truck_id': self.truck_id.id,
-                    'delivery_number_id': template.delivery_number_id.id,
-                    'create_from_wizard': True,
-                })
-                created |= route
+        existing_route = self.env['delivery.route'].search([
+            ('delivery_date', '=', next_week_date),
+            ('template_delivery_route_id', '=', template.id),
+        ], limit=1)
 
-            existing_client_ids = route.delivery_route_line_ids.mapped('client_id').ids
-            new_lines = [
-                {'route_id': route.id, 'client_id': cid}
-                for cid in client_ids
-                if cid not in existing_client_ids
-            ]
-            if new_lines:
-                self.env['delivery.route.line'].create(new_lines)
+        if existing_route:
+            route = existing_route
+            updated |= route
+        else:
+            route = self.env['delivery.route'].with_context(create_from_wizard=True).create({
+                'name': "{} {}".format(template.name, next_week_date),
+                'template_delivery_route_id': template.id,
+                'delivery_date': next_week_date,
+                'truck_id': self.truck_id.id,
+                'delivery_number_id': template.delivery_number_id.id,
+                'create_from_wizard': True,
+            })
+            created |= route
+
+        existing_client_ids = route.delivery_route_line_ids.mapped('client_id').ids
+        new_lines = [
+            {'route_id': route.id, 'client_id': cid}
+            for cid in client_ids
+            if cid not in existing_client_ids
+        ]
+        if new_lines:
+            self.env['delivery.route.line'].create(new_lines)
 
         return created, updated
 
