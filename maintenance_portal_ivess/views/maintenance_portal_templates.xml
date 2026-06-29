@@ -316,20 +316,35 @@
                     <div class="card-body">
                         <form t-att-action="close_url" method="post">
                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <!-- Datos para JS (pre-selección) -->
+                            <span id="maint_closure_data" style="display:none"
+                                  t-att-data-children="closure_children_json"
+                                  t-att-data-current-reason="maint_request.closure_reason_id.id or 0"
+                                  t-att-data-current-parent="maint_request.closure_reason_id.parent_id.id or 0"/>
+                            <div class="row g-2 mb-2">
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold">
+                                        Categoría principal <span class="text-danger">*</span>
+                                    </label>
+                                    <select class="form-select" id="maint_parent_select">
+                                        <option value="">— Seleccionar categoría —</option>
+                                        <t t-foreach="closure_parents" t-as="parent">
+                                            <option t-att-value="parent.id"
+                                                    t-att-selected="'selected' if maint_request.closure_reason_id.parent_id.id == parent.id else None">
+                                                <t t-esc="parent.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                </div>
+                            </div>
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-8">
                                     <label class="form-label small fw-semibold">
                                         Motivo de cierre <span class="text-danger">*</span>
                                     </label>
                                     <select name="closure_reason_id" class="form-select"
-                                            required="required" id="maint_closure_select">
+                                            required="required" id="maint_closure_select" disabled="disabled">
                                         <option value="">— Seleccionar motivo —</option>
-                                        <t t-foreach="closure_reasons" t-as="cr">
-                                            <option t-att-value="cr.id"
-                                                    t-att-selected="'selected' if maint_request.closure_reason_id.id == cr.id else None">
-                                                <t t-esc="cr.name"/>
-                                            </option>
-                                        </t>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
@@ -523,12 +538,43 @@
 
             <script>
             (function () {
-                var sel = document.getElementById('maint_closure_select');
+                var dataEl = document.getElementById('maint_closure_data');
+                if (!dataEl) return;
+                var allChildren = JSON.parse(dataEl.dataset.children || '[]');
+                var currentReason = parseInt(dataEl.dataset.currentReason) || 0;
+                var currentParent = parseInt(dataEl.dataset.currentParent) || 0;
+                var parentSel = document.getElementById('maint_parent_select');
+                var childSel = document.getElementById('maint_closure_select');
                 var btn = document.getElementById('maint_btn_close');
-                if (!sel || !btn) return;
-                function update() { btn.disabled = !sel.value; }
-                sel.addEventListener('change', update);
-                update();
+                if (!parentSel || !childSel || !btn) return;
+
+                function populateChildren(parentId, preselect) {
+                    childSel.innerHTML = '<option value="">— Seleccionar motivo —</option>';
+                    if (!parentId) { childSel.disabled = true; btn.disabled = true; return; }
+                    var kids = allChildren.filter(function (r) { return r.parent_id === parentId; });
+                    if (!kids.length) { childSel.disabled = true; btn.disabled = true; return; }
+                    kids.forEach(function (r) {
+                        var opt = document.createElement('option');
+                        opt.value = r.id;
+                        opt.textContent = r.name;
+                        if (preselect &amp;&amp; r.id === preselect) opt.selected = true;
+                        childSel.appendChild(opt);
+                    });
+                    childSel.disabled = false;
+                    btn.disabled = !childSel.value;
+                }
+
+                parentSel.addEventListener('change', function () {
+                    populateChildren(parseInt(this.value) || 0, 0);
+                });
+                childSel.addEventListener('change', function () {
+                    btn.disabled = !this.value;
+                });
+
+                if (currentParent) {
+                    parentSel.value = currentParent;
+                    populateChildren(currentParent, currentReason);
+                }
             })();
             </script>
 
@@ -833,14 +879,30 @@
                 <t t-call="portal.portal_searchbar">
                     <t t-set="title">Servicios de Taller</t>
                 </t>
-                <a href="/my/workshop/new" class="btn btn-primary btn-sm">
-                    <i class="fa fa-plus me-1"/> Nueva solicitud
-                </a>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <t t-if="not show_done">
+                        <a href="/my/workshop?show_done=1" class="btn btn-outline-secondary btn-sm">
+                            <i class="fa fa-eye me-1"/> Ver todas
+                        </a>
+                    </t>
+                    <t t-else="">
+                        <a href="/my/workshop" class="btn btn-outline-secondary btn-sm">
+                            <i class="fa fa-filter me-1"/> Solo pendientes
+                        </a>
+                    </t>
+                    <a href="/my/workshop/new" class="btn btn-primary btn-sm">
+                        <i class="fa fa-plus me-1"/> Nueva solicitud
+                    </a>
+                </div>
             </div>
 
             <t t-if="not maintenance_requests">
                 <div class="alert alert-warning mt-3">
-                    No hay servicios de taller disponibles.
+                    <t t-if="not show_done">
+                        No hay servicios de taller pendientes.
+                        <a href="/my/workshop?show_done=1" class="alert-link">Ver todas las órdenes.</a>
+                    </t>
+                    <t t-else="">No hay servicios de taller disponibles.</t>
                 </div>
             </t>
 
@@ -1110,20 +1172,35 @@
                     <div class="card-body">
                         <form t-att-action="close_url" method="post">
                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <!-- Datos para JS (pre-selección) -->
+                            <span id="ws_closure_data" style="display:none"
+                                  t-att-data-children="closure_children_json"
+                                  t-att-data-current-reason="maint_request.closure_reason_id.id or 0"
+                                  t-att-data-current-parent="maint_request.closure_reason_id.parent_id.id or 0"/>
+                            <div class="row g-2 mb-2">
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold">
+                                        Categoría principal <span class="text-danger">*</span>
+                                    </label>
+                                    <select class="form-select" id="ws_parent_select">
+                                        <option value="">— Seleccionar categoría —</option>
+                                        <t t-foreach="closure_parents" t-as="parent">
+                                            <option t-att-value="parent.id"
+                                                    t-att-selected="'selected' if maint_request.closure_reason_id.parent_id.id == parent.id else None">
+                                                <t t-esc="parent.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                </div>
+                            </div>
                             <div class="row g-2 align-items-end">
                                 <div class="col-md-8">
                                     <label class="form-label small fw-semibold">
                                         Motivo de cierre <span class="text-danger">*</span>
                                     </label>
                                     <select name="closure_reason_id" class="form-select"
-                                            required="required" id="ws_closure_select">
+                                            required="required" id="ws_closure_select" disabled="disabled">
                                         <option value="">— Seleccionar motivo —</option>
-                                        <t t-foreach="closure_reasons" t-as="cr">
-                                            <option t-att-value="cr.id"
-                                                    t-att-selected="'selected' if maint_request.closure_reason_id.id == cr.id else None">
-                                                <t t-esc="cr.name"/>
-                                            </option>
-                                        </t>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
@@ -1316,12 +1393,43 @@
 
             <script>
             (function () {
-                var sel = document.getElementById('ws_closure_select');
+                var dataEl = document.getElementById('ws_closure_data');
+                if (!dataEl) return;
+                var allChildren = JSON.parse(dataEl.dataset.children || '[]');
+                var currentReason = parseInt(dataEl.dataset.currentReason) || 0;
+                var currentParent = parseInt(dataEl.dataset.currentParent) || 0;
+                var parentSel = document.getElementById('ws_parent_select');
+                var childSel = document.getElementById('ws_closure_select');
                 var btn = document.getElementById('ws_btn_close');
-                if (!sel || !btn) return;
-                function update() { btn.disabled = !sel.value; }
-                sel.addEventListener('change', update);
-                update();
+                if (!parentSel || !childSel || !btn) return;
+
+                function populateChildren(parentId, preselect) {
+                    childSel.innerHTML = '<option value="">— Seleccionar motivo —</option>';
+                    if (!parentId) { childSel.disabled = true; btn.disabled = true; return; }
+                    var kids = allChildren.filter(function (r) { return r.parent_id === parentId; });
+                    if (!kids.length) { childSel.disabled = true; btn.disabled = true; return; }
+                    kids.forEach(function (r) {
+                        var opt = document.createElement('option');
+                        opt.value = r.id;
+                        opt.textContent = r.name;
+                        if (preselect &amp;&amp; r.id === preselect) opt.selected = true;
+                        childSel.appendChild(opt);
+                    });
+                    childSel.disabled = false;
+                    btn.disabled = !childSel.value;
+                }
+
+                parentSel.addEventListener('change', function () {
+                    populateChildren(parseInt(this.value) || 0, 0);
+                });
+                childSel.addEventListener('change', function () {
+                    btn.disabled = !this.value;
+                });
+
+                if (currentParent) {
+                    parentSel.value = currentParent;
+                    populateChildren(currentParent, currentReason);
+                }
             })();
             </script>
 

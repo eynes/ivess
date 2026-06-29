@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 import logging
 import re
 from datetime import datetime as _dt
@@ -279,6 +280,20 @@ class MaintenancePortalController(CustomerPortal):
 
         return maint_request
 
+    def _closure_reason_context(self):
+        """Returns closure_parents (recordset) and closure_children_json (str) for templates."""
+        all_reasons = request.env['maintenance.closure.reason'].sudo().search([], order='name')
+        parents = all_reasons.filtered(lambda r: not r.parent_id)
+        children = all_reasons.filtered(lambda r: r.parent_id)
+        children_json = json.dumps([
+            {'id': r.id, 'name': r.name, 'parent_id': r.parent_id.id}
+            for r in children
+        ])
+        return {
+            'closure_parents': parents,
+            'closure_children_json': children_json,
+        }
+
     def _maint_close_request(self, maint_request, post):
         """Set closure_reason_id and move to the first done stage."""
         closure_raw = (post.get('closure_reason_id') or '').strip()
@@ -404,9 +419,9 @@ class MaintenancePortalController(CustomerPortal):
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
-        closure_reasons = request.env['maintenance.closure.reason'].sudo().search([], order='name')
         values = self._prepare_portal_layout_values()
         values.update(self._maint_detail_values(maint_request))
+        values.update(self._closure_reason_context())
         values.update({
             'page_name': 'maintenance_detail',
             'back_url': '/my/maintenance',
@@ -417,7 +432,6 @@ class MaintenancePortalController(CustomerPortal):
             'update_material_url': f'/my/maintenance/{request_id}/update_material_qty',
             'del_material_base': f'/my/maintenance/{request_id}/delete_material',
             'product_search_url': '/my/maintenance/products/search',
-            'closure_reasons': closure_reasons,
         })
         return request.render('maintenance_portal_ivess.portal_maintenance_detail', values)
 
@@ -523,17 +537,22 @@ class MaintenancePortalController(CustomerPortal):
         ['/my/workshop', '/my/workshop/page/<int:page>'],
         type='http', auth='user', website=True,
     )
-    def portal_my_workshops(self, page=1, **kw):
+    def portal_my_workshops(self, page=1, show_done=None, **kw):
         MaintenanceRequest = request.env['maintenance.request'].sudo()
-        total = MaintenanceRequest.search_count(_WORKSHOP_DOMAIN)
+        is_showing_done = show_done == '1'
+        domain = list(_WORKSHOP_DOMAIN)
+        if not is_showing_done:
+            domain.append(('stage_id.done', '=', False))
+        total = MaintenanceRequest.search_count(domain)
         pager = portal_pager(
             url='/my/workshop',
             total=total,
             page=page,
             step=_WORKSHOP_PER_PAGE,
+            url_args={'show_done': '1'} if is_showing_done else {},
         )
         requests_list = MaintenanceRequest.search(
-            _WORKSHOP_DOMAIN,
+            domain,
             order='request_date desc, id desc',
             limit=_WORKSHOP_PER_PAGE,
             offset=pager['offset'],
@@ -543,6 +562,7 @@ class MaintenancePortalController(CustomerPortal):
             'maintenance_requests': requests_list,
             'pager': pager,
             'page_name': 'workshops',
+            'show_done': is_showing_done,
             'priority_labels': _PRIORITY_LABELS,
             'priority_badge': _PRIORITY_BADGE,
             'maintenance_type_labels': _MAINTENANCE_TYPE_LABELS,
@@ -557,9 +577,9 @@ class MaintenancePortalController(CustomerPortal):
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/workshop')
-        closure_reasons = request.env['maintenance.closure.reason'].sudo().search([], order='name')
         values = self._prepare_portal_layout_values()
         values.update(self._maint_detail_values(maint_request))
+        values.update(self._closure_reason_context())
         values.update({
             'page_name': 'workshop_detail',
             'back_url': '/my/workshop',
@@ -570,7 +590,6 @@ class MaintenancePortalController(CustomerPortal):
             'update_material_url': f'/my/workshop/{request_id}/update_material_qty',
             'del_material_base': f'/my/workshop/{request_id}/delete_material',
             'product_search_url': '/my/maintenance/products/search',
-            'closure_reasons': closure_reasons,
         })
         return request.render('maintenance_portal_ivess.portal_workshop_detail', values)
 
