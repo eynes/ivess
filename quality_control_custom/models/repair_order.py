@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 FRIO_CALOR_STAGES = [
@@ -13,10 +16,12 @@ FRIO_CALOR_STAGES = [
     ('pintura', 'Pintura'),
     ('armado', 'Embolsado'),
     ('finalizado', 'Finalizado'),
+    ('descarte', 'Descarte'),
 ]
 
-# 'finalizado' y 'pintura' se excluyen del orden de navegación: tienen botones dedicados.
-FRIO_CALOR_STAGE_ORDER = [s[0] for s in FRIO_CALOR_STAGES if s[0] not in ('finalizado', 'pintura')]
+# Etapas excluidas del orden de navegación secuencial: tienen botones dedicados.
+_STAGES_OUT_OF_ORDER = frozenset({'finalizado', 'pintura', 'descarte'})
+FRIO_CALOR_STAGE_ORDER = [s[0] for s in FRIO_CALOR_STAGES if s[0] not in _STAGES_OUT_OF_ORDER]
 # Orden sin pintura
 FRIO_CALOR_STAGE_ORDER_NO_PAINT = [s for s in FRIO_CALOR_STAGE_ORDER if s != 'pintura']
 
@@ -107,6 +112,8 @@ class RepairOrder(models.Model):
 
     def action_start_current_stage(self):
         self.ensure_one()
+        if self.state == 'draft':
+            raise UserError(_("Confirme la orden de reparación antes de comenzar la etapa."))
         open_log = self.stage_log_ids.filtered(lambda l: not l.date_end and not l.date_start)
         if not open_log:
             return
@@ -169,6 +176,8 @@ class RepairOrder(models.Model):
             raise UserError(_("Esta acción solo aplica a equipos de tipo Frío/Calor."))
         if self.is_outsourced:
             raise UserError(_("No se puede avanzar la etapa de una orden tercerizada."))
+        if not self.stage_started:
+            raise UserError(_("Debe iniciar la etapa actual presionando 'Comenzar' antes de avanzar."))
         if self.frio_calor_stage == 'prueba_inicial':
             self.message_post(
                 body=_("El resultado de la prueba inicial de la orden fue '%s'.", self.prueba_inicial_resultado),
@@ -312,6 +321,8 @@ class RepairOrder(models.Model):
 
     def action_init_repair(self):
         for order in self:
+            if order.repair_equipment_type == 'frio_calor' and not order.stage_started:
+                raise UserError(_("Debe iniciar la etapa actual presionando 'Comenzar' antes de enviar a reparación."))
             order.prev_frio_calor_stage = order.frio_calor_stage
             order.with_context(_frio_calor_stage_advance=True).frio_calor_stage = 'repair'
             order.message_post(body=_("La orden fue enviada a reparación."))
@@ -335,6 +346,8 @@ class RepairOrder(models.Model):
                 raise UserError(_("Solo se puede enviar a Pintura desde la etapa 'Embolsado'."))
             if order.is_outsourced:
                 raise UserError(_("No se puede modificar la etapa de una orden tercerizada."))
+            if not order.stage_started:
+                raise UserError(_("Debe iniciar la etapa actual presionando 'Comenzar' antes de continuar."))
             order.with_context(_frio_calor_stage_advance=True).write({'frio_calor_stage': 'pintura'})
             order.message_post(body=_("La orden fue enviada a Pintura desde Embolsado."))
 
@@ -347,8 +360,80 @@ class RepairOrder(models.Model):
             order.with_context(_revert_stage=True).write({'frio_calor_stage': 'armado'})
             order.message_post(body=_("La orden volvió de Pintura a Embolsado."))
 
+    def action_send_to_descarte(self):
+        for order in self:
+            if order.frio_calor_stage in ('descarte', 'finalizado'):
+                continue
+            prev = order.frio_calor_stage
+            order.prev_frio_calor_stage = prev
+            order.with_context(
+                _frio_calor_stage_advance=True,
+                _descarte_action=True,
+            ).write({'frio_calor_stage': 'descarte'})
+            stage_name = dict(FRIO_CALOR_STAGES).get(prev, prev)
+            order.message_post(body=_("La orden fue enviada a Descarte desde la etapa '%s'.", stage_name))
+
+    def action_back_from_descarte(self):
+        for order in self:
+            if order.frio_calor_stage != 'descarte':
+                raise UserError(_("Esta acción solo aplica a órdenes en etapa Descarte."))
+            prev = order.prev_frio_calor_stage or 'prueba_inicial'
+            order.with_context(_frio_calor_stage_advance=True).write({'frio_calor_stage': prev})
+            order.message_post(body=_(
+                "La orden volvió de Descarte a la etapa '%s'.", dict(FRIO_CALOR_STAGES).get(prev, prev)
+            ))
+
+    def action_confirm_descarte(self):
+        for order in self:
+            if order.frio_calor_stage != 'descarte':
+                raise UserError(_("Esta acción solo aplica a órdenes en etapa Descarte."))
+
+            # Cerrar el log de etapa activo
+            now = fields.Datetime.now()
+            open_log = self.env['repair.order.stage.log'].search([
+                ('repair_id', '=', order.id),
+                ('date_end', '=', False),
+            ], limit=1)
+            if open_log and open_log.date_start:
+                open_log.write({'date_end': now})
+
+            # Guardar ubicación antes de cancelar (el compute sigue disponible post-cancel)
+            src_location = order.product_location_src_id
+
+            # Cancelar la orden (unreserva stock, cambia estado a 'cancel')
+            order.with_context(_descarte_action=True).action_repair_cancel()
+
+            # Scrap del producto principal (best-effort)
+            if (order.product_id and order.product_id.is_storable
+                    and order.lot_id and src_location):
+                try:
+                    with order.env.cr.savepoint():
+                        scrap = order.env['stock.scrap'].create({
+                            'product_id': order.product_id.id,
+                            'product_uom_id': order.product_id.uom_id.id,
+                            'lot_id': order.lot_id.id,
+                            'scrap_qty': order.product_qty or 1.0,
+                            'location_id': src_location.id,
+                            'company_id': order.company_id.id,
+                            'origin': order.name,
+                        })
+                        scrap.action_validate()
+                        order.message_post(body=_(
+                            "Equipo dado de baja del stock. Registro de descarte: %s.", scrap.name
+                        ))
+                except Exception as e:
+                    _logger.warning("Descarte scrap failed repair=%s: %s", order.name, e)
+                    order.message_post(body=_(
+                        "Advertencia: no se pudo dar de baja el equipo del stock automáticamente. "
+                        "Verifique el stock manualmente."
+                    ))
+
+            order.message_post(body=_("Orden descartada definitivamente."))
+
     def action_repair_end(self):
         for order in self:
+            if order.repair_equipment_type == 'frio_calor' and not order.stage_started:
+                raise UserError(_("Debe iniciar la etapa actual presionando 'Comenzar' antes de finalizar."))
             order.with_context(_frio_calor_stage_advance=True).write({'frio_calor_stage': 'finalizado'})
         return super().action_repair_end()
 
@@ -376,7 +461,9 @@ class RepairOrder(models.Model):
 
         for order in self:
             # Bloqueo por tercerización
-            if order.is_outsourced and not self.env.context.get('_outsource_action'):
+            if (order.is_outsourced
+                    and not self.env.context.get('_outsource_action')
+                    and not self.env.context.get('_descarte_action')):
                 allowed_fields = {'is_outsourced', 'message_ids', 'message_follower_ids'}
                 if not set(vals.keys()) <= allowed_fields:
                     raise UserError(_("No se puede modificar una orden tercerizada. Primero debe recibirse del tercero."))

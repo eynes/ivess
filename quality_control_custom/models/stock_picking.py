@@ -59,7 +59,26 @@ class StockMoveLine(models.Model):
 class StockMove(models.Model):
     _inherit = 'stock.move'
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            repair_id = vals.get('repair_id')
+            if repair_id:
+                repair = self.env['repair.order'].browse(repair_id)
+                if repair.frio_calor_stage == 'descarte':
+                    vals['repair_line_type'] = 'remove'
+        return super().create(vals_list)
+
     def write(self, vals):
+        if 'repair_line_type' in vals and vals['repair_line_type'] != 'remove':
+            descarte = self.filtered(
+                lambda m: m.repair_id and m.repair_id.frio_calor_stage == 'descarte'
+            )
+            if descarte:
+                others = self - descarte
+                if others:
+                    others.write(vals)
+                return descarte.write({**vals, 'repair_line_type': 'remove'})
         if 'product_uom_qty' in vals:
             frio = self.filtered(lambda m: m.picking_id.picking_type_id.is_frio_calor)
             others = self - frio
