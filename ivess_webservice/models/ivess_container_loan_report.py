@@ -31,6 +31,7 @@ class IvessContainerLoanReport(models.Model):
                 FROM water_container wc
                 JOIN res_partner      rp ON wc.partner_id = rp.id
                 JOIN product_template pt ON wc.product_id = pt.id
+                WHERE wc.state IN ('prestado', 'en_comodato')
             )
             """.format(table=self._table)
         )

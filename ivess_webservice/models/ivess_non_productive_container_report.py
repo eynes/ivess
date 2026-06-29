@@ -25,7 +25,7 @@ class IvessNonProductiveContainerReport(models.Model):
                 FROM water_container wc
                 JOIN res_partner      rp ON wc.partner_id = rp.id
                 JOIN product_template pt ON wc.product_id = pt.id
-                WHERE wc.is_nonproductive = true
+                WHERE wc.is_nonproductive = true AND wc.is_frio_calor IS NOT TRUE
             )
             """.format(table=self._table)
         )
