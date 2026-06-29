@@ -77,3 +77,25 @@ class StockPicking(models.Model):
                                 'state': 'asignado',
                                 'frio_calor_picking_id': picking.id,
                             })
+            elif picking.picking_type_code == 'incoming':
+                frio_calor_return_moves = picking.move_ids.filtered(
+                    lambda m: m.state == 'done'
+                    and m.product_id.product_tmpl_id.is_frio_calor
+                )
+                for move in frio_calor_return_moves:
+                    product_tmpl = move.product_id.product_tmpl_id
+                    lots = move.move_line_ids.mapped('lot_id')
+                    if lots:
+                        containers = WaterContainer.search([
+                            ('partner_id', '=', partner.id),
+                            ('product_id', '=', product_tmpl.id),
+                            ('is_frio_calor', '=', True),
+                            ('lot_id', 'in', lots.ids),
+                        ])
+                    else:
+                        containers = WaterContainer.search([
+                            ('partner_id', '=', partner.id),
+                            ('product_id', '=', product_tmpl.id),
+                            ('is_frio_calor', '=', True),
+                        ], order='id asc', limit=int(move.quantity))
+                    containers.unlink()
