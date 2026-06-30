@@ -62,12 +62,23 @@ class MaintenancePortalController(CustomerPortal):
 
     def _prepare_home_portal_values(self, counters):
         values = super()._prepare_home_portal_values(counters)
+        user = request.env.user
         MaintenanceRequest = request.env['maintenance.request'].sudo()
-        if 'maintenance_count' in counters:
+        if 'maintenance_count' in counters and user.has_group('maintenance_portal_ivess.group_portal_maintenance'):
             values['maintenance_count'] = MaintenanceRequest.search_count(_MAINTENANCE_DOMAIN)
-        if 'workshop_count' in counters:
+        if 'workshop_count' in counters and user.has_group('maintenance_portal_ivess.group_portal_workshop'):
             values['workshop_count'] = MaintenanceRequest.search_count(_WORKSHOP_DOMAIN)
         return values
+
+    def _check_group_maintenance(self):
+        if not request.env.user.has_group('maintenance_portal_ivess.group_portal_maintenance'):
+            return request.redirect('/my')
+        return None
+
+    def _check_group_workshop(self):
+        if not request.env.user.has_group('maintenance_portal_ivess.group_portal_workshop'):
+            return request.redirect('/my')
+        return None
 
     # ── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -386,6 +397,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True,
     )
     def portal_my_maintenance(self, page=1, **kw):
+        redir = self._check_group_maintenance()
+        if redir:
+            return redir
         MaintenanceRequest = request.env['maintenance.request'].sudo()
         total = MaintenanceRequest.search_count(_MAINTENANCE_DOMAIN)
         pager = portal_pager(
@@ -416,6 +430,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True,
     )
     def portal_maintenance_detail(self, request_id, **kw):
+        redir = self._check_group_maintenance()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
@@ -440,6 +457,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['GET', 'POST'],
     )
     def portal_maintenance_edit(self, request_id, **post):
+        redir = self._check_group_maintenance()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
@@ -463,6 +483,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_maintenance_add_material(self, request_id, **post):
+        redir = self._check_group_maintenance()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
@@ -474,6 +497,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_maintenance_delete_material(self, request_id, material_id, **kw):
+        redir = self._check_group_maintenance()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
@@ -485,6 +511,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_maintenance_update_material_qty(self, request_id, **post):
+        redir = self._check_group_maintenance()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
@@ -496,6 +525,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_maintenance_close(self, request_id, **post):
+        redir = self._check_group_maintenance()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/maintenance')
@@ -507,6 +539,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['GET', 'POST'],
     )
     def portal_maintenance_new(self, **post):
+        redir = self._check_group_maintenance()
+        if redir:
+            return redir
         if request.httprequest.method == 'POST':
             new_req = self._maint_create_from_post(post)
             if new_req:
@@ -538,6 +573,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True,
     )
     def portal_my_workshops(self, page=1, show_done=None, **kw):
+        redir = self._check_group_workshop()
+        if redir:
+            return redir
         MaintenanceRequest = request.env['maintenance.request'].sudo()
         is_showing_done = show_done == '1'
         domain = list(_WORKSHOP_DOMAIN)
@@ -574,6 +612,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True,
     )
     def portal_workshop_detail(self, request_id, **kw):
+        redir = self._check_group_workshop()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/workshop')
@@ -598,6 +639,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_workshop_close(self, request_id, **post):
+        redir = self._check_group_workshop()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/workshop')
@@ -609,6 +653,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['GET', 'POST'],
     )
     def portal_workshop_new(self, **post):
+        redir = self._check_group_workshop()
+        if redir:
+            return redir
         if request.httprequest.method == 'POST':
             new_req = self._maint_create_from_post(post)
             if new_req:
@@ -639,6 +686,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['GET', 'POST'],
     )
     def portal_workshop_edit(self, request_id, **post):
+        redir = self._check_group_workshop()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/workshop')
@@ -662,6 +712,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_workshop_add_material(self, request_id, **post):
+        redir = self._check_group_workshop()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/workshop')
@@ -673,6 +726,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_workshop_delete_material(self, request_id, material_id, **kw):
+        redir = self._check_group_workshop()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/workshop')
@@ -684,6 +740,9 @@ class MaintenancePortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_workshop_update_material_qty(self, request_id, **post):
+        redir = self._check_group_workshop()
+        if redir:
+            return redir
         maint_request = request.env['maintenance.request'].sudo().browse(request_id)
         if not maint_request.exists():
             return request.redirect('/my/workshop')
@@ -697,6 +756,10 @@ class MaintenancePortalController(CustomerPortal):
         type='json', auth='user', website=True,
     )
     def portal_maintenance_products_search(self, query=''):
+        user = request.env.user
+        if not (user.has_group('maintenance_portal_ivess.group_portal_maintenance') or
+                user.has_group('maintenance_portal_ivess.group_portal_workshop')):
+            return []
         if len((query or '').strip()) < 2:
             return []
         products = request.env['product.product'].sudo().search(
@@ -710,6 +773,8 @@ class MaintenancePortalController(CustomerPortal):
         type='json', auth='user', website=True,
     )
     def portal_maintenance_productions_search(self, query=''):
+        if not request.env.user.has_group('maintenance_portal_ivess.group_portal_maintenance'):
+            return []
         if len((query or '').strip()) < 2:
             return []
         productions = request.env['mrp.production'].sudo().search(

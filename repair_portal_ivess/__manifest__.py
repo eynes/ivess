@@ -16,6 +16,7 @@
         'quality_control_custom',
     ],
     'data': [
+        'security/security.xml',
         'views/repair_portal_templates.xml',
     ],
     'assets': {

@@ -9,12 +9,14 @@
               inherit_id="portal.portal_my_home"
               customize_show="True">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="icon" t-value="'/repair_portal_ivess/static/src/img/water-dispenser.svg'"/>
-                <t t-set="title">Reparación Frio Calor</t>
-                <t t-set="text">Ver órdenes de reparación de Frio Calor</t>
-                <t t-set="url">/my/repairs</t>
-                <t t-set="placeholder_count">repair_count</t>
+            <t t-if="request.env.user.has_group('repair_portal_ivess.group_portal_repair')">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/repair_portal_ivess/static/src/img/water-dispenser.svg'"/>
+                    <t t-set="title">Reparación Frio Calor</t>
+                    <t t-set="text">Ver órdenes de reparación de Frio Calor</t>
+                    <t t-set="url">/my/repairs</t>
+                    <t t-set="placeholder_count">repair_count</t>
+                </t>
             </t>
         </xpath>
     </template>

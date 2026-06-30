@@ -88,17 +88,25 @@ class RepairPortalController(CustomerPortal):
 
     def _prepare_home_portal_values(self, counters):
         values = super()._prepare_home_portal_values(counters)
-        if 'repair_count' in counters:
+        if 'repair_count' in counters and request.env.user.has_group('repair_portal_ivess.group_portal_repair'):
             values['repair_count'] = request.env['repair.order'].sudo().search_count(
                 [('repair_equipment_type', '=', 'frio_calor')]
             )
         return values
+
+    def _check_group_repair(self):
+        if not request.env.user.has_group('repair_portal_ivess.group_portal_repair'):
+            return request.redirect('/my')
+        return None
 
     @http.route(
         ['/my/repairs/scan'],
         type='http', auth='user', website=True,
     )
     def portal_repair_scan(self, barcode=None, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         values = self._prepare_portal_layout_values()
         values['page_name'] = 'repair_scan'
 
@@ -145,6 +153,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True,
     )
     def portal_my_repairs(self, page=1, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         domain = [('repair_equipment_type', '=', 'frio_calor')]
         RepairOrder = request.env['repair.order'].sudo()
 
@@ -177,6 +188,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True,
     )
     def portal_repair_detail(self, repair_id, add_error=None, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.repair_equipment_type != 'frio_calor':
             return request.redirect('/my/repairs')
@@ -213,6 +227,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_set_initial_test_result(self, repair_id, **post):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.repair_equipment_type != 'frio_calor':
             return request.redirect('/my/repairs')
@@ -233,6 +250,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_init_repair(self, repair_id):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.frio_calor_stage == 'repair' or repair.is_outsourced:
             return request.redirect(f'/my/repairs/{repair_id}')
@@ -247,6 +267,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_back_from_repair(self, repair_id):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.frio_calor_stage != 'repair':
             return request.redirect(f'/my/repairs/{repair_id}')
@@ -261,6 +284,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_outsource(self, repair_id, **post):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if (not repair.exists()
                 or repair.is_outsourced
@@ -291,6 +317,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_receive_from_third_party(self, repair_id, **post):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or not repair.is_outsourced:
             return request.redirect(f'/my/repairs/{repair_id}')
@@ -311,6 +340,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_send_to_pintura(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.frio_calor_stage != 'armado' or repair.is_outsourced:
             return request.redirect(f'/my/repairs/{repair_id}')
@@ -325,6 +357,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_back_from_pintura(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.frio_calor_stage != 'pintura':
             return request.redirect(f'/my/repairs/{repair_id}')
@@ -339,6 +374,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_end(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.frio_calor_stage != 'armado' or repair.is_outsourced:
             return request.redirect(f'/my/repairs/{repair_id}')
@@ -353,6 +391,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_send_to_descarte(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if (not repair.exists()
                 or repair.frio_calor_stage in ('descarte', 'finalizado')
@@ -369,6 +410,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_back_from_descarte(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.frio_calor_stage != 'descarte':
             return request.redirect(f'/my/repairs/{repair_id}')
@@ -383,6 +427,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_confirm_descarte(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.frio_calor_stage != 'descarte':
             return request.redirect(f'/my/repairs/{repair_id}')
@@ -397,6 +444,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_start_stage(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if (not repair.exists()
                 or repair.stage_started
@@ -414,6 +464,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_next_stage(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists():
             return request.redirect('/my/repairs')
@@ -431,6 +484,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_prev_stage(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists():
             return request.redirect('/my/repairs')
@@ -445,6 +501,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_revert_to_stage(self, repair_id, **post):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.is_outsourced:
             return request.redirect(f'/my/repairs/{repair_id}')
@@ -487,6 +546,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_update_part_qty(self, repair_id, **post):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.repair_equipment_type != 'frio_calor':
             return request.redirect('/my/repairs')
@@ -524,6 +586,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_delete_part(self, repair_id, **post):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.repair_equipment_type != 'frio_calor':
             return request.redirect('/my/repairs')
@@ -558,6 +623,8 @@ class RepairPortalController(CustomerPortal):
         type='json', auth='user', website=True,
     )
     def portal_products_search(self, query=''):
+        if not request.env.user.has_group('repair_portal_ivess.group_portal_repair'):
+            return []
         if len((query or '').strip()) < 2:
             return []
         products = request.env['product.product'].sudo().search(
@@ -572,6 +639,9 @@ class RepairPortalController(CustomerPortal):
         type='http', auth='user', website=True, methods=['POST'],
     )
     def portal_repair_add_part(self, repair_id, **post):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
         repair = request.env['repair.order'].sudo().browse(repair_id)
         if not repair.exists() or repair.repair_equipment_type != 'frio_calor':
             return request.redirect('/my/repairs')
