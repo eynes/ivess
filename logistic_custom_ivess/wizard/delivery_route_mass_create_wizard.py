@@ -172,13 +172,19 @@ class DeliveryRouteMassCreateWizard(models.TransientModel):
 
             selected_routes = created_routes.filtered(lambda r: r.delivery_date in selected_dates)
 
-            self.env['delivery.route.line'].create([
-                {
-                    'route_id': route.id,
-                    'client_id': client.id,
-                    'origin': 'plantilla',
-                    'visit_status_id': False,
-                    'no_purchase_reason_id': False,
-                }
-                for route in selected_routes
-            ])
+            lines_to_create = []
+            for route in selected_routes:
+                rastrillo_exists = any(
+                    l.client_id.id == client.id and l.origin == 'rastrillo'
+                    for l in route.delivery_route_line_ids
+                )
+                if not rastrillo_exists:
+                    lines_to_create.append({
+                        'route_id': route.id,
+                        'client_id': client.id,
+                        'origin': 'plantilla',
+                        'visit_status_id': False,
+                        'no_purchase_reason_id': False,
+                    })
+            if lines_to_create:
+                self.env['delivery.route.line'].create(lines_to_create)

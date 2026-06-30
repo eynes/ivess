@@ -47,12 +47,12 @@
                 <group invisible="not id">
                     <group name="group_route" string="Recorrido">
                         <field name="partner_type_id"/>
-                        <field name="distribution"/>
+                        <field name="distribution" invisible="1"/>
                         <field name="distributions_ids">
                             <list>
                                 <field name="distribution"/>
                                 <field name="visit_day"/>
-                                <field name="frequency"/>
+                                <field name="frequency" required="1"/>
                             </list>
                         </field>
                         <field name="average_hour" widget="float_time"/>
@@ -73,7 +73,7 @@
                     <group>
                         <field name="distribution"/>
                         <field name="visit_day"/>
-                        <field name="frequency"/>
+                        <field name="frequency" required="1"/>
                     </group>
                 </sheet>
             </form>

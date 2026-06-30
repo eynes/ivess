@@ -55,6 +55,7 @@
                                     <field name="effective_visit_hour" widget="float_time" optional="show"/>
                                     <field name="sale_order_id" optional="show"/>
                                     <field name="stock_picking_id" optional="show"/>
+                                    <field name="frequency" optional="show"/>
                                     <field name="origin" optional="show"/>
                                     <field name="parent_delivery_type" force_save="1" column_invisible="1"/>
                                     <field name="allowed_client" column_invisible="1" force_save="1"/>
