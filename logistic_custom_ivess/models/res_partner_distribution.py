@@ -125,7 +125,16 @@ class PartnerDistributions(models.Model):
             selected_dates = route_dates[::interval]
 
         for route in filtered_routes.filtered(lambda r: r.delivery_date in selected_dates):
-            new_line = self.env['delivery.route.line'].create({'client_id': self.partner_id.id})
+            rastrillo_exists = any(
+                l.client_id.id == self.partner_id.id and l.origin == 'rastrillo'
+                for l in route.delivery_route_line_ids
+            )
+            if rastrillo_exists:
+                continue
+            new_line = self.env['delivery.route.line'].create({
+                'client_id': self.partner_id.id,
+                'origin': 'plantilla',
+            })
             route.delivery_route_line_ids = [(4, new_line.id)]
 
     def _unlink_future_route_lines(self, distribution_id):

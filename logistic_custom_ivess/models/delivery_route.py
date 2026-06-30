@@ -503,6 +503,29 @@ class DeliveryRouteLine(models.Model):
     origin = fields.Char(
         string='Origen',
     )
+    frequency = fields.Selection(
+        selection=[
+            ('weekly', 'Weekly'),
+            ('biweekly', 'Biweekly'),
+            ('monthly', 'Monthly'),
+        ],
+        string='Frecuencia',
+        compute='_compute_frequency',
+        store=True,
+        readonly=True,
+    )
+
+    @api.depends('client_id', 'route_id.template_delivery_route_id')
+    def _compute_frequency(self):
+        for rec in self:
+            template = rec.route_id.template_delivery_route_id
+            if not rec.client_id or not template:
+                rec.frequency = False
+                continue
+            dist = rec.client_id.distributions_ids.filtered(
+                lambda d: d.distribution.id == template.id
+            )
+            rec.frequency = dist[:1].frequency if dist else False
 
     @api.model_create_multi
     def create(self, vals_list):
