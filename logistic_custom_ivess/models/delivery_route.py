@@ -507,6 +507,7 @@ class DeliveryRouteLine(models.Model):
                     rec.client_id.write({
                         'category_id': [(4, category.id)]
                     })
+        recs._handle_rake_line_creation()
         return recs
 
     def write(self, vals):
@@ -539,7 +540,41 @@ class DeliveryRouteLine(models.Model):
                 if new_reason and new_reason.id not in partner.category_id.ids:
                     partner.category_id = [(4, new_reason.id)]
 
+        if 'no_purchase_reason_id' in vals:
+            self._handle_rake_line_creation()
+
         return res
+
+    def _handle_rake_line_creation(self):
+        if self.env.context.get('_creating_rake_line'):
+            return
+        for rec in self:
+            if (
+                not rec.no_purchase_reason_id
+                or not rec.no_purchase_reason_id.is_rake
+                or not rec.client_id.is_important_client
+                or rec.origin == 'rastrillo'
+            ):
+                continue
+            existing = self.search([
+                ('route_id', '=', rec.route_id.id),
+                ('client_id', '=', rec.client_id.id),
+                ('origin', '=', 'rastrillo'),
+            ], limit=1)
+            if existing:
+                continue
+            self.with_context(_creating_rake_line=True).create([{
+                'route_id': rec.route_id.id,
+                'template_route_id': rec.template_route_id.id,
+                'client_id': rec.client_id.id,
+                'sequence': rec.sequence,
+                'possible_customer_withdrawal': rec.possible_customer_withdrawal,
+                'reason_customer_withdrawal': rec.reason_customer_withdrawal.id,
+                'effective_visit_hour': rec.effective_visit_hour,
+                'sale_order_id': rec.sale_order_id.id,
+                'stock_picking_id': rec.stock_picking_id.id,
+                'origin': 'rastrillo',
+            }])
 
     def unlink(self):
         for rec in self:
