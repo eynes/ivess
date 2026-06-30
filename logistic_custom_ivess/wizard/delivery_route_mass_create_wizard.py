@@ -173,6 +173,12 @@ class DeliveryRouteMassCreateWizard(models.TransientModel):
             selected_routes = created_routes.filtered(lambda r: r.delivery_date in selected_dates)
 
             self.env['delivery.route.line'].create([
-                {'route_id': route.id, 'client_id': client.id}
+                {
+                    'route_id': route.id,
+                    'client_id': client.id,
+                    'origin': 'plantilla',
+                    'visit_status_id': False,
+                    'no_purchase_reason_id': False,
+                }
                 for route in selected_routes
             ])

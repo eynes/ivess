@@ -205,6 +205,7 @@ class DeliveryRoute(models.Model):
         return [(0, 0, {
             'route_id': self.id,
             'client_id': line.client_id.id,
+            'origin': 'plantilla',
         }) for line in template.delivery_route_line_ids]
 
     @api.model_create_multi
@@ -250,7 +251,7 @@ class DeliveryRoute(models.Model):
     def action_set_closed(self):
         for record in self:
             record._validate_state()
-            record._validate_rake_restriction()
+            # record._validate_rake_restriction()
             record.write({'state': 'closed'})
             created, updated = record._generate_next_week_route()
             record._post_next_routes_chatter(created, updated)
@@ -279,6 +280,8 @@ class DeliveryRoute(models.Model):
 
         client_ids = []
         for line in self.delivery_route_line_ids:
+            if line.origin == 'rastrillo':
+                continue
             client = line.client_id
             dist = client.distributions_ids.filtered(lambda d: d.distribution.id == template.id)
             if not dist:
@@ -311,7 +314,13 @@ class DeliveryRoute(models.Model):
 
         existing_client_ids = route.delivery_route_line_ids.mapped('client_id').ids
         new_lines = [
-            {'route_id': route.id, 'client_id': cid}
+            {
+                'route_id': route.id,
+                'client_id': cid,
+                'origin': 'plantilla',
+                'visit_status_id': False,
+                'no_purchase_reason_id': False,
+            }
             for cid in client_ids
             if cid not in existing_client_ids
         ]
