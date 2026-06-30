@@ -394,7 +394,7 @@ class DeliveryRoute(models.Model):
         for template in templates:
             if not template.delivery_route_line_ids:
                 continue
-            wizard = self.env['delivery.route.mass.create.wizard'].create({
+            wizard = self.env['delivery.route.mass.create.wizard'].sudo().create({
                 'date_from': month_start,
                 'date_to': month_end,
                 'template_delivery_route_id': template.id,

@@ -27,9 +27,9 @@ class DeliveryRouteMassCreateWizard(models.TransientModel):
     _name = 'delivery.route.mass.create.wizard'
     _description = 'Wizard to mass create delivery routes'
 
-    date_from = fields.Date(string="Date from", required=True)
-    date_to = fields.Date(string="Date to", required=True)
-    template_delivery_route_id = fields.Many2one('template.delivery.route', string="Recorrido", required=True)
+    date_from = fields.Date(string="Fecha Desde", required=True)
+    date_to = fields.Date(string="Fecha Hasta", required=True)
+    template_delivery_route_id = fields.Many2one('template.delivery.route', string="Plantilla", required=True)
 
     def _validate_dates(self):
         """Valida que la fecha de inicio (date_from) no sea mayor que la fecha de fin (date_to).
@@ -49,8 +49,11 @@ class DeliveryRouteMassCreateWizard(models.TransientModel):
         self._validate_dates()
 
     def route_exists(self, date, template_delivery_route_id):
+        from datetime import date as date_type
+        if not isinstance(date, date_type):
+            date = date.date()
         return self.env['delivery.route'].search_count([
-            ('delivery_date', '=', date), 
+            ('delivery_date', '=', date),
             ('template_delivery_route_id', '=', template_delivery_route_id)
         ])
 
@@ -111,23 +114,33 @@ class DeliveryRouteMassCreateWizard(models.TransientModel):
 
         # Genera todas las fechas en el rango que coincidan con el día de la semana
         dates = self.get_dates(assigned_weekday_index)
+        if not dates:
+            raise ValidationError(_("The selected date range does not contain any occurrence of the template's weekday."))
+
         created_routes = self.env['delivery.route']
         for current_date in dates:
-            data = self.prepare_vals_delivery_route(date=current_date.date())  # Convertimos a `date`
-            route_exists = self.route_exists(current_date, data.get('template_delivery_route_id'))
-            if route_exists > 0:
+            date = current_date.date()
+            data = self.prepare_vals_delivery_route(date=date)
+            if self.route_exists(date, data.get('template_delivery_route_id')):
                 continue
             delivery_route = self.env['delivery.route'].with_context({'create_from_wizard': True}).create(data)
             created_routes |= delivery_route
-        
+
         self.set_client_to_visit(created_routes)
+
+        # Mostrar todas las rutas del template en el rango, no solo las nuevas
+        all_routes = self.env['delivery.route'].search([
+            ('template_delivery_route_id', '=', template_route.id),
+            ('delivery_date', '>=', self.date_from),
+            ('delivery_date', '<=', self.date_to),
+        ])
 
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Generated Delivery Routes'),
+            'name': _('Recorridos Generados'),
             'res_model': 'delivery.route',
-            'view_mode': 'tree,form',
-            'domain': [('id', 'in', created_routes.ids)],
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', all_routes.ids)],
             'target': 'current',
         }
 

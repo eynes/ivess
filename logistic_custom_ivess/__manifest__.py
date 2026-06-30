@@ -46,6 +46,7 @@
         'views/sale_report.xml',
         'views/menuitems.xml',
         'wizard/delivery_route_bis_wizard.xml',
+        'wizard/delivery_route_mass_create_wizard.xml',
     ],
     'demo': [],
     'test': [],
