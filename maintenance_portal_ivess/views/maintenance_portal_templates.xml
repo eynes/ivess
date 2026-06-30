@@ -9,12 +9,14 @@
               inherit_id="portal.portal_my_home"
               customize_show="True">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="icon" t-value="'/maintenance_portal_ivess/static/src/img/maintenance.svg'"/>
-                <t t-set="title">Órdenes de Mantenimiento</t>
-                <t t-set="text">Ver solicitudes de mantenimiento</t>
-                <t t-set="url">/my/maintenance</t>
-                <t t-set="placeholder_count">maintenance_count</t>
+            <t t-if="request.env.user.has_group('maintenance_portal_ivess.group_portal_maintenance')">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/maintenance_portal_ivess/static/src/img/maintenance.svg'"/>
+                    <t t-set="title">Órdenes de Mantenimiento</t>
+                    <t t-set="text">Ver solicitudes de mantenimiento</t>
+                    <t t-set="url">/my/maintenance</t>
+                    <t t-set="placeholder_count">maintenance_count</t>
+                </t>
             </t>
         </xpath>
     </template>
@@ -857,12 +859,14 @@
               inherit_id="portal.portal_my_home"
               customize_show="True">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="icon" t-value="'/maintenance_portal_ivess/static/src/img/maintenance.svg'"/>
-                <t t-set="title">Servicios de Taller</t>
-                <t t-set="text">Ver servicios de taller</t>
-                <t t-set="url">/my/workshop</t>
-                <t t-set="placeholder_count">workshop_count</t>
+            <t t-if="request.env.user.has_group('maintenance_portal_ivess.group_portal_workshop')">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/maintenance_portal_ivess/static/src/img/maintenance.svg'"/>
+                    <t t-set="title">Servicios de Taller</t>
+                    <t t-set="text">Ver servicios de taller</t>
+                    <t t-set="url">/my/workshop</t>
+                    <t t-set="placeholder_count">workshop_count</t>
+                </t>
             </t>
         </xpath>
     </template>
