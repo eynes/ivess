@@ -27,6 +27,11 @@ class MaintenanceRequest(models.Model):
         ondelete='restrict',
     )
 
+    department_id = fields.Many2one(
+        'hr.department',
+        string='Departamento'
+    )
+
     def action_mark_as_repaired(self):
         repaired_stage = self.env['maintenance.stage'].search(
             [('done', '=', True)], order='sequence asc', limit=1

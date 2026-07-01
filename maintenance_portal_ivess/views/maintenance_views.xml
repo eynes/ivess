@@ -126,6 +126,10 @@
                 <field name="closure_reason_id" options="{'no_create': True}"/>
             </xpath>
 
+            <xpath expr="//field[@name='equipment_id']" position="after">
+                <field name="department_id" options="{'no_create': True}"/>
+            </xpath>
+
         </field>
     </record>
 
