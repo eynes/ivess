@@ -1,12 +1,23 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 
-from odoo import models, fields, api
+from odoo import models, fields, api, _
+from odoo.exceptions import ValidationError
 
 FREQUENCY_MAPPING = {
     'weekly': 1,
     'biweekly': 2,
     'monthly': 4,
+}
+
+DAY_LABELS_ES = {
+    'monday': 'Lunes',
+    'tuesday': 'Martes',
+    'wednesday': 'Miércoles',
+    'thursday': 'Jueves',
+    'friday': 'Viernes',
+    'saturday': 'Sábado',
+    'sunday': 'Domingo',
 }
 
 
@@ -37,6 +48,27 @@ class PartnerDistributions(models.Model):
         ondelete='set null',
         copy=False,
     )
+
+    @api.constrains('partner_id', 'distribution')
+    def _check_unique_visit_day(self):
+        for record in self:
+            if not record.partner_id or not record.distribution or not record.distribution.day:
+                continue
+            duplicate = self.search([
+                ('id', '!=', record.id),
+                ('partner_id', '=', record.partner_id.id),
+                ('distribution.day', '=', record.distribution.day),
+            ], limit=1)
+            if duplicate:
+                day_label = DAY_LABELS_ES.get(record.distribution.day, record.distribution.day)
+                raise ValidationError(_(
+                    "El cliente %(partner)s ya tiene asignada una distribución los días %(day)s "
+                    "(plantilla %(template)s). No puede tener dos líneas con el mismo día de visita."
+                ) % {
+                    'partner': record.partner_id.name,
+                    'day': day_label,
+                    'template': duplicate.distribution.name,
+                })
 
     @api.model_create_multi
     def create(self, vals_list):
