@@ -503,6 +503,24 @@ class DeliveryRouteLine(models.Model):
     origin = fields.Char(
         string='Origen',
     )
+    is_vacation = fields.Boolean(
+        string='Vacaciones',
+        compute='_compute_is_vacation',
+        store=True,
+        copy=False,
+    )
+    vacation_date_from = fields.Date(
+        string='Vacaciones Desde',
+        related='client_id.date_from',
+        store=True,
+        readonly=False,
+    )
+    vacation_date_to = fields.Date(
+        string='Vacaciones Hasta',
+        related='client_id.date_to',
+        store=True,
+        readonly=False,
+    )
     frequency = fields.Selection(
         selection=[
             ('weekly', 'Weekly'),
@@ -515,10 +533,48 @@ class DeliveryRouteLine(models.Model):
         readonly=True,
     )
 
-    @api.depends('client_id', 'route_id.template_delivery_route_id')
+    def _is_client_on_vacation(self, delivery_date):
+        """El cliente está de vacaciones para esa fecha si su estado es
+        'holidays' y la fecha cae dentro de su rango date_from/date_to
+        (los límites no definidos se consideran abiertos)."""
+        self.ensure_one()
+        partner = self.client_id
+        if not delivery_date or partner.state != 'holidays':
+            return False
+        if partner.date_from and delivery_date < partner.date_from:
+            return False
+        if partner.date_to and delivery_date > partner.date_to:
+            return False
+        return True
+
+    @api.depends(
+        'client_id.state',
+        'client_id.date_from',
+        'client_id.date_to',
+        'route_id.delivery_date',
+        'route_id.state',
+    )
+    def _compute_is_vacation(self):
+        """Se calcula en vivo (visible en cualquier estado del recorrido) para
+        que se vea antes de cerrar. Una vez que el recorrido se cierra, queda
+        congelado con el valor que tenía en ese momento, para trazabilidad y
+        para el cálculo de frecuencia (RF-6)."""
+        for rec in self:
+            if rec.route_id and rec.route_id.state == 'closed':
+                rec.is_vacation = rec.is_vacation
+                continue
+            rec.is_vacation = rec._is_client_on_vacation(rec.route_id.delivery_date)
+
+    @api.depends(
+        'client_id',
+        'route_id.template_delivery_route_id',
+        'template_route_id',
+        'client_id.distributions_ids.distribution',
+        'client_id.distributions_ids.frequency',
+    )
     def _compute_frequency(self):
         for rec in self:
-            template = rec.route_id.template_delivery_route_id
+            template = rec.template_route_id or rec.route_id.template_delivery_route_id
             if not rec.client_id or not template:
                 rec.frequency = False
                 continue
@@ -540,6 +596,7 @@ class DeliveryRouteLine(models.Model):
                         'category_id': [(4, category.id)]
                     })
         recs._handle_rake_line_creation()
+        recs._sync_partner_distribution()
         return recs
 
     def write(self, vals):
@@ -575,7 +632,29 @@ class DeliveryRouteLine(models.Model):
         if 'no_purchase_reason_id' in vals:
             self._handle_rake_line_creation()
 
+        if 'client_id' in vals or 'template_route_id' in vals:
+            self._sync_partner_distribution()
+
         return res
+
+    def _sync_partner_distribution(self):
+        """Crea el partner.distribution correspondiente cuando una línea de
+        plantilla (template_route_id, sin route_id) queda con un cliente
+        asignado, para que quede reflejado en distributions_ids del partner."""
+        if self.env.context.get('no_sync_distribution'):
+            return
+        for rec in self:
+            if not rec.template_route_id or rec.route_id or not rec.client_id:
+                continue
+            existing = self.env['partner.distribution'].search([
+                ('distribution', '=', rec.template_route_id.id),
+                ('partner_id', '=', rec.client_id.id),
+            ], limit=1)
+            if not existing:
+                self.env['partner.distribution'].create({
+                    'distribution': rec.template_route_id.id,
+                    'partner_id': rec.client_id.id,
+                })
 
     def _handle_rake_line_creation(self):
         if self.env.context.get('_creating_rake_line'):
