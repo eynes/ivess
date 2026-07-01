@@ -39,7 +39,7 @@
                     <notebook>
                         <page string="Clients to Visit">
                             <field name="delivery_route_line_ids" readonly="state in ('closed')">
-                                <list editable="bottom" delete="false" class="tree-view-auto-columns">
+                                <list editable="bottom" delete="false" class="tree-view-auto-columns" decoration-warning="is_vacation">
                                     <field name="sequence" widget="handle" column_invisible="parent.allow_reordering == False"/>
                                     <field name="client_id" widget="many2one_link" optional="show" domain="[('id', 'in', allowed_client)]"/>
                                     <field name="customer_code" style="width:5% !important;" optional="show" force_save="1"/>
@@ -57,6 +57,8 @@
                                     <field name="stock_picking_id" optional="show"/>
                                     <field name="frequency" optional="show"/>
                                     <field name="origin" optional="show"/>
+                                    <field name="is_vacation" optional="show" readonly="1"/>
+                                    <field name="vacation_date_to" optional="show"/>
                                     <field name="parent_delivery_type" force_save="1" column_invisible="1"/>
                                     <field name="allowed_client" column_invisible="1" force_save="1"/>
                                     <field name="route_id" column_invisible="1"/>
