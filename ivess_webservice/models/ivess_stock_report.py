@@ -19,12 +19,11 @@ class IvessStockReport(models.Model):
                 SELECT
                     sq.id           AS id,
                     sq.product_id   AS product_id,
-                    pt.default_code AS default_code,
+                    pp.default_code AS default_code,
                     sq.location_id  AS location_id,
                     sq.quantity     AS inventory_quantity
                 FROM stock_quant sq
-                JOIN product_product  pp ON pp.id = sq.product_id
-                JOIN product_template pt ON pt.id = pp.product_tmpl_id
+                JOIN product_product pp ON pp.id = sq.product_id
             )
             """.format(table=self._table)
         )
