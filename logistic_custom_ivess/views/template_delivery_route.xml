@@ -11,7 +11,6 @@
                             <field name="delivery_number_id"
                                 options="{'no_create': True, 'no_create_edit':True, 'no_open':True}"/>
                             <field name="name"/>
-                            <field name="truck_id"/>
                             <field name="allow_price_editing" invisible="1"/>
                             <field name="allow_reordering" invisible="1"/>
                             <field name="allow_closing_with_rake" invisible="1"/>
