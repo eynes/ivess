@@ -509,11 +509,17 @@ class DeliveryRouteLine(models.Model):
         store=True,
         copy=False,
     )
+    vacation_date_from = fields.Date(
+        string='Vacaciones Desde',
+        related='client_id.date_from',
+        store=True,
+        readonly=False,
+    )
     vacation_date_to = fields.Date(
         string='Vacaciones Hasta',
         related='client_id.date_to',
         store=True,
-        readonly=True,
+        readonly=False,
     )
     frequency = fields.Selection(
         selection=[

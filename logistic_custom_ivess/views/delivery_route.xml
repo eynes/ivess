@@ -58,6 +58,7 @@
                                     <field name="frequency" optional="show"/>
                                     <field name="origin" optional="show"/>
                                     <field name="is_vacation" optional="show" readonly="1"/>
+                                    <field name="vacation_date_from" optional="show"/>
                                     <field name="vacation_date_to" optional="show"/>
                                     <field name="parent_delivery_type" force_save="1" column_invisible="1"/>
                                     <field name="allowed_client" column_invisible="1" force_save="1"/>
