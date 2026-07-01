@@ -84,6 +84,13 @@ class TemplateDeliveryRoute(models.Model):
         tracking=True,
         # help="Reflects the cash‑sale setting of the associated delivery number."
     )
+    location_ids = fields.Many2many(
+        'stock.location',
+        'template_delivery_route_stock_location_rel',
+        'route_id',
+        'location_id',
+        string='Ubicaciones',
+    )
 
     @api.depends(
         'day',
