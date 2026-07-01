@@ -28,6 +28,7 @@
                                     <field name="client_address"/>
                                     <field name="visit_hour_from"/>
                                     <field name="visit_hour_to"/>
+                                    <field name="frequency"/>
                                 </list>
                             </field>
                         </page>

@@ -515,10 +515,16 @@ class DeliveryRouteLine(models.Model):
         readonly=True,
     )
 
-    @api.depends('client_id', 'route_id.template_delivery_route_id')
+    @api.depends(
+        'client_id',
+        'route_id.template_delivery_route_id',
+        'template_route_id',
+        'client_id.distributions_ids.distribution',
+        'client_id.distributions_ids.frequency',
+    )
     def _compute_frequency(self):
         for rec in self:
-            template = rec.route_id.template_delivery_route_id
+            template = rec.template_route_id or rec.route_id.template_delivery_route_id
             if not rec.client_id or not template:
                 rec.frequency = False
                 continue
