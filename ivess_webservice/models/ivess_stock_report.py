@@ -63,6 +63,10 @@ class IvessStockReport(models.Model):
         for rec in records:
             product_id = rec["product_id"][0] if rec["product_id"] else False
             if product_id not in grouped:
-                grouped[product_id] = {"default_code": rec["default_code"], "quantity": 0.0}
+                grouped[product_id] = {
+                    "product_id": product_id,
+                    "default_code": rec["default_code"],
+                    "quantity": 0.0,
+                }
             grouped[product_id]["quantity"] += rec["inventory_quantity"]
         return list(grouped.values())
