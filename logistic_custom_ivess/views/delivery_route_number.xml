@@ -49,6 +49,10 @@
                     <group string="Configuración" name="conf_group">
                         <group>
                             <field name="allow_price_editing"/>
+                            <field name="date_from" invisible="not allow_price_editing" required="allow_price_editing"/>
+                            <field name="date_to" invisible="not allow_price_editing" required="allow_price_editing"/>
+                        </group>
+                        <group>
                             <field name="allow_free_of_charge"/>
                             <field name="allow_reordering"/>
                         </group>

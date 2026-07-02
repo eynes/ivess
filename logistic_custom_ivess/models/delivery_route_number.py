@@ -1,4 +1,5 @@
-from odoo import models, fields
+from odoo import api, models, fields
+from odoo.exceptions import ValidationError
 
 
 class DeliveryRouteNumberCategory(models.Model):
@@ -102,5 +103,20 @@ class DeliveryRouteNumber(models.Model):
         'stock.location',
         string='Ubicación',
     )
+
+    date_from = fields.Date(
+        string='Fecha Desde',
+    )
+    date_to = fields.Date(
+        string='Fecha Hasta',
+    )
+
+    @api.constrains('allow_price_editing', 'date_from', 'date_to')
+    def _check_date_from_to_required(self):
+        for record in self:
+            if record.allow_price_editing and not (record.date_from and record.date_to):
+                raise ValidationError(
+                    "Debe completar 'Fecha Desde' y 'Fecha Hasta' cuando 'Permitir editar precio' está habilitado."
+                )
 
 
