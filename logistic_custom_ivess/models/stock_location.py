@@ -1,13 +1,18 @@
-from odoo import models, fields
+from odoo import models, fields, api
 
 
 class StockLocation(models.Model):
     _inherit = 'stock.location'
 
-    template_delivery_route_ids = fields.Many2many(
-        'template.delivery.route',
-        'template_delivery_route_stock_location_rel',
-        'location_id',
-        'route_id',
-        string='Distribuciones',
+    delivery_route_number_id = fields.Many2one(
+        'delivery.route.number',
+        string='Reparto',
+        compute='_compute_delivery_route_number_id',
     )
+
+    @api.depends()
+    def _compute_delivery_route_number_id(self):
+        for rec in self:
+            rec.delivery_route_number_id = self.env['delivery.route.number'].search(
+                [('location_id', '=', rec.id)], limit=1
+            )

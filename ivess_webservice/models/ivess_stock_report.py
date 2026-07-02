@@ -55,7 +55,7 @@ class IvessStockReport(models.Model):
         if not template_routes:
             return {"error": "No existe ninguna distribución con el código '%s'." % distribution}
 
-        location_ids = template_routes.location_ids.ids
+        location_ids = template_routes.mapped("delivery_number_id.location_id").ids
         domain = [("location_id", "in", location_ids)] if location_ids else [("id", "=", False)]
 
         records = self.search(domain).read(["product_id", "default_code", "inventory_quantity"])
