@@ -31,14 +31,6 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Ubicaciones">
-                            <field name="location_ids">
-                                <list editable="bottom">
-                                    <field name="complete_name"/>
-                                    <field name="usage"/>
-                                </list>
-                            </field>
-                        </page>
                     </notebook>
                 </sheet>
             </form>
