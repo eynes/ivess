@@ -111,12 +111,12 @@ class DeliveryRouteNumber(models.Model):
         string='Fecha Hasta',
     )
 
-    @api.constrains('allow_price_editing', 'date_from', 'date_to')
+    @api.constrains('allow_previous_price', 'date_from', 'date_to')
     def _check_date_from_to_required(self):
         for record in self:
-            if record.allow_price_editing and not (record.date_from and record.date_to):
+            if record.allow_previous_price and not (record.date_from and record.date_to):
                 raise ValidationError(
-                    "Debe completar 'Fecha Desde' y 'Fecha Hasta' cuando 'Permitir editar precio' está habilitado."
+                    "Debe completar 'Fecha Desde' y 'Fecha Hasta' cuando 'Permitir precio anterior' está habilitado."
                 )
 
 
