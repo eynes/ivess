@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 
-from odoo import models, fields, api
+from odoo import models, fields, api, _
+from odoo.exceptions import ValidationError
 
 FREQUENCY_MAPPING = {
     'weekly': 1,
@@ -9,9 +10,20 @@ FREQUENCY_MAPPING = {
     'monthly': 4,
 }
 
+DAY_LABELS_ES = {
+    'monday': 'Lunes',
+    'tuesday': 'Martes',
+    'wednesday': 'Miércoles',
+    'thursday': 'Jueves',
+    'friday': 'Viernes',
+    'saturday': 'Sábado',
+    'sunday': 'Domingo',
+}
+
 
 class PartnerDistributions(models.Model):
     _name = 'partner.distribution'
+    _inherit = ['visit.schedule.mixin']
     _description = 'Distributions'
 
     distribution = fields.Many2one('template.delivery.route', tracking=True)
@@ -37,6 +49,33 @@ class PartnerDistributions(models.Model):
         ondelete='set null',
         copy=False,
     )
+    last_visit_date = fields.Date(
+        string='Última Visita',
+        copy=False,
+        readonly=True,
+        tracking=True,
+    )
+
+    @api.constrains('partner_id', 'distribution')
+    def _check_unique_visit_day(self):
+        for record in self:
+            if not record.partner_id or not record.distribution or not record.distribution.day:
+                continue
+            duplicate = self.search([
+                ('id', '!=', record.id),
+                ('partner_id', '=', record.partner_id.id),
+                ('distribution.day', '=', record.distribution.day),
+            ], limit=1)
+            if duplicate:
+                day_label = DAY_LABELS_ES.get(record.distribution.day, record.distribution.day)
+                raise ValidationError(_(
+                    "El cliente %(partner)s ya tiene asignada una distribución los días %(day)s "
+                    "(plantilla %(template)s). No puede tener dos líneas con el mismo día de visita."
+                ) % {
+                    'partner': record.partner_id.name,
+                    'day': day_label,
+                    'template': duplicate.distribution.name,
+                })
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -125,7 +164,16 @@ class PartnerDistributions(models.Model):
             selected_dates = route_dates[::interval]
 
         for route in filtered_routes.filtered(lambda r: r.delivery_date in selected_dates):
-            new_line = self.env['delivery.route.line'].create({'client_id': self.partner_id.id})
+            rastrillo_exists = any(
+                l.client_id.id == self.partner_id.id and l.origin == 'rastrillo'
+                for l in route.delivery_route_line_ids
+            )
+            if rastrillo_exists:
+                continue
+            new_line = self.env['delivery.route.line'].create({
+                'client_id': self.partner_id.id,
+                'origin': 'plantilla',
+            })
             route.delivery_route_line_ids = [(4, new_line.id)]
 
     def _unlink_future_route_lines(self, distribution_id):

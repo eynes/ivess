@@ -29,6 +29,7 @@
                         <group>
                             <field name="number"/>
                             <field name="region_id"/>
+                            <field name="location_id"/>
                         </group>
                         <group>
                             <field name="truck_id"/>

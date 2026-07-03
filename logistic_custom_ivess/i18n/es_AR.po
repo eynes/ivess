@@ -148,6 +148,7 @@ msgid "Container State"
 msgstr "Estado del Envase"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__delivery_route_line__frequency__biweekly
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__biweekly
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__frequency__biweekly
 msgid "Biweekly"
@@ -720,6 +721,7 @@ msgid "Month"
 msgstr "Mes"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__delivery_route_line__frequency__monthly
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__monthly
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__frequency__monthly
 msgid "Monthly"
@@ -1231,6 +1233,7 @@ msgid "Wednesday"
 msgstr "Miércoles"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__delivery_route_line__frequency__weekly
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__partner_distribution__frequency__weekly
 #: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__frequency__weekly
 msgid "Weekly"

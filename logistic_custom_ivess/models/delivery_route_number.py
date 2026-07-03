@@ -1,4 +1,4 @@
-from odoo import models, fields, api, _
+from odoo import models, fields
 
 
 class DeliveryRouteNumberCategory(models.Model):
@@ -12,13 +12,15 @@ class DeliveryRouteNumber(models.Model):
     _name = 'delivery.route.number'
     _description = 'Delivery Route Number'
     _rec_name = 'number'
-    _sql_constraints = [
-        (
-            'unique_delivery_route_number',
-            'UNIQUE(number)',
-            'The delivery route number must be unique.'
-        )
-    ]
+
+    _unique_delivery_route_number = models.Constraint(
+        'UNIQUE(number)',
+        'The delivery route number must be unique.',
+    )
+    _unique_location_id = models.Constraint(
+        'UNIQUE(location_id)',
+        'Esa ubicación ya está vinculada a otro reparto.',
+    )
 
     def _get_default_number(self):
         last_route = self.search([], order='number desc', limit=1)
@@ -95,6 +97,10 @@ class DeliveryRouteNumber(models.Model):
     category_id = fields.Many2one(
         'delivery.route.number.category',
         string='Categoría',
+    )
+    location_id = fields.Many2one(
+        'stock.location',
+        string='Ubicación',
     )
 
 

@@ -12,3 +12,4 @@ from . import ivess_roadmap_report
 from . import ivess_price_list_report
 from . import ivess_localities_report
 from . import ivess_limit_free_of_charge_report
+from . import ivess_stock_report

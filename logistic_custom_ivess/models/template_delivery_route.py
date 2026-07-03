@@ -84,7 +84,6 @@ class TemplateDeliveryRoute(models.Model):
         tracking=True,
         # help="Reflects the cash‑sale setting of the associated delivery number."
     )
-
     @api.depends(
         'day',
         'delivery_number_id',

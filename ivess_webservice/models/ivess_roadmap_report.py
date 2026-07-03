@@ -62,6 +62,8 @@ class IvessRoadmapReport(models.Model):
     lts_min_bonification = fields.Integer(readonly=True)
     consumption_liters = fields.Float(readonly=True)
     overdue_balance = fields.Float(readonly=True)
+    mobile_number = fields.Char(readonly=True)
+    address_details = fields.Text(readonly=True)
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -86,7 +88,9 @@ class IvessRoadmapReport(models.Model):
                     rp.partner_type_id                  AS partner_type_id,
                     rp.city                             AS city,
                     rp.phone                            AS phone,
+                    rp.mobile_number                    AS mobile_number,
                     tdr.delivery_number_id              AS delivery_number_id,
+                    rp.address_details                  AS address_details,
                     rp.vat                              AS vat,
                     rp.final_balance                    AS final_balance,
                     rp.state                            AS state,
@@ -187,7 +191,9 @@ class IvessRoadmapReport(models.Model):
             "partner_type_id",
             "city",
             "phone",
+            "mobile_number",
             "delivery_number_id",
+            "address_details",
             "vat",
             "final_balance",
             "state",
@@ -223,7 +229,9 @@ class IvessRoadmapReport(models.Model):
                     "lts_min_bonification": rec["lts_min_bonification"],
                     "consumption_liters": rec["consumption_liters"],
                     "phone": rec["phone"],
+                    "mobile_number": rec["mobile_number"],
                     "delivery_number_id": rec["delivery_number_id"],
+                    "address_details": rec["address_details"],
                     "property_payment_term_id": False,
                     "vat": rec["vat"],
                     "final_balance": rec["final_balance"],

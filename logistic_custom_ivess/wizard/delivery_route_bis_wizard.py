@@ -20,6 +20,10 @@ class DeliveryRouteBisWizard(models.TransientModel):
             'template_delivery_route_id': False,
             'truck_id': self.delivery_number_id.truck_id.id or False,
         })
+        self.env['delivery.route.line'].create([
+            {'route_id': new_route.id, 'client_id': line.client_id.id}
+            for line in self.route_id.delivery_route_line_ids
+        ])
         new_route.message_post(
             body=_(
                 "Esta ruta fue generada mediante la acción 'Crear ruta Bis' "
