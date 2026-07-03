@@ -53,6 +53,7 @@
                                 <field name="distribution"/>
                                 <field name="visit_day"/>
                                 <field name="frequency" required="1"/>
+                                <field name="last_visit_date" readonly="1"/>
                             </list>
                         </field>
                         <field name="average_hour" widget="float_time"/>
@@ -74,6 +75,7 @@
                         <field name="distribution"/>
                         <field name="visit_day"/>
                         <field name="frequency" required="1"/>
+                        <field name="last_visit_date" readonly="1"/>
                     </group>
                 </sheet>
             </form>
