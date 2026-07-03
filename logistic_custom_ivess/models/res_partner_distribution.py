@@ -23,6 +23,7 @@ DAY_LABELS_ES = {
 
 class PartnerDistributions(models.Model):
     _name = 'partner.distribution'
+    _inherit = ['visit.schedule.mixin']
     _description = 'Distributions'
 
     distribution = fields.Many2one('template.delivery.route', tracking=True)
@@ -47,6 +48,12 @@ class PartnerDistributions(models.Model):
         string='Route Line',
         ondelete='set null',
         copy=False,
+    )
+    last_visit_date = fields.Date(
+        string='Última Visita',
+        copy=False,
+        readonly=True,
+        tracking=True,
     )
 
     @api.constrains('partner_id', 'distribution')
