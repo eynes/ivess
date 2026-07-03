@@ -109,6 +109,120 @@
 
 
     <!-- ============================================================
+         Vista procesamiento por lote: /my/repairs/batch
+         Habilitada solo para las etapas 'hidrolavadora' y 'pintura'.
+    ============================================================ -->
+    <template id="portal_repair_batch" name="Procesar Equipos por Lote">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/repairs">Órdenes de Reparación</a>
+                            </li>
+                            <li class="breadcrumb-item active">Procesar por Lote</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="row justify-content-center mt-2">
+                <div class="col-md-8">
+                    <div class="card shadow-sm">
+                        <div class="card-body p-4">
+
+                            <h4 class="mb-2">
+                                <i class="fa fa-layer-group me-2" style="color: #875a7b;"/>
+                                Procesar Equipos por Lote
+                            </h4>
+                            <p class="text-muted mb-4">
+                                Escanee o ingrese los números de serie de los equipos a procesar en conjunto.
+                                Solo se admiten equipos que compartan exactamente la misma etapa
+                                (Limpieza con hidrolavadora o Pintura).
+                            </p>
+
+                            <div id="batch-alert"></div>
+
+                            <div class="d-flex gap-2 mb-2">
+                                <button type="button" id="batch-scan-camera-btn"
+                                        class="btn btn-primary">
+                                    <i class="fa fa-camera me-2"/>
+                                    Escanear con cámara
+                                </button>
+                                <div class="input-group">
+                                    <input
+                                        id="batch_barcode_input"
+                                        type="text"
+                                        class="form-control"
+                                        placeholder="O escribir N° de serie y presionar Enter..."
+                                        autocomplete="off"
+                                    />
+                                    <button type="button" id="batch_barcode_add_btn" class="btn btn-outline-primary">
+                                        <i class="fa fa-plus"/>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <span class="text-muted small">Etapa del lote:</span>
+                                <span id="batch-stage-indicator" class="badge text-bg-secondary">Sin definir</span>
+                            </div>
+
+                            <div class="table-responsive mb-3">
+                                <table class="table table-hover table-sm mb-0" id="batch-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>N° de Serie</th>
+                                            <th>Referencia</th>
+                                            <th>Etapa</th>
+                                            <th>Estado</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="batch-table-body">
+                                        <tr id="batch-table-empty-row">
+                                            <td colspan="5" class="text-center text-muted py-3">
+                                                Ningún equipo agregado todavía.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-center gap-3">
+                                <button type="button" id="batch-btn-start"
+                                        class="btn btn-success btn-lg px-4" disabled="disabled">
+                                    <i class="fa fa-play me-2"/> Comenzar
+                                </button>
+                                <button type="button" id="batch-btn-finish"
+                                        class="btn btn-primary btn-lg px-4" disabled="disabled">
+                                    Fin de Etapa <i class="fa fa-chevron-right ms-1"/>
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script type="text/javascript">
+                window.REPAIR_STAGE_BADGE = {
+                    <t t-foreach="stage_badge.items()" t-as="sb">'<t t-esc="sb[0]"/>': '<t t-esc="sb[1]"/>',
+                    </t>
+                };
+                window.REPAIR_STAGE_LABELS = {
+                    <t t-foreach="stage_labels.items()" t-as="sl">'<t t-esc="sl[0]"/>': '<t t-esc="sl[1]"/>',
+                    </t>
+                };
+            </script>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
          Vista lista: /my/repairs
     ============================================================ -->
     <template id="portal_my_repairs" name="Mis Órdenes de Reparación">
@@ -120,6 +234,9 @@
             </t>
 
             <div class="text-end mb-2">
+                <a href="/my/repairs/batch" class="btn btn-outline-secondary btn-sm me-2">
+                    <i class="fa fa-layer-group me-1"/> Procesar por lote
+                </a>
                 <a href="/my/repairs/scan" class="btn btn-outline-primary btn-sm">
                     <i class="fa fa-barcode me-1"/> Escanear N° de Serie
                 </a>
