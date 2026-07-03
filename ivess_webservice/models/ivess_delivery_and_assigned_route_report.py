@@ -108,9 +108,19 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             'date_to_drn', 
             'allow_sale_without_stock', 
             'allow_reordering',
-            'state_rp', 
-            'date_from_rp', 
+            'state_rp',
+            'date_from_rp',
             'date_to_rp',
         ]
-        return {"result": records.read(fields_to_read)}
+
+        minutos_x_convertir_factura = float(self.env['ir.config_parameter'].sudo().get_param(
+            'logistic_custom_ivess.minutos_x_convertir_factura', default=0.0
+        ))
+
+        return {
+            "settings": {
+                "minutos_x_convertir_factura": minutos_x_convertir_factura,
+            },
+            "result": records.read(fields_to_read),
+        }
 
