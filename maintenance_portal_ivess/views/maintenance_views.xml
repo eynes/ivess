@@ -26,6 +26,8 @@
             <list string="Motivos de cierre">
                 <field name="parent_id" optional="show"/>
                 <field name="name"/>
+                <field name="is_workshop"/>
+                <field name="is_maintenance"/>
                 <field name="child_ids" string="Subcategorías" optional="hide"/>
             </list>
         </field>
@@ -40,6 +42,8 @@
                     <group>
                         <field name="parent_id" options="{'no_create': True}"/>
                         <field name="name"/>
+                        <field name="is_workshop" readonly="parent_id"/>
+                        <field name="is_maintenance" readonly="parent_id"/>
                     </group>
                     <notebook>
                         <page string="Subcategorías" invisible="parent_id">

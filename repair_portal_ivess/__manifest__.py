@@ -10,6 +10,9 @@
         - Ver todas las órdenes de reparación de equipos Frío/Calor en una tabla.
         - Acceder al detalle de cada orden y visualizar la etapa actual.
         - Avanzar o revertir la etapa desde la vista portal.
+        - Procesar equipos por lote (hidrolavadora / pintura): escanear varios
+          números de serie, validar que compartan la misma etapa, y registrar
+          el inicio/fin de etapa de todo el lote en una sola acción.
     """,
     'depends': [
         'portal',
@@ -22,6 +25,7 @@
     'assets': {
         'web.assets_frontend': [
             'repair_portal_ivess/static/src/js/portal_barcode_scanner.js',
+            'repair_portal_ivess/static/src/js/portal_batch_process.js',
         ],
     },
     'installable': True,

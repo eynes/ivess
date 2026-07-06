@@ -291,9 +291,12 @@ class MaintenancePortalController(CustomerPortal):
 
         return maint_request
 
-    def _closure_reason_context(self):
+    def _closure_reason_context(self, is_workshop=False):
         """Returns closure_parents (recordset) and closure_children_json (str) for templates."""
-        all_reasons = request.env['maintenance.closure.reason'].sudo().search([], order='name')
+        type_field = 'is_workshop' if is_workshop else 'is_maintenance'
+        all_reasons = request.env['maintenance.closure.reason'].sudo().search(
+            [(type_field, '=', True)], order='name'
+        )
         parents = all_reasons.filtered(lambda r: not r.parent_id)
         children = all_reasons.filtered(lambda r: r.parent_id)
         children_json = json.dumps([
@@ -438,7 +441,7 @@ class MaintenancePortalController(CustomerPortal):
             return request.redirect('/my/maintenance')
         values = self._prepare_portal_layout_values()
         values.update(self._maint_detail_values(maint_request))
-        values.update(self._closure_reason_context())
+        values.update(self._closure_reason_context(is_workshop=False))
         values.update({
             'page_name': 'maintenance_detail',
             'back_url': '/my/maintenance',
@@ -620,7 +623,7 @@ class MaintenancePortalController(CustomerPortal):
             return request.redirect('/my/workshop')
         values = self._prepare_portal_layout_values()
         values.update(self._maint_detail_values(maint_request))
-        values.update(self._closure_reason_context())
+        values.update(self._closure_reason_context(is_workshop=True))
         values.update({
             'page_name': 'workshop_detail',
             'back_url': '/my/workshop',

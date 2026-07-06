@@ -226,9 +226,21 @@ class StockPicking(models.Model):
                         'picking_type_id': repair_type.id,
                         'origin_picking_id': self.id,
                     })
+                    # Confirmar automáticamente la orden (draft -> confirmed): el equipo
+                    # ya está físicamente en stock (el picking se acaba de validar), por
+                    # lo que action_validate() debería confirmar sin requerir el wizard
+                    # de cantidad insuficiente.
+                    repair.action_validate()
                 created_lots.add(lot.id)
                 repair.message_post(body=_(
                     "Orden creada automáticamente al validar el picking %s.", self.name))
+                if repair.state == 'draft':
+                    _logger.warning(
+                        "Auto repair order %s quedó en borrador tras action_validate() "
+                        "(posible falta de stock disponible).", repair.name)
+                    repair.message_post(body=_(
+                        "No se pudo confirmar automáticamente la orden: verifique la "
+                        "disponibilidad de stock del equipo."))
                 self.message_post(body=_(
                     "Se creó la orden de reparación %s para el N° de serie %s.",
                     repair.name, lot.name))

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields
+from odoo import api, models, fields
 
 
 class MaintenanceClosureReason(models.Model):
@@ -25,7 +25,29 @@ class MaintenanceClosureReason(models.Model):
         compute='_compute_is_parent',
         store=True,
     )
+    is_workshop = fields.Boolean(
+        string='Taller',
+        compute='_compute_type_flags',
+        store=True,
+        readonly=False,
+    )
+    is_maintenance = fields.Boolean(
+        string='Mantenimiento',
+        compute='_compute_type_flags',
+        store=True,
+        readonly=False,
+    )
 
     def _compute_is_parent(self):
         for rec in self:
             rec.is_parent = not rec.parent_id
+
+    @api.depends('parent_id', 'parent_id.is_workshop', 'parent_id.is_maintenance')
+    def _compute_type_flags(self):
+        for rec in self:
+            if rec.parent_id:
+                rec.is_workshop = rec.parent_id.is_workshop
+                rec.is_maintenance = rec.parent_id.is_maintenance
+            else:
+                rec.is_workshop = rec.is_workshop
+                rec.is_maintenance = rec.is_maintenance

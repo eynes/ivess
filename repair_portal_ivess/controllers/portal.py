@@ -44,6 +44,9 @@ _STAGE_BADGE = {
 
 _REPAIRS_PER_PAGE = 20
 
+# Etapas habilitadas para el procesamiento por lote (batch).
+_ALLOWED_BATCH_STAGES = frozenset({'hidrolavadora', 'pintura'})
+
 # Etapas desde las que el botón Revertir no se muestra en el portal.
 # 'repair' se maneja con botón dedicado; 'prueba_inicial' no tiene etapas previas válidas.
 # Alineado con la restricción del backend:
@@ -84,6 +87,62 @@ def _stage_nav_flags(repair):
     return can_go_prev, can_go_next
 
 
+def _resolve_repair_by_barcode(barcode):
+    """Busca la orden de reparación 'frio_calor' activa para un número de serie escaneado.
+
+    Odoo ZPL encodes lot labels with GS1 AI "21" (serial number) prefix.
+    Physical scanners or unmodified camera scanners may return "21<lot_name>".
+    Build candidate list: try original value first, then without GS1 prefix.
+
+    Retorna el recordset 'repair.order' (vacío si no se encontró).
+    """
+    barcode = (barcode or '').strip()
+    if not barcode:
+        return request.env['repair.order'].sudo()
+
+    candidates = [barcode]
+    if barcode.startswith('21') and len(barcode) > 2:
+        candidates.append(barcode[2:])
+
+    RepairOrder = request.env['repair.order'].sudo()
+    repair = RepairOrder
+    for candidate in candidates:
+        repair = RepairOrder.search([
+            ('lot_id.name', '=', candidate),
+            ('repair_equipment_type', '=', 'frio_calor'),
+            ('state', 'not in', ['cancel', 'done']),
+        ], order='create_date desc', limit=1)
+        if repair:
+            return repair
+
+    for candidate in candidates:
+        repair = RepairOrder.search([
+            ('lot_id.name', '=', candidate),
+            ('repair_equipment_type', '=', 'frio_calor'),
+        ], order='create_date desc', limit=1)
+        if repair:
+            return repair
+
+    return RepairOrder
+
+
+def _batch_eligibility_error(repair):
+    """Valida si una orden es elegible para procesamiento por lote.
+
+    Retorna un mensaje de error (str) si NO es elegible, o None si es elegible.
+    """
+    if repair.repair_equipment_type != 'frio_calor':
+        return _("No es un equipo de tipo Frío/Calor.")
+    if repair.state in ('draft', 'cancel', 'done'):
+        return _("La orden no está en un estado válido para procesar.")
+    if repair.is_outsourced:
+        return _("El equipo está tercerizado.")
+    if repair.frio_calor_stage not in _ALLOWED_BATCH_STAGES:
+        stage_label = _STAGE_LABELS.get(repair.frio_calor_stage, repair.frio_calor_stage)
+        return _("Etapa actual '%s' no habilitada para procesamiento por lote.", stage_label)
+    return None
+
+
 class RepairPortalController(CustomerPortal):
 
     def _prepare_home_portal_values(self, counters):
@@ -114,39 +173,190 @@ class RepairPortalController(CustomerPortal):
             return request.render('repair_portal_ivess.portal_repair_scan', values)
 
         barcode = barcode.strip()
-
-        # Odoo ZPL encodes lot labels with GS1 AI "21" (serial number) prefix.
-        # Physical scanners or unmodified camera scanners may return "21<lot_name>".
-        # Build candidate list: try original value first, then without GS1 prefix.
-        candidates = [barcode]
-        if barcode.startswith('21') and len(barcode) > 2:
-            candidates.append(barcode[2:])
-
-        RepairOrder = request.env['repair.order'].sudo()
-        repair = None
-        for candidate in candidates:
-            repair = RepairOrder.search([
-                ('lot_id.name', '=', candidate),
-                ('repair_equipment_type', '=', 'frio_calor'),
-                ('state', 'not in', ['cancel', 'done']),
-            ], order='create_date desc', limit=1)
-            if repair:
-                break
-
-        if not repair:
-            for candidate in candidates:
-                repair = RepairOrder.search([
-                    ('lot_id.name', '=', candidate),
-                    ('repair_equipment_type', '=', 'frio_calor'),
-                ], order='create_date desc', limit=1)
-                if repair:
-                    break
+        repair = _resolve_repair_by_barcode(barcode)
 
         if repair:
             return request.redirect(f'/my/repairs/{repair.id}')
 
         values.update({'barcode': barcode, 'not_found': True})
         return request.render('repair_portal_ivess.portal_repair_scan', values)
+
+    # ============================================================
+    # Procesamiento por lote (batch): hidrolavadora / pintura
+    # ============================================================
+
+    @http.route(
+        ['/my/repairs/batch'],
+        type='http', auth='user', website=True,
+    )
+    def portal_repair_batch(self, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'page_name': 'repair_batch',
+            'stage_labels': _STAGE_LABELS,
+            'stage_badge': _STAGE_BADGE,
+        })
+        return request.render('repair_portal_ivess.portal_repair_batch', values)
+
+    @http.route(
+        ['/my/repairs/batch/resolve'],
+        type='json', auth='user', website=True,
+    )
+    def portal_repair_batch_resolve(self, barcode=None, **kw):
+        if not request.env.user.has_group('repair_portal_ivess.group_portal_repair'):
+            return {'ok': False, 'error': 'forbidden', 'message': _("No tiene permisos para esta acción.")}
+
+        barcode = (barcode or '').strip()
+        if not barcode:
+            return {'ok': False, 'error': 'empty', 'message': _("Ingrese o escanee un número de serie.")}
+
+        repair = _resolve_repair_by_barcode(barcode)
+        if not repair:
+            return {
+                'ok': False, 'error': 'not_found', 'barcode': barcode,
+                'message': _("No se encontró una orden de reparación para el número de serie '%s'.", barcode),
+            }
+
+        error = _batch_eligibility_error(repair)
+        if error:
+            return {'ok': False, 'error': 'not_eligible', 'barcode': barcode, 'message': error}
+
+        return {
+            'ok': True,
+            'repair': {
+                'id': repair.id,
+                'name': repair.name,
+                'serial': repair.lot_id.name or '',
+                'stage': repair.frio_calor_stage,
+                'stage_label': _STAGE_LABELS.get(repair.frio_calor_stage, repair.frio_calor_stage),
+                'stage_started': repair.stage_started,
+            },
+        }
+
+    def _batch_prepare_recordset(self, repair_ids):
+        """Convierte y filtra los IDs recibidos, devolviendo (repairs_existentes, resultados_parciales).
+
+        resultados_parciales acumula errores para IDs inválidos o inexistentes.
+        """
+        try:
+            ids = [int(i) for i in (repair_ids or [])]
+        except (TypeError, ValueError):
+            ids = []
+
+        RepairOrder = request.env['repair.order'].sudo()
+        repairs = RepairOrder.browse(ids).exists() if ids else RepairOrder
+
+        results = []
+        missing_ids = set(ids) - set(repairs.ids)
+        for missing_id in missing_ids:
+            results.append({'id': missing_id, 'name': False, 'ok': False,
+                             'error': _("El equipo ya no existe.")})
+        return repairs, results
+
+    def _batch_split_eligible(self, repairs, results):
+        """Separa 'repairs' en elegibles (recordset) según _batch_eligibility_error,
+        agregando errores de los no elegibles a 'results' (in-place)."""
+        RepairOrder = request.env['repair.order'].sudo()
+        eligible = RepairOrder
+        for repair in repairs:
+            error = _batch_eligibility_error(repair)
+            if error:
+                results.append({'id': repair.id, 'name': repair.name, 'ok': False, 'error': error})
+            else:
+                eligible |= repair
+        return eligible
+
+    @http.route(
+        ['/my/repairs/batch/start'],
+        type='json', auth='user', website=True,
+    )
+    def portal_repair_batch_start(self, repair_ids=None, **kw):
+        if not request.env.user.has_group('repair_portal_ivess.group_portal_repair'):
+            return {'ok': False, 'error': 'forbidden', 'message': _("No tiene permisos para esta acción.")}
+
+        repairs, results = self._batch_prepare_recordset(repair_ids)
+        if not repairs and not results:
+            return {'ok': False, 'error': 'empty', 'message': _("El lote está vacío.")}
+
+        eligible = self._batch_split_eligible(repairs, results)
+        if not eligible:
+            return {'ok': False, 'error': 'no_eligible', 'results': results,
+                    'message': _("Ningún equipo del lote es elegible para procesamiento por lote.")}
+
+        stages = set(eligible.mapped('frio_calor_stage'))
+        if len(stages) > 1:
+            return {'ok': False, 'error': 'not_homogeneous', 'results': results,
+                    'message': _("El lote contiene equipos en etapas distintas. Todos deben compartir la misma etapa.")}
+        batch_stage = list(stages)[0]
+
+        for repair in eligible:
+            if repair.stage_started:
+                results.append({'id': repair.id, 'name': repair.name, 'ok': False,
+                                 'error': _("La etapa de este equipo ya fue iniciada.")})
+                continue
+            try:
+                with request.env.cr.savepoint():
+                    repair.with_context(_portal_user_id=request.env.uid).action_start_current_stage()
+                results.append({'id': repair.id, 'name': repair.name, 'ok': True})
+            except UserError as e:
+                results.append({'id': repair.id, 'name': repair.name, 'ok': False, 'error': str(e)})
+            except Exception as e:
+                _logger.exception("Portal batch start failed repair_id=%s: %s", repair.id, e)
+                results.append({'id': repair.id, 'name': repair.name, 'ok': False,
+                                 'error': _("Ocurrió un error inesperado.")})
+
+        return {'ok': True, 'batch_stage': batch_stage, 'results': results}
+
+    @http.route(
+        ['/my/repairs/batch/finish'],
+        type='json', auth='user', website=True,
+    )
+    def portal_repair_batch_finish(self, repair_ids=None, **kw):
+        if not request.env.user.has_group('repair_portal_ivess.group_portal_repair'):
+            return {'ok': False, 'error': 'forbidden', 'message': _("No tiene permisos para esta acción.")}
+
+        repairs, results = self._batch_prepare_recordset(repair_ids)
+        if not repairs and not results:
+            return {'ok': False, 'error': 'empty', 'message': _("El lote está vacío.")}
+
+        eligible = self._batch_split_eligible(repairs, results)
+        if not eligible:
+            return {'ok': False, 'error': 'no_eligible', 'results': results,
+                    'message': _("Ningún equipo del lote es elegible para procesamiento por lote.")}
+
+        stages = set(eligible.mapped('frio_calor_stage'))
+        if len(stages) > 1:
+            return {'ok': False, 'error': 'not_homogeneous', 'results': results,
+                    'message': _("El lote contiene equipos en etapas distintas. Todos deben compartir la misma etapa.")}
+        batch_stage = list(stages)[0]
+
+        for repair in eligible:
+            if not repair.stage_started:
+                results.append({'id': repair.id, 'name': repair.name, 'ok': False,
+                                 'error': _("Debe iniciar la etapa (Comenzar) antes de finalizar.")})
+                continue
+            try:
+                with request.env.cr.savepoint():
+                    order = repair.with_context(_portal_user_id=request.env.uid)
+                    if batch_stage == 'hidrolavadora':
+                        order.action_open_advance_next_stage()
+                    elif batch_stage == 'pintura':
+                        order.action_back_from_pintura()
+                results.append({
+                    'id': repair.id, 'name': repair.name, 'ok': True,
+                    'new_stage': repair.frio_calor_stage,
+                })
+            except (UserError, IndexError) as e:
+                results.append({'id': repair.id, 'name': repair.name, 'ok': False, 'error': str(e)})
+            except Exception as e:
+                _logger.exception("Portal batch finish failed repair_id=%s: %s", repair.id, e)
+                results.append({'id': repair.id, 'name': repair.name, 'ok': False,
+                                 'error': _("Ocurrió un error inesperado.")})
+
+        return {'ok': True, 'batch_stage': batch_stage, 'results': results}
 
     @http.route(
         ['/my/repairs', '/my/repairs/page/<int:page>'],
@@ -476,8 +686,8 @@ class RepairPortalController(CustomerPortal):
         try:
             repair.with_context(_portal_user_id=request.env.uid).action_open_advance_next_stage()
         except (UserError, IndexError):
-            pass
-        return request.redirect(f'/my/repairs/{repair_id}')
+            return request.redirect(f'/my/repairs/{repair_id}')
+        return request.redirect('/my/repairs')
 
     @http.route(
         ['/my/repairs/<int:repair_id>/prev_stage'],
