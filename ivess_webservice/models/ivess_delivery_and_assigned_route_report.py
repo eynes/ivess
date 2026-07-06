@@ -6,6 +6,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
     _auto = False
 
     # delivery.route
+    route_id = fields.Many2one('delivery.route', readonly=True)
     delivery_date = fields.Date(readonly=True)
     state_dr = fields.Selection(
         selection=lambda self: self.env['delivery.route']._fields['state'].selection,
@@ -14,6 +15,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
     template_delivery_route_id = fields.Many2one('template.delivery.route', readonly=True)
 
     #delivery.route.number
+    delivery_number_id = fields.Many2one('delivery.route.number', readonly=True)
     allow_price_editing = fields.Boolean(readonly=True)
     allow_free_of_charge = fields.Boolean(readonly=True)
     is_cold_hot_delivery = fields.Boolean(readonly=True)
@@ -46,9 +48,11 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             CREATE OR REPLACE VIEW ivess_delivery_and_assigned_route_report AS (
                 SELECT
                     drl.id AS id,
+                    dr.id AS route_id,
                     dr.delivery_date AS delivery_date,
                     dr.state AS state_dr,
                     dr.template_delivery_route_id AS template_delivery_route_id,
+                    drn.id AS delivery_number_id,
                     drn.allow_price_editing AS allow_price_editing,
                     drn.allow_free_of_charge AS allow_free_of_charge,
                     drn.is_cold_hot_delivery AS is_cold_hot_delivery,
@@ -101,27 +105,61 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
         if not records:
             return {"error": "No hay rutas/clientes asignados para la distribución '%s'." % distribution}
 
-        fields_to_read = [
-            'delivery_date', 
-            'state_dr', 
-            'template_delivery_route_id',
-            'allow_price_editing', 
-            'allow_free_of_charge', 
+        delivery_number_fields = [
+            'delivery_number_id',
+            'allow_price_editing',
+            'allow_free_of_charge',
             'is_cold_hot_delivery',
-            'number', 
-            'allow_cash_sale', 
+            'number',
+            'allow_cash_sale',
             'allow_manual_address',
             'allow_closing_with_rake',
             'allow_previous_price',
-            'date_from_drn', 
-            'date_to_drn', 
+            'date_from_drn',
+            'date_to_drn',
             'allow_sale_without_stock',
             'allow_reordering',
             'number_next_actual',
+        ]
+        route_fields = [
+            'route_id',
+            'delivery_date',
+            'state_dr',
+            'template_delivery_route_id',
+        ]
+        client_fields = [
             'state_rp',
             'date_from_rp',
             'date_to_rp',
         ]
+
+        raw_records = records.read(delivery_number_fields + route_fields + client_fields)
+
+        delivery_numbers_by_id = {}
+        delivery_numbers = []
+        routes_by_key = {}
+        for rec in raw_records:
+            delivery_number_id = rec['delivery_number_id'][0] if rec['delivery_number_id'] else False
+            if delivery_number_id not in delivery_numbers_by_id:
+                delivery_number_data = {field: rec[field] for field in delivery_number_fields}
+                delivery_number_data['delivery_number_id'] = delivery_number_id
+                delivery_number_data['routes'] = []
+                delivery_numbers_by_id[delivery_number_id] = delivery_number_data
+                delivery_numbers.append(delivery_number_data)
+
+            route_id = rec['route_id'][0] if rec['route_id'] else False
+            route_key = (delivery_number_id, route_id)
+            if route_key not in routes_by_key:
+                route_data = {field: rec[field] for field in route_fields}
+                route_data['route_id'] = route_id
+                route_data['clients'] = []
+                routes_by_key[route_key] = route_data
+                delivery_numbers_by_id[delivery_number_id]['routes'].append(route_data)
+
+            routes_by_key[route_key]['clients'].append({
+                'id': rec['id'],
+                **{field: rec[field] for field in client_fields},
+            })
 
         minutos_x_convertir_factura = float(self.env['ir.config_parameter'].sudo().get_param(
             'logistic_custom_ivess.minutos_x_convertir_factura', default=0.0
@@ -131,6 +169,6 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             "settings": {
                 "minutos_x_convertir_factura": minutos_x_convertir_factura,
             },
-            "result": records.read(fields_to_read),
+            "result": delivery_numbers,
         }
 
