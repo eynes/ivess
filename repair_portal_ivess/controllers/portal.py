@@ -686,8 +686,8 @@ class RepairPortalController(CustomerPortal):
         try:
             repair.with_context(_portal_user_id=request.env.uid).action_open_advance_next_stage()
         except (UserError, IndexError):
-            pass
-        return request.redirect(f'/my/repairs/{repair_id}')
+            return request.redirect(f'/my/repairs/{repair_id}')
+        return request.redirect('/my/repairs')
 
     @http.route(
         ['/my/repairs/<int:repair_id>/prev_stage'],
