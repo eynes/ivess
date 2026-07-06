@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_repair_batch_list" model="ir.ui.view">
+        <field name="name">repair.batch.list</field>
+        <field name="model">repair.batch</field>
+        <field name="arch" type="xml">
+            <list string="Lotes de Procesamiento">
+                <field name="name"/>
+                <field name="stage" widget="badge"
+                    decoration-primary="stage == 'hidrolavadora'"
+                    decoration-muted="stage == 'pintura'"/>
+                <field name="state" widget="badge"
+                    decoration-info="state == 'draft'"
+                    decoration-warning="state == 'in_progress'"
+                    decoration-success="state == 'done'"/>
+                <field name="repair_count"/>
+                <field name="user_id" optional="show"/>
+                <field name="date_start" optional="show"/>
+                <field name="date_end" optional="show"/>
+                <field name="create_date" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_repair_batch_form" model="ir.ui.view">
+        <field name="name">repair.batch.form</field>
+        <field name="model">repair.batch</field>
+        <field name="arch" type="xml">
+            <form string="Lote de Procesamiento">
+                <header>
+                    <button name="action_start" type="object" string="Comenzar"
+                            class="oe_highlight"
+                            confirm="¿Confirmar inicio de la etapa para todo el lote?"
+                            invisible="state != 'draft' or repair_count == 0"/>
+                    <button name="action_finish" type="object" string="Fin de Etapa"
+                            class="oe_highlight"
+                            confirm="¿Confirmar fin de etapa para todo el lote?"
+                            invisible="state != 'in_progress'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                        <field name="stage" readonly="1" widget="badge"
+                            decoration-primary="stage == 'hidrolavadora'"
+                            decoration-muted="stage == 'pintura'"/>
+                    </div>
+                    <group>
+                        <group string="Lote">
+                            <field name="repair_count" string="Cantidad de Equipos"/>
+                            <field name="user_id" string="Responsable"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Tiempos">
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Equipos del Lote">
+                            <field name="repair_ids" readonly="state != 'draft'">
+                                <list>
+                                    <field name="lot_id" string="N° de Serie"/>
+                                    <field name="name" string="Referencia"/>
+                                    <field name="frio_calor_stage" string="Etapa Actual" widget="badge"
+                                        decoration-success="frio_calor_stage in ('armado', 'finalizado')"
+                                        decoration-info="frio_calor_stage == 'prueba_inicial'"
+                                        decoration-primary="frio_calor_stage in ('hidrolavadora','pileta')"
+                                        decoration-muted="frio_calor_stage == 'pintura'"
+                                        decoration-warning="frio_calor_stage in ('prueba','secado')"
+                                        decoration-danger="frio_calor_stage in ('repair', 'descarte')"/>
+                                    <field name="stage_started" string="Etapa Iniciada" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_repair_batch" model="ir.actions.act_window">
+        <field name="name">Lotes de Procesamiento</field>
+        <field name="res_model">repair.batch</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_repair_batch"
+        name="Lotes de Procesamiento"
+        parent="repair.menu_repair_order"
+        action="action_repair_batch"
+        sequence="6"
+        groups="stock.group_stock_user"/>
+
+</odoo>

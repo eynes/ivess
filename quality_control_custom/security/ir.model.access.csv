@@ -7,3 +7,4 @@ access_repair_outsource_reason,repair.outsource.reason,model_repair_outsource_re
 access_repair_outsource_reason_manager,repair.outsource.reason.manager,model_repair_outsource_reason,stock.group_stock_manager,1,1,1,1
 access_repair_outsource_wizard,repair.outsource.wizard,model_repair_outsource_wizard,stock.group_stock_user,1,1,1,1
 access_repair_receive_third_party_wizard,repair.receive.third.party.wizard,model_repair_receive_third_party_wizard,stock.group_stock_user,1,1,1,1
+access_repair_batch,repair.batch,model_repair_batch,stock.group_stock_user,1,1,1,1

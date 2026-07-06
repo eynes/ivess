@@ -4,6 +4,7 @@ from . import product_template
 from . import quality_check
 from . import repair_order
 from . import repair_order_stage_log
+from . import repair_batch
 from . import quality_point
 from . import stock_picking
 from . import repair_outsource_reason
