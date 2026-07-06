@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
@@ -39,13 +40,11 @@ class ResPartner(models.Model):
     )
     state = fields.Selection(
         selection=[
-            ('active', 'Active'),
             ('discharge_review', 'Discharge Review'),
-            ('dont_pass', "Don't pass"),
             ('holidays', 'Holidays'),
-            ('rake', 'Rake')
+            ('inactive', 'Inactive'),
         ],
-        default='active',
+        default=False,
         string='State',
         tracking=True,
     )
@@ -295,11 +294,36 @@ class ResPartner(models.Model):
         _logger.info("Cron - Checking partner states")
         today = fields.Date.today()
 
-        domain = [('state', 'in', ['holidays', 'dont_pass']), ('date_to', '<', today)]
+        domain = [('state', '=', 'holidays'), ('date_to', '<', today)]
         partners_to_update = self.search(domain)
-        partners_to_update.write({'state': 'active', 'date_from': False, 'date_to': False})
+        partners_to_update.write({'state': False, 'date_from': False, 'date_to': False})
 
         _logger.info(f">>>>>>>>>> Checked and updated {len(partners_to_update)} partners states")
+
+    @api.model
+    def _cron_check_partner_inactivity(self):
+        _logger.info("Cron - Checking partner inactivity")
+        thirty_days_ago = fields.Date.today() - timedelta(days=30)
+
+        candidates = self.search([
+            ('is_customer', '=', True),
+            ('state', 'not in', ['holidays', 'discharge_review', 'inactive']),
+        ])
+
+        to_deactivate = self.env['res.partner']
+        for partner in candidates:
+            has_recent_sale = self.env['sale.order'].search_count([
+                ('partner_id', '=', partner.id),
+                ('state', 'in', ['sale', 'done']),
+                ('date_order', '>=', thirty_days_ago),
+            ])
+            if not has_recent_sale:
+                to_deactivate |= partner
+
+        if to_deactivate:
+            to_deactivate.write({'state': 'inactive'})
+
+        _logger.info(f">>>>>>>>>> Checked and marked {len(to_deactivate)} partners as inactive")
 
     def _delete_route_lines(self):
         for partner in self:

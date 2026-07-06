@@ -48,11 +48,9 @@ class IvessRoadmapReport(models.Model):
     final_balance = fields.Float(readonly=True)
     state = fields.Selection(
         [
-            ("active", "Activo"),
             ("discharge_review", "Revisión de baja"),
-            ("dont_pass", "No pasar"),
             ("holidays", "Vacaciones"),
-            ("rake", "Rastrillo"),
+            ("inactive", "Inactivo"),
         ],
         readonly=True,
     )
