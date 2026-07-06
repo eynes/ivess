@@ -20,11 +20,17 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
     number = fields.Integer(readonly=True)
     allow_cash_sale = fields.Boolean(readonly=True)
     allow_manual_address = fields.Boolean(readonly=True)
+    allow_closing_with_rake = fields.Boolean(readonly=True)
     allow_previous_price = fields.Boolean(readonly=True)
     date_from_drn = fields.Date(readonly=True)
     date_to_drn = fields.Date(readonly=True)
     allow_sale_without_stock = fields.Boolean(readonly=True)
     allow_reordering = fields.Boolean(readonly=True)
+    repair_order_sequence_id = fields.Many2one('ir.sequence', readonly=True)
+    number_next_actual = fields.Integer(
+        related='repair_order_sequence_id.number_next_actual',
+        readonly=True,
+    )
 
     #res.partner
     state_rp = fields.Selection(
@@ -49,11 +55,13 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
                     drn.number AS number,
                     drn.allow_cash_sale AS allow_cash_sale,
                     drn.allow_manual_address AS allow_manual_address,
+                    drn.allow_closing_with_rake AS allow_closing_with_rake,
                     drn.allow_previous_price AS allow_previous_price,
                     drn.date_from AS date_from_drn,
                     drn.date_to AS date_to_drn,
                     drn.allow_sale_without_stock AS allow_sale_without_stock,
                     drn.allow_reordering AS allow_reordering,
+                    drn.repair_order_sequence_id AS repair_order_sequence_id,
                     rp.state AS state_rp,
                     rp.date_from AS date_from_rp,
                     rp.date_to AS date_to_rp
@@ -102,12 +110,14 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             'is_cold_hot_delivery',
             'number', 
             'allow_cash_sale', 
-            'allow_manual_address', 
+            'allow_manual_address',
+            'allow_closing_with_rake',
             'allow_previous_price',
             'date_from_drn', 
             'date_to_drn', 
-            'allow_sale_without_stock', 
+            'allow_sale_without_stock',
             'allow_reordering',
+            'number_next_actual',
             'state_rp',
             'date_from_rp',
             'date_to_rp',
