@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+from urllib.parse import urlencode
 from odoo import http, _
 from odoo.http import request
 
@@ -43,9 +44,19 @@ _STAGE_BADGE = {
 }
 
 _REPAIRS_PER_PAGE = 20
+_BATCHES_PER_PAGE = 20
 
-# Etapas habilitadas para el procesamiento por lote (batch).
-_ALLOWED_BATCH_STAGES = frozenset({'hidrolavadora', 'pintura'})
+# Estilo de badge por estado de repair.batch.
+_BATCH_STATE_BADGE = {
+    'draft': 'info',
+    'in_progress': 'warning',
+    'done': 'success',
+}
+_BATCH_STATE_LABELS = {
+    'draft': 'En Preparación',
+    'in_progress': 'En Proceso',
+    'done': 'Finalizado',
+}
 
 # Etapas desde las que el botón Revertir no se muestra en el portal.
 # 'repair' se maneja con botón dedicado; 'prueba_inicial' no tiene etapas previas válidas.
@@ -126,23 +137,6 @@ def _resolve_repair_by_barcode(barcode):
     return RepairOrder
 
 
-def _batch_eligibility_error(repair):
-    """Valida si una orden es elegible para procesamiento por lote.
-
-    Retorna un mensaje de error (str) si NO es elegible, o None si es elegible.
-    """
-    if repair.repair_equipment_type != 'frio_calor':
-        return _("No es un equipo de tipo Frío/Calor.")
-    if repair.state in ('draft', 'cancel', 'done'):
-        return _("La orden no está en un estado válido para procesar.")
-    if repair.is_outsourced:
-        return _("El equipo está tercerizado.")
-    if repair.frio_calor_stage not in _ALLOWED_BATCH_STAGES:
-        stage_label = _STAGE_LABELS.get(repair.frio_calor_stage, repair.frio_calor_stage)
-        return _("Etapa actual '%s' no habilitada para procesamiento por lote.", stage_label)
-    return None
-
-
 class RepairPortalController(CustomerPortal):
 
     def _prepare_home_portal_values(self, counters):
@@ -182,181 +176,178 @@ class RepairPortalController(CustomerPortal):
         return request.render('repair_portal_ivess.portal_repair_scan', values)
 
     # ============================================================
-    # Procesamiento por lote (batch): hidrolavadora / pintura
+    # Procesamiento por lote persistente (repair.batch): hidrolavadora / pintura
     # ============================================================
 
+    def _get_portal_batch(self, batch_id):
+        batch = request.env['repair.batch'].sudo().browse(batch_id)
+        return batch if batch.exists() else request.env['repair.batch'].sudo()
+
     @http.route(
-        ['/my/repairs/batch'],
+        ['/my/repairs/batch', '/my/repairs/batch/page/<int:page>'],
         type='http', auth='user', website=True,
     )
-    def portal_repair_batch(self, **kw):
+    def portal_repair_batch_list(self, page=1, **kw):
         redir = self._check_group_repair()
         if redir:
             return redir
+        RepairBatch = request.env['repair.batch'].sudo()
+        batch_count = RepairBatch.search_count([])
+        pager = portal_pager(
+            url='/my/repairs/batch',
+            total=batch_count,
+            page=page,
+            step=_BATCHES_PER_PAGE,
+        )
+        batches = RepairBatch.search(
+            [], order='create_date desc', limit=_BATCHES_PER_PAGE, offset=pager['offset'],
+        )
         values = self._prepare_portal_layout_values()
         values.update({
-            'page_name': 'repair_batch',
+            'page_name': 'repair_batch_list',
+            'batches': batches,
+            'pager': pager,
             'stage_labels': _STAGE_LABELS,
             'stage_badge': _STAGE_BADGE,
+            'batch_state_labels': _BATCH_STATE_LABELS,
+            'batch_state_badge': _BATCH_STATE_BADGE,
         })
-        return request.render('repair_portal_ivess.portal_repair_batch', values)
+        return request.render('repair_portal_ivess.portal_repair_batch_list', values)
 
     @http.route(
-        ['/my/repairs/batch/resolve'],
-        type='json', auth='user', website=True,
+        ['/my/repairs/batch/new'],
+        type='http', auth='user', website=True, methods=['POST'],
     )
-    def portal_repair_batch_resolve(self, barcode=None, **kw):
-        if not request.env.user.has_group('repair_portal_ivess.group_portal_repair'):
-            return {'ok': False, 'error': 'forbidden', 'message': _("No tiene permisos para esta acción.")}
+    def portal_repair_batch_new(self, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = request.env['repair.batch'].sudo().with_context(
+            _portal_user_id=request.env.uid,
+        ).create({})
+        return request.redirect(f'/my/repairs/batch/{batch.id}')
+
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>'],
+        type='http', auth='user', website=True,
+    )
+    def portal_repair_batch_detail(self, batch_id, add_error=None, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if not batch:
+            return request.redirect('/my/repairs/batch')
+
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'page_name': 'repair_batch_detail',
+            'batch': batch,
+            'stage_labels': _STAGE_LABELS,
+            'stage_badge': _STAGE_BADGE,
+            'batch_state_labels': _BATCH_STATE_LABELS,
+            'batch_state_badge': _BATCH_STATE_BADGE,
+            'add_error': add_error,
+        })
+        return request.render('repair_portal_ivess.portal_repair_batch_detail', values)
+
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>/add'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_batch_add(self, batch_id, barcode=None, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if not batch:
+            return request.redirect('/my/repairs/batch')
 
         barcode = (barcode or '').strip()
         if not barcode:
-            return {'ok': False, 'error': 'empty', 'message': _("Ingrese o escanee un número de serie.")}
+            return request.redirect(f'/my/repairs/batch/{batch_id}')
 
         repair = _resolve_repair_by_barcode(barcode)
         if not repair:
-            return {
-                'ok': False, 'error': 'not_found', 'barcode': barcode,
-                'message': _("No se encontró una orden de reparación para el número de serie '%s'.", barcode),
-            }
+            error = _("No se encontró una orden de reparación para el número de serie '%s'.", barcode)
+            return request.redirect(f'/my/repairs/batch/{batch_id}?{urlencode({"add_error": error})}')
 
-        error = _batch_eligibility_error(repair)
-        if error:
-            return {'ok': False, 'error': 'not_eligible', 'barcode': barcode, 'message': error}
-
-        return {
-            'ok': True,
-            'repair': {
-                'id': repair.id,
-                'name': repair.name,
-                'serial': repair.lot_id.name or '',
-                'stage': repair.frio_calor_stage,
-                'stage_label': _STAGE_LABELS.get(repair.frio_calor_stage, repair.frio_calor_stage),
-                'stage_started': repair.stage_started,
-            },
-        }
-
-    def _batch_prepare_recordset(self, repair_ids):
-        """Convierte y filtra los IDs recibidos, devolviendo (repairs_existentes, resultados_parciales).
-
-        resultados_parciales acumula errores para IDs inválidos o inexistentes.
-        """
         try:
-            ids = [int(i) for i in (repair_ids or [])]
+            batch.with_context(_portal_user_id=request.env.uid).action_add_repair(repair)
+        except UserError as e:
+            return request.redirect(f'/my/repairs/batch/{batch_id}?{urlencode({"add_error": str(e)})}')
+
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
+
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>/remove'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_batch_remove(self, batch_id, repair_id=None, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if not batch:
+            return request.redirect('/my/repairs/batch')
+
+        try:
+            repair_id = int(repair_id or 0)
         except (TypeError, ValueError):
-            ids = []
-
-        RepairOrder = request.env['repair.order'].sudo()
-        repairs = RepairOrder.browse(ids).exists() if ids else RepairOrder
-
-        results = []
-        missing_ids = set(ids) - set(repairs.ids)
-        for missing_id in missing_ids:
-            results.append({'id': missing_id, 'name': False, 'ok': False,
-                             'error': _("El equipo ya no existe.")})
-        return repairs, results
-
-    def _batch_split_eligible(self, repairs, results):
-        """Separa 'repairs' en elegibles (recordset) según _batch_eligibility_error,
-        agregando errores de los no elegibles a 'results' (in-place)."""
-        RepairOrder = request.env['repair.order'].sudo()
-        eligible = RepairOrder
-        for repair in repairs:
-            error = _batch_eligibility_error(repair)
-            if error:
-                results.append({'id': repair.id, 'name': repair.name, 'ok': False, 'error': error})
-            else:
-                eligible |= repair
-        return eligible
+            repair_id = 0
+        repair = request.env['repair.order'].sudo().browse(repair_id)
+        if repair.exists():
+            try:
+                batch.with_context(_portal_user_id=request.env.uid).action_remove_repair(repair)
+            except UserError:
+                pass
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
 
     @http.route(
-        ['/my/repairs/batch/start'],
-        type='json', auth='user', website=True,
+        ['/my/repairs/batch/<int:batch_id>/start'],
+        type='http', auth='user', website=True, methods=['POST'],
     )
-    def portal_repair_batch_start(self, repair_ids=None, **kw):
-        if not request.env.user.has_group('repair_portal_ivess.group_portal_repair'):
-            return {'ok': False, 'error': 'forbidden', 'message': _("No tiene permisos para esta acción.")}
-
-        repairs, results = self._batch_prepare_recordset(repair_ids)
-        if not repairs and not results:
-            return {'ok': False, 'error': 'empty', 'message': _("El lote está vacío.")}
-
-        eligible = self._batch_split_eligible(repairs, results)
-        if not eligible:
-            return {'ok': False, 'error': 'no_eligible', 'results': results,
-                    'message': _("Ningún equipo del lote es elegible para procesamiento por lote.")}
-
-        stages = set(eligible.mapped('frio_calor_stage'))
-        if len(stages) > 1:
-            return {'ok': False, 'error': 'not_homogeneous', 'results': results,
-                    'message': _("El lote contiene equipos en etapas distintas. Todos deben compartir la misma etapa.")}
-        batch_stage = list(stages)[0]
-
-        for repair in eligible:
-            if repair.stage_started:
-                results.append({'id': repair.id, 'name': repair.name, 'ok': False,
-                                 'error': _("La etapa de este equipo ya fue iniciada.")})
-                continue
+    def portal_repair_batch_start(self, batch_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if batch:
             try:
-                with request.env.cr.savepoint():
-                    repair.with_context(_portal_user_id=request.env.uid).action_start_current_stage()
-                results.append({'id': repair.id, 'name': repair.name, 'ok': True})
-            except UserError as e:
-                results.append({'id': repair.id, 'name': repair.name, 'ok': False, 'error': str(e)})
-            except Exception as e:
-                _logger.exception("Portal batch start failed repair_id=%s: %s", repair.id, e)
-                results.append({'id': repair.id, 'name': repair.name, 'ok': False,
-                                 'error': _("Ocurrió un error inesperado.")})
-
-        return {'ok': True, 'batch_stage': batch_stage, 'results': results}
+                batch.with_context(_portal_user_id=request.env.uid).action_start()
+            except UserError:
+                pass
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
 
     @http.route(
-        ['/my/repairs/batch/finish'],
-        type='json', auth='user', website=True,
+        ['/my/repairs/batch/<int:batch_id>/finish'],
+        type='http', auth='user', website=True, methods=['POST'],
     )
-    def portal_repair_batch_finish(self, repair_ids=None, **kw):
-        if not request.env.user.has_group('repair_portal_ivess.group_portal_repair'):
-            return {'ok': False, 'error': 'forbidden', 'message': _("No tiene permisos para esta acción.")}
-
-        repairs, results = self._batch_prepare_recordset(repair_ids)
-        if not repairs and not results:
-            return {'ok': False, 'error': 'empty', 'message': _("El lote está vacío.")}
-
-        eligible = self._batch_split_eligible(repairs, results)
-        if not eligible:
-            return {'ok': False, 'error': 'no_eligible', 'results': results,
-                    'message': _("Ningún equipo del lote es elegible para procesamiento por lote.")}
-
-        stages = set(eligible.mapped('frio_calor_stage'))
-        if len(stages) > 1:
-            return {'ok': False, 'error': 'not_homogeneous', 'results': results,
-                    'message': _("El lote contiene equipos en etapas distintas. Todos deben compartir la misma etapa.")}
-        batch_stage = list(stages)[0]
-
-        for repair in eligible:
-            if not repair.stage_started:
-                results.append({'id': repair.id, 'name': repair.name, 'ok': False,
-                                 'error': _("Debe iniciar la etapa (Comenzar) antes de finalizar.")})
-                continue
+    def portal_repair_batch_finish(self, batch_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if batch:
             try:
-                with request.env.cr.savepoint():
-                    order = repair.with_context(_portal_user_id=request.env.uid)
-                    if batch_stage == 'hidrolavadora':
-                        order.action_open_advance_next_stage()
-                    elif batch_stage == 'pintura':
-                        order.action_back_from_pintura()
-                results.append({
-                    'id': repair.id, 'name': repair.name, 'ok': True,
-                    'new_stage': repair.frio_calor_stage,
-                })
-            except (UserError, IndexError) as e:
-                results.append({'id': repair.id, 'name': repair.name, 'ok': False, 'error': str(e)})
-            except Exception as e:
-                _logger.exception("Portal batch finish failed repair_id=%s: %s", repair.id, e)
-                results.append({'id': repair.id, 'name': repair.name, 'ok': False,
-                                 'error': _("Ocurrió un error inesperado.")})
+                batch.with_context(_portal_user_id=request.env.uid).action_finish()
+            except UserError:
+                pass
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
 
-        return {'ok': True, 'batch_stage': batch_stage, 'results': results}
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>/delete'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_batch_delete(self, batch_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if batch and batch.state == 'draft':
+            batch.unlink()
+            return request.redirect('/my/repairs/batch')
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
 
     @http.route(
         ['/my/repairs', '/my/repairs/page/<int:page>'],
