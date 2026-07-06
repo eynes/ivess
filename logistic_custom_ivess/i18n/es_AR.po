@@ -605,6 +605,11 @@ msgid "In Progress"
 msgstr "En progreso"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields.selection,name:logistic_custom_ivess.selection__res_partner__state__inactive
+msgid "Inactive"
+msgstr "Inactivo"
+
+#. module: logistic_custom_ivess
 #. odoo-python
 #: code:addons/logistic_custom_ivess/models/visit_status.py:0
 #: model:ir.model.fields,help:logistic_custom_ivess.field_visit_status__requires_reason

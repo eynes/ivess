@@ -33,8 +33,8 @@
             </xpath>
             <xpath expr="//field[@name='express_id']" position="before">
                 <field name="state" />
-                <field name="date_from" invisible="state not in ['holidays','dont_pass']"/>
-                <field name="date_to" invisible="state not in ['holidays','dont_pass']"/>
+                <field name="date_from" invisible="state != 'holidays'"/>
+                <field name="date_to" invisible="state != 'holidays'"/>
                 <field name="current_month_water_liters"/>
                 <field name="current_year_water_liters"/>
                 <field name="registration_channel_id"/>

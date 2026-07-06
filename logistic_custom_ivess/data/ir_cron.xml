@@ -11,6 +11,16 @@
         <field name="nextcall" eval="(datetime.now().replace(hour=2, minute=0, second=0)).strftime('%Y-%m-%d %H:%M:%S')" />
     </record>
 
+    <record id="ir_cron_check_partner_inactivity" model="ir.cron">
+        <field name="name">Verificar Inactividad de Clientes</field>
+        <field name="model_id" ref="model_res_partner"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_check_partner_inactivity()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="nextcall" eval="(datetime.now().replace(hour=2, minute=30, second=0)).strftime('%Y-%m-%d %H:%M:%S')" />
+    </record>
+
     <record id="ir_cron_generate_monthly_routes" model="ir.cron">
         <field name="name">Generar Rutas Mensuales</field>
         <field name="model_id" ref="model_delivery_route"/>
