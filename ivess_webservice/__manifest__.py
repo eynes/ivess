@@ -14,6 +14,7 @@
         "base",
         "l10n_ar_eynes",
         "helpdesk_maint_custom",
+        "logistic_custom_ivess",
     ],
     "data": [
         "data/ir_sequence.xml",
