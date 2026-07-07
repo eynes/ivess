@@ -173,10 +173,11 @@ class RepairBatch(models.Model):
                 continue
             try:
                 with self.env.cr.savepoint():
+                    order = repair.with_context(_batch_processing=True)
                     if self.stage == 'hidrolavadora':
-                        repair.action_open_advance_next_stage()
+                        order.action_open_advance_next_stage()
                     elif self.stage == 'pintura':
-                        repair.action_back_from_pintura()
+                        order.action_back_from_pintura()
             except (UserError, IndexError) as e:
                 errors.append(_("%s: %s", repair.name, str(e)))
             except Exception as e:
