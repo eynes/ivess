@@ -135,40 +135,31 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
 
         raw_records = records.read(delivery_number_fields + route_fields + client_fields)
 
-        delivery_numbers_by_id = {}
-        delivery_numbers = []
-        routes_by_key = {}
-        for rec in raw_records:
-            delivery_number_id = rec['delivery_number_id'][0] if rec['delivery_number_id'] else False
-            if delivery_number_id not in delivery_numbers_by_id:
-                delivery_number_data = {field: rec[field] for field in delivery_number_fields}
-                delivery_number_data['delivery_number_id'] = delivery_number_id
-                delivery_number_data['routes'] = []
-                delivery_numbers_by_id[delivery_number_id] = delivery_number_data
-                delivery_numbers.append(delivery_number_data)
-
-            route_id = rec['route_id'][0] if rec['route_id'] else False
-            route_key = (delivery_number_id, route_id)
-            if route_key not in routes_by_key:
-                route_data = {field: rec[field] for field in route_fields}
-                route_data['route_id'] = route_id
-                route_data['clients'] = []
-                routes_by_key[route_key] = route_data
-                delivery_numbers_by_id[delivery_number_id]['routes'].append(route_data)
-
-            routes_by_key[route_key]['clients'].append({
-                'id': rec['id'],
-                **{field: rec[field] for field in client_fields},
-            })
-
         minutos_x_convertir_factura = float(self.env['ir.config_parameter'].sudo().get_param(
             'logistic_custom_ivess.minutos_x_convertir_factura', default=0.0
         ))
 
-        return {
-            "settings": {
-                "minutos_x_convertir_factura": minutos_x_convertir_factura,
-            },
-            "result": delivery_numbers,
-        }
+        unwrap_fields = {'delivery_number_id', 'route_id'}
+
+        routes_by_id = {}
+        result = []
+        for rec in raw_records:
+            route_id = rec['route_id'][0] if rec['route_id'] else False
+            if route_id not in routes_by_id:
+                route_data = {'minutos_x_convertir_factura': minutos_x_convertir_factura}
+                for field in delivery_number_fields + route_fields:
+                    value = rec[field]
+                    if field in unwrap_fields:
+                        value = value[0] if value else False
+                    route_data[field] = value
+                route_data['clients'] = []
+                routes_by_id[route_id] = route_data
+                result.append(route_data)
+
+            routes_by_id[route_id]['clients'].append({
+                'client_id': rec['id'],
+                **{field: rec[field] for field in client_fields},
+            })
+
+        return result
 
