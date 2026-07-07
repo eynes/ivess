@@ -498,6 +498,10 @@ class RepairOrder(models.Model):
                         'stage': order.frio_calor_stage,
                         'user_id': self.env.context.get('_portal_user_id', self.env.user.id),
                     })
+                    # Al salir de 'prueba_inicial' (aprobada o desaprobada) el equipo
+                    # entra al flujo físico de reparación: pasar la orden a "En reparación".
+                    if old_stage == 'prueba_inicial' and order.state in ('draft', 'confirmed'):
+                        order.action_repair_start()
 
         return result
 

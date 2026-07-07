@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+from urllib.parse import urlencode
 from odoo import http, _
 from odoo.http import request
 
@@ -43,6 +44,19 @@ _STAGE_BADGE = {
 }
 
 _REPAIRS_PER_PAGE = 20
+_BATCHES_PER_PAGE = 20
+
+# Estilo de badge por estado de repair.batch.
+_BATCH_STATE_BADGE = {
+    'draft': 'info',
+    'in_progress': 'warning',
+    'done': 'success',
+}
+_BATCH_STATE_LABELS = {
+    'draft': 'En Preparación',
+    'in_progress': 'En Proceso',
+    'done': 'Finalizado',
+}
 
 # Etapas desde las que el botón Revertir no se muestra en el portal.
 # 'repair' se maneja con botón dedicado; 'prueba_inicial' no tiene etapas previas válidas.
@@ -84,6 +98,45 @@ def _stage_nav_flags(repair):
     return can_go_prev, can_go_next
 
 
+def _resolve_repair_by_barcode(barcode):
+    """Busca la orden de reparación 'frio_calor' activa para un número de serie escaneado.
+
+    Odoo ZPL encodes lot labels with GS1 AI "21" (serial number) prefix.
+    Physical scanners or unmodified camera scanners may return "21<lot_name>".
+    Build candidate list: try original value first, then without GS1 prefix.
+
+    Retorna el recordset 'repair.order' (vacío si no se encontró).
+    """
+    barcode = (barcode or '').strip()
+    if not barcode:
+        return request.env['repair.order'].sudo()
+
+    candidates = [barcode]
+    if barcode.startswith('21') and len(barcode) > 2:
+        candidates.append(barcode[2:])
+
+    RepairOrder = request.env['repair.order'].sudo()
+    repair = RepairOrder
+    for candidate in candidates:
+        repair = RepairOrder.search([
+            ('lot_id.name', '=', candidate),
+            ('repair_equipment_type', '=', 'frio_calor'),
+            ('state', 'not in', ['cancel', 'done']),
+        ], order='create_date desc', limit=1)
+        if repair:
+            return repair
+
+    for candidate in candidates:
+        repair = RepairOrder.search([
+            ('lot_id.name', '=', candidate),
+            ('repair_equipment_type', '=', 'frio_calor'),
+        ], order='create_date desc', limit=1)
+        if repair:
+            return repair
+
+    return RepairOrder
+
+
 class RepairPortalController(CustomerPortal):
 
     def _prepare_home_portal_values(self, counters):
@@ -114,39 +167,187 @@ class RepairPortalController(CustomerPortal):
             return request.render('repair_portal_ivess.portal_repair_scan', values)
 
         barcode = barcode.strip()
-
-        # Odoo ZPL encodes lot labels with GS1 AI "21" (serial number) prefix.
-        # Physical scanners or unmodified camera scanners may return "21<lot_name>".
-        # Build candidate list: try original value first, then without GS1 prefix.
-        candidates = [barcode]
-        if barcode.startswith('21') and len(barcode) > 2:
-            candidates.append(barcode[2:])
-
-        RepairOrder = request.env['repair.order'].sudo()
-        repair = None
-        for candidate in candidates:
-            repair = RepairOrder.search([
-                ('lot_id.name', '=', candidate),
-                ('repair_equipment_type', '=', 'frio_calor'),
-                ('state', 'not in', ['cancel', 'done']),
-            ], order='create_date desc', limit=1)
-            if repair:
-                break
-
-        if not repair:
-            for candidate in candidates:
-                repair = RepairOrder.search([
-                    ('lot_id.name', '=', candidate),
-                    ('repair_equipment_type', '=', 'frio_calor'),
-                ], order='create_date desc', limit=1)
-                if repair:
-                    break
+        repair = _resolve_repair_by_barcode(barcode)
 
         if repair:
             return request.redirect(f'/my/repairs/{repair.id}')
 
         values.update({'barcode': barcode, 'not_found': True})
         return request.render('repair_portal_ivess.portal_repair_scan', values)
+
+    # ============================================================
+    # Procesamiento por lote persistente (repair.batch): hidrolavadora / pintura
+    # ============================================================
+
+    def _get_portal_batch(self, batch_id):
+        batch = request.env['repair.batch'].sudo().browse(batch_id)
+        return batch if batch.exists() else request.env['repair.batch'].sudo()
+
+    @http.route(
+        ['/my/repairs/batch', '/my/repairs/batch/page/<int:page>'],
+        type='http', auth='user', website=True,
+    )
+    def portal_repair_batch_list(self, page=1, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        RepairBatch = request.env['repair.batch'].sudo()
+        batch_count = RepairBatch.search_count([])
+        pager = portal_pager(
+            url='/my/repairs/batch',
+            total=batch_count,
+            page=page,
+            step=_BATCHES_PER_PAGE,
+        )
+        batches = RepairBatch.search(
+            [], order='create_date desc', limit=_BATCHES_PER_PAGE, offset=pager['offset'],
+        )
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'page_name': 'repair_batch_list',
+            'batches': batches,
+            'pager': pager,
+            'stage_labels': _STAGE_LABELS,
+            'stage_badge': _STAGE_BADGE,
+            'batch_state_labels': _BATCH_STATE_LABELS,
+            'batch_state_badge': _BATCH_STATE_BADGE,
+        })
+        return request.render('repair_portal_ivess.portal_repair_batch_list', values)
+
+    @http.route(
+        ['/my/repairs/batch/new'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_batch_new(self, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = request.env['repair.batch'].sudo().with_context(
+            _portal_user_id=request.env.uid,
+        ).create({})
+        return request.redirect(f'/my/repairs/batch/{batch.id}')
+
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>'],
+        type='http', auth='user', website=True,
+    )
+    def portal_repair_batch_detail(self, batch_id, add_error=None, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if not batch:
+            return request.redirect('/my/repairs/batch')
+
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'page_name': 'repair_batch_detail',
+            'batch': batch,
+            'stage_labels': _STAGE_LABELS,
+            'stage_badge': _STAGE_BADGE,
+            'batch_state_labels': _BATCH_STATE_LABELS,
+            'batch_state_badge': _BATCH_STATE_BADGE,
+            'add_error': add_error,
+        })
+        return request.render('repair_portal_ivess.portal_repair_batch_detail', values)
+
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>/add'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_batch_add(self, batch_id, barcode=None, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if not batch:
+            return request.redirect('/my/repairs/batch')
+
+        barcode = (barcode or '').strip()
+        if not barcode:
+            return request.redirect(f'/my/repairs/batch/{batch_id}')
+
+        repair = _resolve_repair_by_barcode(barcode)
+        if not repair:
+            error = _("No se encontró una orden de reparación para el número de serie '%s'.", barcode)
+            return request.redirect(f'/my/repairs/batch/{batch_id}?{urlencode({"add_error": error})}')
+
+        try:
+            batch.with_context(_portal_user_id=request.env.uid).action_add_repair(repair)
+        except UserError as e:
+            return request.redirect(f'/my/repairs/batch/{batch_id}?{urlencode({"add_error": str(e)})}')
+
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
+
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>/remove'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_batch_remove(self, batch_id, repair_id=None, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if not batch:
+            return request.redirect('/my/repairs/batch')
+
+        try:
+            repair_id = int(repair_id or 0)
+        except (TypeError, ValueError):
+            repair_id = 0
+        repair = request.env['repair.order'].sudo().browse(repair_id)
+        if repair.exists():
+            try:
+                batch.with_context(_portal_user_id=request.env.uid).action_remove_repair(repair)
+            except UserError:
+                pass
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
+
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>/start'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_batch_start(self, batch_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if batch:
+            try:
+                batch.with_context(_portal_user_id=request.env.uid).action_start()
+            except UserError:
+                pass
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
+
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>/finish'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_batch_finish(self, batch_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if batch:
+            try:
+                batch.with_context(_portal_user_id=request.env.uid).action_finish()
+            except UserError:
+                pass
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
+
+    @http.route(
+        ['/my/repairs/batch/<int:batch_id>/delete'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_batch_delete(self, batch_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        batch = self._get_portal_batch(batch_id)
+        if batch and batch.state == 'draft':
+            batch.unlink()
+            return request.redirect('/my/repairs/batch')
+        return request.redirect(f'/my/repairs/batch/{batch_id}')
 
     @http.route(
         ['/my/repairs', '/my/repairs/page/<int:page>'],
@@ -476,8 +677,8 @@ class RepairPortalController(CustomerPortal):
         try:
             repair.with_context(_portal_user_id=request.env.uid).action_open_advance_next_stage()
         except (UserError, IndexError):
-            pass
-        return request.redirect(f'/my/repairs/{repair_id}')
+            return request.redirect(f'/my/repairs/{repair_id}')
+        return request.redirect('/my/repairs')
 
     @http.route(
         ['/my/repairs/<int:repair_id>/prev_stage'],
