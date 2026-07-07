@@ -16,6 +16,7 @@
         "helpdesk_maint_custom",
         "logistic_custom_ivess",
         "ivess_partner_custom",
+        "pricelist_custom",
     ],
     "data": [
         "data/ir_sequence.xml",
