@@ -34,6 +34,7 @@
         'views/replacement_reason.xml',
         'views/res_partner_water_consumption.xml',
         'views/res_partner.xml',
+        'views/res_config_settings.xml',
         'views/role.xml',
         'views/res_company.xml',
         'views/sale_order.xml',
