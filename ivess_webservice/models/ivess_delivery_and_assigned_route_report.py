@@ -35,6 +35,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
     )
 
     #res.partner
+    partner_id = fields.Many2one('res.partner', readonly=True)
     state_rp = fields.Selection(
         selection=lambda self: self.env['res.partner']._fields['state'].selection,
         readonly=True,
@@ -66,6 +67,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
                     drn.allow_sale_without_stock AS allow_sale_without_stock,
                     drn.allow_reordering AS allow_reordering,
                     drn.repair_order_sequence_id AS repair_order_sequence_id,
+                    rp.id AS partner_id,
                     rp.state AS state_rp,
                     rp.date_from AS date_from_rp,
                     rp.date_to AS date_to_rp
@@ -91,17 +93,19 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             return {
                 "error": "Se requiere el parámetro distribution."
             }
-        if not isinstance(distribution, str):
+        if not isinstance(distribution, int):
             return {
-                "error": "El parámetro 'distribution' debe ser una cadena de texto. "
+                "error": "El parámetro 'distribution' debe ser un entero. "
                         "Tipo recibido: %s." % type(distribution).__name__
             }
 
-        template = self.env['template.delivery.route'].search([('name', '=', distribution)], limit=1)
-        if not template:
-            return {"error": "No existe una distribución con el código '%s'." % distribution}
+        delivery = self.env['delivery.route.number'].search([('number', '=', distribution)], limit=1)
+        if not delivery:
+            return {"error": "No existe un reparto con el código '%s'." % distribution}
 
-        records = self.search([('template_delivery_route_id', '=', template.id)])
+        templates = self.env['template.delivery.route'].search([('delivery_number_id', '=', delivery.id)])
+
+        records = self.search([('template_delivery_route_id', 'in', templates.ids)])
         if not records:
             return {"error": "No hay rutas/clientes asignados para la distribución '%s'." % distribution}
 
@@ -128,6 +132,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             'template_delivery_route_id',
         ]
         client_fields = [
+            'partner_id',
             'state_rp',
             'date_from_rp',
             'date_to_rp',
@@ -139,7 +144,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             'logistic_custom_ivess.minutos_x_convertir_factura', default=0.0
         ))
 
-        unwrap_fields = {'delivery_number_id', 'route_id'}
+        unwrap_fields = {'delivery_number_id', 'route_id', 'partner_id'}
 
         routes_by_id = {}
         result = []
@@ -157,8 +162,8 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
                 result.append(route_data)
 
             routes_by_id[route_id]['clients'].append({
-                'client_id': rec['id'],
-                **{field: rec[field] for field in client_fields},
+                field: (rec[field][0] if rec[field] else False) if field in unwrap_fields else rec[field]
+                for field in client_fields
             })
 
         return result
