@@ -91,17 +91,19 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             return {
                 "error": "Se requiere el parámetro distribution."
             }
-        if not isinstance(distribution, str):
+        if not isinstance(distribution, int):
             return {
-                "error": "El parámetro 'distribution' debe ser una cadena de texto. "
+                "error": "El parámetro 'distribution' debe ser un entero. "
                         "Tipo recibido: %s." % type(distribution).__name__
             }
 
-        template = self.env['template.delivery.route'].search([('name', '=', distribution)], limit=1)
-        if not template:
-            return {"error": "No existe una distribución con el código '%s'." % distribution}
+        delivery = self.env['delivery.route.number'].search([('number', '=', distribution)], limit=1)
+        if not delivery:
+            return {"error": "No existe un reparto con el código '%s'." % distribution}
 
-        records = self.search([('template_delivery_route_id', '=', template.id)])
+        templates = self.env['template.delivery.route'].search([('delivery_number_id', '=', delivery.id)])
+
+        records = self.search([('template_delivery_route_id', 'in', templates.ids)])
         if not records:
             return {"error": "No hay rutas/clientes asignados para la distribución '%s'." % distribution}
 
