@@ -48,11 +48,9 @@ class IvessRoadmapReport(models.Model):
     final_balance = fields.Float(readonly=True)
     state = fields.Selection(
         [
-            ("active", "Activo"),
             ("discharge_review", "Revisión de baja"),
-            ("dont_pass", "No pasar"),
             ("holidays", "Vacaciones"),
-            ("rake", "Rastrillo"),
+            ("inactive", "Inactivo"),
         ],
         readonly=True,
     )
@@ -74,7 +72,7 @@ class IvessRoadmapReport(models.Model):
                     drl.id                              AS id,
                     drl.customer_code                   AS customer_code,
                     tdr.day                             AS day,
-                    rp.x_studio_requiere_comprobante    AS receipt_required,
+                    rp.requiere_comprobante    AS receipt_required,
                     rp.name                             AS name,
                     rp.average_hour                     AS avg_hour,
                     rp.partner_latitude                 AS partner_latitude,
@@ -241,7 +239,7 @@ class IvessRoadmapReport(models.Model):
                     "date_from": rec["date_from"],
                     "date_to": rec["date_to"],
                 }
-            
+
         partners = self.env["res.partner"].search([("customer_code", "in", list(grouped.keys()))])
         for partner in partners:
             code = partner.customer_code

@@ -6,19 +6,9 @@ from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
 
-WEEKDAY_MAPPING = {
-    'monday': 0,
-    'tuesday': 1,
-    'wednesday': 2,
-    'thursday': 3,
-    'friday': 4,
-    'saturday': 5,
-    'sunday': 6,
-}
-
 class DeliveryRoute(models.Model):
     _name = 'delivery.route'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread', 'mail.activity.mixin', 'visit.schedule.mixin']
     _description = 'Delivery Route'
     _rec_name = 'name'
 
@@ -205,6 +195,7 @@ class DeliveryRoute(models.Model):
         return [(0, 0, {
             'route_id': self.id,
             'client_id': line.client_id.id,
+            'origin': 'plantilla',
         }) for line in template.delivery_route_line_ids]
 
     @api.model_create_multi
@@ -250,10 +241,55 @@ class DeliveryRoute(models.Model):
     def action_set_closed(self):
         for record in self:
             record._validate_state()
-            record._validate_rake_restriction()
+            # record._validate_rake_restriction()
             record.write({'state': 'closed'})
+            record._update_last_visit_dates()
             created, updated = record._generate_next_week_route()
             record._post_next_routes_chatter(created, updated)
+
+    def _update_last_visit_dates(self):
+        """Actualiza partner.distribution.last_visit_date por cada cliente
+        visitado efectivamente en este recorrido (no rastrillo, no
+        vacaciones). Debe correr después de cerrar (is_vacation ya
+        congelado, ver _compute_is_vacation) y antes de generar el próximo
+        recorrido, para que este último ya vea el last_visit_date al día."""
+        self.ensure_one()
+        template = self.template_delivery_route_id
+        if not template or not self.delivery_date:
+            return
+
+        for line in self.delivery_route_line_ids:
+            if line.origin == 'rastrillo' or line.is_vacation:
+                continue
+
+            dist = line.client_id.distributions_ids.filtered(
+                lambda d: d.distribution.id == template.id
+            )[:1]
+            if not dist:
+                continue
+
+            if dist.last_visit_date:
+                expected_date = dist._compute_next_visit_date(
+                    dist.last_visit_date, dist.frequency, dist.visit_day
+                )
+                if expected_date:
+                    deviation = abs((self.delivery_date - expected_date).days)
+                    if deviation > 2:
+                        self.message_post(body=_(
+                            "Desvío de frecuencia para %(partner)s: se esperaba la "
+                            "próxima visita el %(expected)s (última visita %(last)s, "
+                            "frecuencia %(freq)s), pero el recorrido se cerró el "
+                            "%(actual)s (desvío de %(days)s día/s)."
+                        ) % {
+                            'partner': line.client_id.name,
+                            'expected': expected_date.strftime('%d/%m/%Y'),
+                            'last': dist.last_visit_date.strftime('%d/%m/%Y'),
+                            'freq': dict(dist._fields['frequency'].selection).get(dist.frequency, dist.frequency),
+                            'actual': self.delivery_date.strftime('%d/%m/%Y'),
+                            'days': deviation,
+                        })
+
+            dist.last_visit_date = self.delivery_date
 
     def _post_next_routes_chatter(self, created, updated):
         lines = []
@@ -265,9 +301,13 @@ class DeliveryRoute(models.Model):
             self.message_post(body=Markup('Rutas generadas al cerrar:<br/>') + Markup('<br/>').join(lines))
 
     def _generate_next_week_route(self):
-        """Al cerrar la ruta, genera un único recorrido para la semana siguiente.
-        Solo incluye clientes cuya próxima visita cae en esa fecha (frecuencia semanal).
-        Clientes con otras frecuencias son gestionados por el cron mensual."""
+        """Al cerrar la ruta, genera (o completa) el recorrido de la semana
+        siguiente. Incluye a todo cliente de la plantilla cuya próxima fecha
+        esperada (last_visit_date + frecuencia) ya llegó o pasó respecto a
+        next_week_date (esto reprograma automáticamente a quien quedó
+        vencido, p.ej. por vacaciones en su fecha exacta), o que nunca fue
+        visitado (last_visit_date vacío -> se incluye siempre, criterio
+        conservador)."""
         created = self.env['delivery.route']
         updated = self.env['delivery.route']
 
@@ -275,17 +315,26 @@ class DeliveryRoute(models.Model):
             return created, updated
 
         template = self.template_delivery_route_id
-        next_week_date = self.delivery_date + timedelta(days=7)
+        next_week_date = self._compute_next_visit_date(self.delivery_date, 'weekly', template.day)
+        if not next_week_date:
+            return created, updated
+
+        distributions = self.env['partner.distribution'].search([
+            ('distribution', '=', template.id),
+        ])
 
         client_ids = []
-        for line in self.delivery_route_line_ids:
-            client = line.client_id
-            dist = client.distributions_ids.filtered(lambda d: d.distribution.id == template.id)
-            if not dist:
-                dist = client.distributions_ids
-            frequency = dist[:1].frequency or client.frequency or 'weekly'
-            if frequency == 'weekly':
-                client_ids.append(client.id)
+        for dist in distributions:
+            if not dist.partner_id:
+                continue
+            if not dist.last_visit_date:
+                client_ids.append(dist.partner_id.id)
+                continue
+            expected_date = dist._compute_next_visit_date(
+                dist.last_visit_date, dist.frequency, dist.visit_day
+            )
+            if expected_date and expected_date <= next_week_date:
+                client_ids.append(dist.partner_id.id)
 
         if not client_ids:
             return created, updated
@@ -311,7 +360,13 @@ class DeliveryRoute(models.Model):
 
         existing_client_ids = route.delivery_route_line_ids.mapped('client_id').ids
         new_lines = [
-            {'route_id': route.id, 'client_id': cid}
+            {
+                'route_id': route.id,
+                'client_id': cid,
+                'origin': 'plantilla',
+                'visit_status_id': False,
+                'no_purchase_reason_id': False,
+            }
             for cid in client_ids
             if cid not in existing_client_ids
         ]
@@ -319,24 +374,6 @@ class DeliveryRoute(models.Model):
             self.env['delivery.route.line'].create(new_lines)
 
         return created, updated
-
-    def _compute_next_visit_date(self, frequency, visit_day):
-        """Retorna la próxima fecha de visita según la frecuencia y el día de visita del cliente."""
-        current_date = self.delivery_date
-        weekday_index = WEEKDAY_MAPPING.get(visit_day, current_date.weekday())
-
-        if frequency == 'biweekly':
-            base_date = current_date + timedelta(days=14)
-        elif frequency == 'monthly':
-            next_month_first = (current_date.replace(day=1) + timedelta(days=32)).replace(day=1)
-            days_ahead = (weekday_index - next_month_first.weekday()) % 7
-            return next_month_first + timedelta(days=days_ahead)
-        else:  # weekly
-            base_date = current_date + timedelta(days=7)
-
-        # Ajustar al día de visita correcto a partir de base_date
-        days_ahead = (weekday_index - base_date.weekday()) % 7
-        return base_date + timedelta(days=days_ahead)
 
     def _validate_state(self):
         if self.state != 'in_progress':
@@ -394,7 +431,7 @@ class DeliveryRoute(models.Model):
         for template in templates:
             if not template.delivery_route_line_ids:
                 continue
-            wizard = self.env['delivery.route.mass.create.wizard'].create({
+            wizard = self.env['delivery.route.mass.create.wizard'].sudo().create({
                 'date_from': month_start,
                 'date_to': month_end,
                 'template_delivery_route_id': template.id,
@@ -494,6 +531,85 @@ class DeliveryRouteLine(models.Model):
     origin = fields.Char(
         string='Origen',
     )
+    is_vacation = fields.Boolean(
+        string='Vacaciones',
+        compute='_compute_is_vacation',
+        store=True,
+        copy=False,
+    )
+    vacation_date_from = fields.Date(
+        string='Vacaciones Desde',
+        related='client_id.date_from',
+        store=True,
+        readonly=False,
+    )
+    vacation_date_to = fields.Date(
+        string='Vacaciones Hasta',
+        related='client_id.date_to',
+        store=True,
+        readonly=False,
+    )
+    frequency = fields.Selection(
+        selection=[
+            ('weekly', 'Weekly'),
+            ('biweekly', 'Biweekly'),
+            ('monthly', 'Monthly'),
+        ],
+        string='Frecuencia',
+        compute='_compute_frequency',
+        store=True,
+        readonly=True,
+    )
+
+    def _is_client_on_vacation(self, delivery_date):
+        """El cliente está de vacaciones para esa fecha si su estado es
+        'holidays' y la fecha cae dentro de su rango date_from/date_to
+        (los límites no definidos se consideran abiertos)."""
+        self.ensure_one()
+        partner = self.client_id
+        if not delivery_date or partner.state != 'holidays':
+            return False
+        if partner.date_from and delivery_date < partner.date_from:
+            return False
+        if partner.date_to and delivery_date > partner.date_to:
+            return False
+        return True
+
+    @api.depends(
+        'client_id.state',
+        'client_id.date_from',
+        'client_id.date_to',
+        'route_id.delivery_date',
+        'route_id.state',
+    )
+    def _compute_is_vacation(self):
+        """Se calcula en vivo (visible en cualquier estado del recorrido) para
+        que se vea antes de cerrar. Una vez que el recorrido se cierra, queda
+        congelado con el valor que tenía en ese momento, para trazabilidad y
+        para el cálculo de frecuencia (RF-6)."""
+        for rec in self:
+            if rec.route_id and rec.route_id.state == 'closed':
+                rec.is_vacation = rec.is_vacation
+                continue
+            rec.is_vacation = rec._is_client_on_vacation(rec.route_id.delivery_date)
+
+    @api.depends(
+        'client_id',
+        'route_id.template_delivery_route_id',
+        'template_route_id',
+        'client_id.distributions_ids.distribution',
+        'client_id.distributions_ids.frequency',
+    )
+    def _compute_frequency(self):
+        for rec in self:
+            template = rec.template_route_id or rec.route_id.template_delivery_route_id
+            if not rec.client_id or not template:
+                rec.frequency = False
+                continue
+            dist = rec.client_id.distributions_ids.filtered(
+                lambda d: d.distribution.id == template.id
+            )
+            rec.frequency = dist[:1].frequency if dist else False
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -507,9 +623,30 @@ class DeliveryRouteLine(models.Model):
                     rec.client_id.write({
                         'category_id': [(4, category.id)]
                     })
+        recs._handle_rake_line_creation()
+        recs._sync_partner_distribution()
         return recs
 
     def write(self, vals):
+        vacation_field_map = {'vacation_date_from': 'date_from', 'vacation_date_to': 'date_to'}
+        super_vals = vals
+        if vacation_field_map.keys() & vals.keys():
+            # Estos dos campos son related+store al cliente. Si se dejan pasar
+            # por el write() normal, el ORM propaga cada uno por separado con
+            # una escritura propia sobre res.partner, lo que puede violar
+            # transitoriamente la restricción date_from <= date_to (p.ej. al
+            # escribir primero la nueva date_from mientras la date_to vieja
+            # todavía es anterior). Por eso se escriben juntas, en un solo
+            # write sobre el partner.
+            partner_vals = {
+                target: vals[field]
+                for field, target in vacation_field_map.items()
+                if field in vals
+            }
+            for rec in self.filtered('client_id'):
+                rec.client_id.write(partner_vals)
+            super_vals = {k: v for k, v in vals.items() if k not in vacation_field_map}
+
         # save previous reason
         old_data = {
             rec.id: {
@@ -517,7 +654,7 @@ class DeliveryRouteLine(models.Model):
             } for rec in self
         }
 
-        res = super().write(vals)
+        res = super().write(super_vals) if super_vals else True
 
         for rec in self:
             old_reason = old_data[rec.id]['old_reason']
@@ -539,7 +676,63 @@ class DeliveryRouteLine(models.Model):
                 if new_reason and new_reason.id not in partner.category_id.ids:
                     partner.category_id = [(4, new_reason.id)]
 
+        if 'no_purchase_reason_id' in vals:
+            self._handle_rake_line_creation()
+
+        if 'client_id' in vals or 'template_route_id' in vals:
+            self._sync_partner_distribution()
+
         return res
+
+    def _sync_partner_distribution(self):
+        """Crea el partner.distribution correspondiente cuando una línea de
+        plantilla (template_route_id, sin route_id) queda con un cliente
+        asignado, para que quede reflejado en distributions_ids del partner."""
+        if self.env.context.get('no_sync_distribution'):
+            return
+        for rec in self:
+            if not rec.template_route_id or rec.route_id or not rec.client_id:
+                continue
+            existing = self.env['partner.distribution'].search([
+                ('distribution', '=', rec.template_route_id.id),
+                ('partner_id', '=', rec.client_id.id),
+            ], limit=1)
+            if not existing:
+                self.env['partner.distribution'].create({
+                    'distribution': rec.template_route_id.id,
+                    'partner_id': rec.client_id.id,
+                })
+
+    def _handle_rake_line_creation(self):
+        if self.env.context.get('_creating_rake_line'):
+            return
+        for rec in self:
+            if (
+                not rec.no_purchase_reason_id
+                or not rec.no_purchase_reason_id.is_rake
+                or not rec.client_id.is_important_client
+                or rec.origin == 'rastrillo'
+            ):
+                continue
+            existing = self.search([
+                ('route_id', '=', rec.route_id.id),
+                ('client_id', '=', rec.client_id.id),
+                ('origin', '=', 'rastrillo'),
+            ], limit=1)
+            if existing:
+                continue
+            self.with_context(_creating_rake_line=True).create([{
+                'route_id': rec.route_id.id,
+                'template_route_id': rec.template_route_id.id,
+                'client_id': rec.client_id.id,
+                'sequence': rec.sequence,
+                'possible_customer_withdrawal': rec.possible_customer_withdrawal,
+                'reason_customer_withdrawal': rec.reason_customer_withdrawal.id,
+                'effective_visit_hour': rec.effective_visit_hour,
+                'sale_order_id': rec.sale_order_id.id,
+                'stock_picking_id': rec.stock_picking_id.id,
+                'origin': 'rastrillo',
+            }])
 
     def unlink(self):
         for rec in self:

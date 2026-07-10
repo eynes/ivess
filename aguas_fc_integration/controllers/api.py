@@ -23,7 +23,7 @@ class AguasFCController(http.Controller):
         if not api_key or api_key != expected_key:
             return {'success': False, 'error': 'Token inválido o no proporcionado'}
 
-        data = request.get_json_data()
+        data = kwargs
 
         required = ['fecha', 'idreparto', 'tecnico', 'usuario', 'equipos']
         missing = [f for f in required if not data.get(f)]

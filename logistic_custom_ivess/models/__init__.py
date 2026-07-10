@@ -4,6 +4,7 @@ from . import client_type
 from . import template_delivery_route
 from . import delivery_route_region
 from . import delivery_route_number
+from . import visit_schedule_mixin
 from . import res_partner_distribution
 from . import delivery_route
 from . import no_purchase_reason

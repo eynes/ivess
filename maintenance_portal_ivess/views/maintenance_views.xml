@@ -23,8 +23,12 @@
         <field name="name">maintenance.closure.reason.list</field>
         <field name="model">maintenance.closure.reason</field>
         <field name="arch" type="xml">
-            <list string="Motivos de cierre" editable="bottom">
+            <list string="Motivos de cierre">
+                <field name="parent_id" optional="show"/>
                 <field name="name"/>
+                <field name="is_workshop"/>
+                <field name="is_maintenance"/>
+                <field name="child_ids" string="Subcategorías" optional="hide"/>
             </list>
         </field>
     </record>
@@ -36,8 +40,20 @@
             <form string="Motivo de cierre">
                 <sheet>
                     <group>
+                        <field name="parent_id" options="{'no_create': True}"/>
                         <field name="name"/>
+                        <field name="is_workshop" readonly="parent_id"/>
+                        <field name="is_maintenance" readonly="parent_id"/>
                     </group>
+                    <notebook>
+                        <page string="Subcategorías" invisible="parent_id">
+                            <field name="child_ids">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>
@@ -47,6 +63,8 @@
         <field name="name">Motivos de cierre</field>
         <field name="res_model">maintenance.closure.reason</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">[]</field>
+        <field name="context">{'default_parent_id': False}</field>
     </record>
 
     <menuitem
@@ -56,6 +74,36 @@
         action="action_maintenance_closure_reason"
         groups="maintenance.group_equipment_manager"
         sequence="10"/>
+
+
+    <!-- ══════════════════════════════════════════════════════
+         Herencia: maintenance.request — filtro pendientes por defecto
+    ══════════════════════════════════════════════════════ -->
+
+    <!-- Agregar filtro "Pendientes" a la vista de búsqueda -->
+    <record id="maintenance_request_view_search_pending" model="ir.ui.view">
+        <field name="name">maintenance.request.search.pending</field>
+        <field name="model">maintenance.request</field>
+        <field name="inherit_id" ref="maintenance.hr_equipment_request_view_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='active']" position="before">
+                <filter
+                    name="not_done"
+                    string="Pendientes"
+                    domain="[('stage_id.done', '=', False)]"/>
+                <separator/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Activar filtro Pendientes por defecto en la acción principal -->
+    <record id="maintenance.hr_equipment_todo_request_action_from_dashboard" model="ir.actions.act_window">
+        <field name="context">{
+            'search_default_active': True,
+            'search_default_not_done': 1,
+            'default_user_id': uid
+        }</field>
+    </record>
 
 
     <!-- ══════════════════════════════════════════════════════
@@ -80,6 +128,10 @@
             <!-- Campo motivo de cierre al final del segundo grupo -->
             <xpath expr="//field[@name='email_cc']" position="after">
                 <field name="closure_reason_id" options="{'no_create': True}"/>
+            </xpath>
+
+            <xpath expr="//field[@name='equipment_id']" position="after">
+                <field name="department_id" options="{'no_create': True}"/>
             </xpath>
 
         </field>

@@ -9,12 +9,14 @@
               inherit_id="portal.portal_my_home"
               customize_show="True">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="icon" t-value="'/repair_portal_ivess/static/src/img/water-dispenser.svg'"/>
-                <t t-set="title">Reparación Frio Calor</t>
-                <t t-set="text">Ver órdenes de reparación de Frio Calor</t>
-                <t t-set="url">/my/repairs</t>
-                <t t-set="placeholder_count">repair_count</t>
+            <t t-if="request.env.user.has_group('repair_portal_ivess.group_portal_repair')">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/repair_portal_ivess/static/src/img/water-dispenser.svg'"/>
+                    <t t-set="title">Reparación Frio Calor</t>
+                    <t t-set="text">Ver órdenes de reparación de Frio Calor</t>
+                    <t t-set="url">/my/repairs</t>
+                    <t t-set="placeholder_count">repair_count</t>
+                </t>
             </t>
         </xpath>
     </template>
@@ -107,6 +109,294 @@
 
 
     <!-- ============================================================
+         Vista lista de lotes: /my/repairs/batch
+         Lotes de procesamiento persistentes (hidrolavadora / pintura).
+    ============================================================ -->
+    <template id="portal_repair_batch_list" name="Lotes de Procesamiento">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/repairs">Órdenes de Reparación</a>
+                            </li>
+                            <li class="breadcrumb-item active">Lotes de Procesamiento</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="mb-0">
+                    <i class="fa fa-layer-group me-2" style="color: #875a7b;"/>
+                    Lotes de Procesamiento
+                </h4>
+                <form action="/my/repairs/batch/new" method="post">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fa fa-plus me-1"/> Nuevo Lote
+                    </button>
+                </form>
+            </div>
+            <p class="text-muted mb-3">
+                Solo aplica a las etapas Limpieza con hidrolavadora y Pintura. Todos los equipos de
+                un lote deben compartir exactamente la misma etapa. El lote queda guardado hasta que
+                se finalice la etapa que lo conformó.
+            </p>
+
+            <t t-if="not batches">
+                <div class="alert alert-warning mt-3">
+                    No hay lotes de procesamiento creados todavía.
+                </div>
+            </t>
+
+            <t t-if="batches">
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Referencia</th>
+                                    <th>Etapa</th>
+                                    <th>Estado</th>
+                                    <th>Equipos</th>
+                                    <th>Responsable</th>
+                                    <th>Creado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="batches" t-as="batch">
+                                    <tr>
+                                        <td>
+                                            <a t-attf-href="/my/repairs/batch/#{batch.id}">
+                                                <t t-esc="batch.name"/>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <span t-if="batch.stage" t-attf-class="badge rounded-pill text-bg-#{stage_badge.get(batch.stage, 'secondary')}">
+                                                <t t-esc="stage_labels.get(batch.stage, batch.stage)"/>
+                                            </span>
+                                            <span t-else="" class="text-muted">—</span>
+                                        </td>
+                                        <td>
+                                            <span t-attf-class="badge rounded-pill text-bg-#{batch_state_badge.get(batch.state, 'secondary')}">
+                                                <t t-esc="batch_state_labels.get(batch.state, batch.state)"/>
+                                            </span>
+                                        </td>
+                                        <td><t t-esc="batch.repair_count"/></td>
+                                        <td><t t-esc="batch.user_id.name or '—'"/></td>
+                                        <td><t t-esc="batch.create_date"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div t-if="pager" class="o_portal_pager text-center mt-3">
+                    <t t-call="portal.pager"/>
+                </div>
+            </t>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Vista detalle de lote: /my/repairs/batch/<id>
+    ============================================================ -->
+    <template id="portal_repair_batch_detail" name="Detalle de Lote de Procesamiento">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/repairs">Órdenes de Reparación</a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                <a href="/my/repairs/batch">Lotes de Procesamiento</a>
+                            </li>
+                            <li class="breadcrumb-item active"><t t-esc="batch.name"/></li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="row justify-content-center mt-2">
+                <div class="col-md-8">
+                    <div class="card shadow-sm">
+                        <div class="card-body p-4">
+
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h4 class="mb-1">
+                                        <i class="fa fa-layer-group me-2" style="color: #875a7b;"/>
+                                        <t t-esc="batch.name"/>
+                                    </h4>
+                                    <span t-if="batch.stage" t-attf-class="badge rounded-pill text-bg-#{stage_badge.get(batch.stage, 'secondary')} me-1">
+                                        <t t-esc="stage_labels.get(batch.stage, batch.stage)"/>
+                                    </span>
+                                    <span t-attf-class="badge rounded-pill text-bg-#{batch_state_badge.get(batch.state, 'secondary')}">
+                                        <t t-esc="batch_state_labels.get(batch.state, batch.state)"/>
+                                    </span>
+                                </div>
+                                <t t-if="batch.state == 'draft'">
+                                    <form t-attf-action="/my/repairs/batch/#{batch.id}/delete" method="post"
+                                          onsubmit="return confirm('¿Eliminar este lote?');">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                                            <i class="fa fa-trash me-1"/> Eliminar Lote
+                                        </button>
+                                    </form>
+                                </t>
+                            </div>
+
+                            <t t-if="add_error">
+                                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                    <t t-esc="add_error"/>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            </t>
+
+                            <!-- Escaneo: solo mientras el lote está en preparación -->
+                            <t t-if="batch.state == 'draft'">
+                                <p class="text-muted mb-3">
+                                    Escanee o ingrese los números de serie de los equipos a agregar al lote.
+                                    Todos deben compartir exactamente la misma etapa.
+                                </p>
+                                <form t-attf-action="/my/repairs/batch/#{batch.id}/add" method="post" id="batch_add_form">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <div class="d-flex gap-2 mb-3">
+                                        <button type="button" id="batch-scan-camera-btn" class="btn btn-primary">
+                                            <i class="fa fa-camera me-2"/> Escanear con cámara
+                                        </button>
+                                        <div class="input-group">
+                                            <input
+                                                id="batch_barcode_input"
+                                                type="text"
+                                                name="barcode"
+                                                class="form-control"
+                                                placeholder="O escribir N° de serie y presionar Enter..."
+                                                autocomplete="off"
+                                            />
+                                            <button type="submit" class="btn btn-outline-primary">
+                                                <i class="fa fa-plus"/>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </t>
+
+                            <div class="table-responsive mb-3">
+                                <table class="table table-hover table-sm mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>N° de Serie</th>
+                                            <th>Referencia</th>
+                                            <th>Etapa Actual</th>
+                                            <th t-if="batch.state != 'draft'">Iniciado</th>
+                                            <th t-if="batch.state == 'draft'"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="not batch.repair_ids">
+                                            <td colspan="4" class="text-center text-muted py-3">
+                                                Ningún equipo agregado todavía.
+                                            </td>
+                                        </tr>
+                                        <t t-foreach="batch.repair_ids" t-as="member">
+                                            <tr>
+                                                <td><t t-esc="member.lot_id.name or '—'"/></td>
+                                                <td>
+                                                    <a t-attf-href="/my/repairs/#{member.id}"><t t-esc="member.name"/></a>
+                                                </td>
+                                                <td>
+                                                    <span t-attf-class="badge rounded-pill text-bg-#{stage_badge.get(member.frio_calor_stage, 'secondary')}">
+                                                        <t t-esc="stage_labels.get(member.frio_calor_stage, member.frio_calor_stage)"/>
+                                                    </span>
+                                                </td>
+                                                <td t-if="batch.state != 'draft'">
+                                                    <i t-attf-class="fa #{'fa-check text-success' if member.stage_started else 'fa-clock text-muted'}"/>
+                                                </td>
+                                                <td t-if="batch.state == 'draft'">
+                                                    <form t-attf-action="/my/repairs/batch/#{batch.id}/remove" method="post">
+                                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                        <input type="hidden" name="repair_id" t-att-value="member.id"/>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Quitar del lote">
+                                                            <i class="fa fa-times"/>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-center gap-3">
+                                <t t-if="batch.state == 'draft'">
+                                    <form t-attf-action="/my/repairs/batch/#{batch.id}/start" method="post">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-success btn-lg px-4"
+                                                t-att-disabled="not batch.repair_ids or None"
+                                                onclick="return confirm('¿Confirmar inicio de la etapa para todo el lote?');">
+                                            <i class="fa fa-play me-2"/> Comenzar
+                                        </button>
+                                    </form>
+                                </t>
+                                <t t-if="batch.state == 'in_progress'">
+                                    <form t-attf-action="/my/repairs/batch/#{batch.id}/finish" method="post">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-primary btn-lg px-4"
+                                                onclick="return confirm('¿Confirmar fin de etapa para todo el lote?');">
+                                            Fin de Etapa <i class="fa fa-chevron-right ms-1"/>
+                                        </button>
+                                    </form>
+                                </t>
+                                <t t-if="batch.state == 'done'">
+                                    <span class="text-success"><i class="fa fa-check-circle me-1"/> Lote finalizado.</span>
+                                </t>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script type="text/javascript">
+                (function () {
+                    var input = document.getElementById('batch_barcode_input');
+                    var form = document.getElementById('batch_add_form');
+                    if (!input || !form) return;
+                    input.focus();
+                    input.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            form.submit();
+                        }
+                    });
+                    var cameraBtn = document.getElementById('batch-scan-camera-btn');
+                    if (cameraBtn) {
+                        cameraBtn.addEventListener('click', function () {
+                            if (!window.RepairScanner) return;
+                            window.RepairScanner.open(function (value) {
+                                input.value = value;
+                                form.submit();
+                            });
+                        });
+                    }
+                })();
+            </script>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
          Vista lista: /my/repairs
     ============================================================ -->
     <template id="portal_my_repairs" name="Mis Órdenes de Reparación">
@@ -118,6 +408,9 @@
             </t>
 
             <div class="text-end mb-2">
+                <a href="/my/repairs/batch" class="btn btn-outline-secondary btn-sm me-2">
+                    <i class="fa fa-layer-group me-1"/> Procesar por lote
+                </a>
                 <a href="/my/repairs/scan" class="btn btn-outline-primary btn-sm">
                     <i class="fa fa-barcode me-1"/> Escanear N° de Serie
                 </a>
