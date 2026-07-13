@@ -53,8 +53,12 @@
                             <field name="allow_reordering"/>
                         </group>
                         <group>
-                            <field name="allow_sale_without_stock"/>
                             <field name="allow_previous_price"/>
+                            <field name="date_from" invisible="not allow_previous_price" required="allow_previous_price"/>
+                            <field name="date_to" invisible="not allow_previous_price" required="allow_previous_price"/>
+                        </group>
+                        <group>
+                            <field name="allow_sale_without_stock"/>
                             <field name="allow_cash_sale"/>
                             <field name="is_cold_hot_delivery"/>
                             <field name="allow_manual_address"/>

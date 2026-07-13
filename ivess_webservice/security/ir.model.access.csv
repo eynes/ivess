@@ -47,3 +47,9 @@ access_sale_order_line_bot,sale.order.line.bot,sale.model_sale_order_line,ivess_
 access_ivess_stock_report_bot,ivess.stock.report.bot,model_ivess_stock_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 access_stock_location_bot,stock.location.bot,stock.model_stock_location,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 access_stock_quant_bot,stock.quant.bot,stock.model_stock_quant,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+
+access_ivess_delivery_and_assigned_route_report_bot,ivess.delivery.and.assigned.route.report.bot,model_ivess_delivery_and_assigned_route_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+
+access_ivess_customer_fc_report_bot,ivess.customer.fc.report.bot,model_ivess_customer_fc_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+
+access_ivess_fc_stock_in_truck_bot,ivess.fc.stock.in.truck.bot,model_ivess_fc_stock_in_truck,ivess_webservice.group_ivess_webservice_user,1,0,0,0

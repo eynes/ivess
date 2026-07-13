@@ -304,6 +304,22 @@
                             <strong><t t-esc="maint_request.closure_reason_id.name"/></strong>
                         </div>
                     </t>
+
+                    <!-- Adjuntos -->
+                    <t t-if="maint_attachments">
+                        <hr/>
+                        <h6 class="text-muted mb-2">Adjuntos</h6>
+                        <div class="list-group">
+                            <t t-foreach="maint_attachments" t-as="att">
+                                <a t-attf-href="/my/maintenance/attachment/#{att.id}"
+                                   target="_blank"
+                                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fa fa-paperclip me-2 text-muted"/><t t-esc="att.name"/></span>
+                                    <i class="fa fa-external-link text-muted"/>
+                                </a>
+                            </t>
+                        </div>
+                    </t>
                 </div>
             </div>
 
@@ -1160,6 +1176,22 @@
                             <i class="fa fa-check-circle text-success"/>
                             <small class="text-muted">Motivo de cierre:</small>
                             <strong><t t-esc="maint_request.closure_reason_id.name"/></strong>
+                        </div>
+                    </t>
+
+                    <!-- Adjuntos -->
+                    <t t-if="maint_attachments">
+                        <hr/>
+                        <h6 class="text-muted mb-2">Adjuntos</h6>
+                        <div class="list-group">
+                            <t t-foreach="maint_attachments" t-as="att">
+                                <a t-attf-href="/my/maintenance/attachment/#{att.id}"
+                                   target="_blank"
+                                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fa fa-paperclip me-2 text-muted"/><t t-esc="att.name"/></span>
+                                    <i class="fa fa-external-link text-muted"/>
+                                </a>
+                            </t>
                         </div>
                     </t>
                 </div>

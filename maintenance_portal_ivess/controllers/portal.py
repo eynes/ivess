@@ -104,10 +104,18 @@ class MaintenancePortalController(CustomerPortal):
             'maintenance_for_options': [('equipment', 'Equipo'), ('workcenter', 'Centro de trabajo')],
         }
 
+    def _maint_attachments(self, maint_request):
+        """Attachments (chatter + uploads) linked to a maintenance.request."""
+        return request.env['ir.attachment'].sudo().search(
+            [('res_model', '=', 'maintenance.request'), ('res_id', '=', maint_request.id)],
+            order='id desc',
+        )
+
     def _maint_detail_values(self, maint_request):
         """Common read-only display values for detail views."""
         return {
             'maint_request': maint_request,
+            'maint_attachments': self._maint_attachments(maint_request),
             'priority_labels': _PRIORITY_LABELS,
             'priority_badge': _PRIORITY_BADGE,
             'maintenance_type_labels': _MAINTENANCE_TYPE_LABELS,
@@ -785,3 +793,23 @@ class MaintenancePortalController(CustomerPortal):
             limit=15, order='id desc',
         )
         return [{'id': p.id, 'name': p.display_name} for p in productions]
+
+    # ── Adjuntos: apertura/descarga desde el portal ───────────────────────────
+
+    @http.route(
+        ['/my/maintenance/attachment/<int:attachment_id>'],
+        type='http', auth='user', website=True,
+    )
+    def portal_maintenance_attachment(self, attachment_id, **kw):
+        user = request.env.user
+        if not (user.has_group('maintenance_portal_ivess.group_portal_maintenance') or
+                user.has_group('maintenance_portal_ivess.group_portal_workshop')):
+            return request.redirect('/my')
+        attachment = request.env['ir.attachment'].sudo().browse(attachment_id)
+        if not attachment.exists() or attachment.res_model != 'maintenance.request':
+            return request.not_found()
+        maint_request = request.env['maintenance.request'].sudo().browse(attachment.res_id)
+        if not maint_request.exists():
+            return request.not_found()
+        stream = request.env['ir.binary'].sudo()._get_stream_from(attachment, 'raw')
+        return stream.get_response(as_attachment=kw.get('download') == '1')

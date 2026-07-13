@@ -128,6 +128,14 @@ class RepairOrder(models.Model):
             return FRIO_CALOR_STAGE_ORDER
         return FRIO_CALOR_STAGE_ORDER_NO_PAINT
 
+    def _get_active_batch(self, states=('draft', 'in_progress')):
+        """Retorna el 'repair.batch' (no finalizado) al que pertenece esta orden, o vacío."""
+        self.ensure_one()
+        return self.env['repair.batch'].sudo().search([
+            ('repair_ids', '=', self.id),
+            ('state', 'in', list(states)),
+        ], limit=1)
+
     def action_next_frio_calor_stage(self):
         for order in self:
             if order.repair_equipment_type != 'frio_calor':
@@ -252,6 +260,12 @@ class RepairOrder(models.Model):
     def _do_outsource(self, reason=None):
         self.ensure_one()
         order = self
+        active_batch = order._get_active_batch()
+        if active_batch:
+            raise UserError(_(
+                "No se puede tercerizar: el equipo forma parte del lote '%s'. "
+                "Quítelo del lote o finalícelo para continuar.", active_batch.name
+            ))
         stage_label = dict(FRIO_CALOR_STAGES).get(order.frio_calor_stage, order.frio_calor_stage)
 
         internal_picking_type = self.env['stock.picking.type'].search([
@@ -323,6 +337,12 @@ class RepairOrder(models.Model):
         for order in self:
             if order.repair_equipment_type == 'frio_calor' and not order.stage_started:
                 raise UserError(_("Debe iniciar la etapa actual presionando 'Comenzar' antes de enviar a reparación."))
+            active_batch = order._get_active_batch()
+            if active_batch:
+                raise UserError(_(
+                    "No se puede enviar a reparación: el equipo forma parte del lote '%s'. "
+                    "Quítelo del lote o finalícelo para continuar.", active_batch.name
+                ))
             order.prev_frio_calor_stage = order.frio_calor_stage
             order.with_context(_frio_calor_stage_advance=True).frio_calor_stage = 'repair'
             order.message_post(body=_("La orden fue enviada a reparación."))
@@ -364,6 +384,12 @@ class RepairOrder(models.Model):
         for order in self:
             if order.frio_calor_stage in ('descarte', 'finalizado'):
                 continue
+            active_batch = order._get_active_batch()
+            if active_batch:
+                raise UserError(_(
+                    "No se puede enviar a descarte: el equipo forma parte del lote '%s'. "
+                    "Quítelo del lote o finalícelo para continuar.", active_batch.name
+                ))
             prev = order.frio_calor_stage
             order.prev_frio_calor_stage = prev
             order.with_context(
@@ -472,6 +498,13 @@ class RepairOrder(models.Model):
             if 'frio_calor_stage' in vals and order.repair_equipment_type == 'frio_calor':
                 if not self.env.context.get('_frio_calor_stage_advance') and not self.env.context.get('_revert_stage'):
                     raise UserError(_("No se puede modificar la etapa directamente. Use los botones 'Avanzar Etapa' o 'Revertir Etapa'."))
+                if not self.env.context.get('_batch_processing'):
+                    active_batch = order._get_active_batch(states=('in_progress',))
+                    if active_batch:
+                        raise UserError(_(
+                            "No se puede cambiar la etapa: el equipo forma parte del lote '%s', que está en proceso. "
+                            "Debe finalizar el lote para continuar.", active_batch.name
+                        ))
 
             # Validación de requires_painting
             if 'requires_painting' in vals and not vals['requires_painting']:
