@@ -27,8 +27,11 @@ class IvessRoadmapReport(models.Model):
         ],
         readonly=True,
     )
+    receipt_required = fields.Boolean(readonly=True)
     name = fields.Char(readonly=True)
     avg_hour = fields.Float(readonly=True)
+    partner_latitude = fields.Float(readonly=True)
+    partner_longitude = fields.Float(readonly=True)
     street = fields.Char(readonly=True)
     street2 = fields.Char(readonly=True)
     street_number = fields.Char(readonly=True)
@@ -42,18 +45,23 @@ class IvessRoadmapReport(models.Model):
     property_payment_term_id = fields.Many2one("account.payment.term", readonly=True)
     property_account_position_id = fields.Many2one("account.fiscal.position", readonly=True)
     vat = fields.Char(readonly=True)
+    final_balance = fields.Float(readonly=True)
     state = fields.Selection(
         [
-            ("active", "Activo"),
             ("discharge_review", "Revisión de baja"),
-            ("dont_pass", "No pasar"),
             ("holidays", "Vacaciones"),
-            ("rake", "Rastrillo"),
+            ("inactive", "Inactivo"),
         ],
         readonly=True,
     )
     date_to = fields.Date(readonly=True)
     date_from = fields.Date(readonly=True)
+    frio_calor_count = fields.Integer(readonly=True)
+    lts_min_bonification = fields.Integer(readonly=True)
+    consumption_liters = fields.Float(readonly=True)
+    overdue_balance = fields.Float(readonly=True)
+    mobile_number = fields.Char(readonly=True)
+    address_details = fields.Text(readonly=True)
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -64,8 +72,11 @@ class IvessRoadmapReport(models.Model):
                     drl.id                              AS id,
                     drl.customer_code                   AS customer_code,
                     tdr.day                             AS day,
+                    rp.requiere_comprobante    AS receipt_required,
                     rp.name                             AS name,
                     rp.average_hour                     AS avg_hour,
+                    rp.partner_latitude                 AS partner_latitude,
+                    rp.partner_longitude                AS partner_longitude,
                     rp.street                           AS street,
                     rp.street2                          AS street2,
                     rp.num                              AS street_number,
@@ -75,11 +86,41 @@ class IvessRoadmapReport(models.Model):
                     rp.partner_type_id                  AS partner_type_id,
                     rp.city                             AS city,
                     rp.phone                            AS phone,
+                    rp.mobile_number                    AS mobile_number,
                     tdr.delivery_number_id              AS delivery_number_id,
+                    rp.address_details                  AS address_details,
                     rp.vat                              AS vat,
+                    rp.final_balance                    AS final_balance,
                     rp.state                            AS state,
                     rp.date_to                          AS date_to,
-                    rp.date_from                        AS date_from
+                    rp.date_from                        AS date_from,
+                    (
+                        SELECT COUNT(*)
+                        FROM water_container wc
+                        WHERE wc.partner_id = rp.id
+                        AND wc.is_frio_calor = TRUE
+                    )                                   AS frio_calor_count,
+                    (
+                        SELECT pt.litros_min_bonificacion
+                        FROM product_template pt
+                        WHERE pt.is_frio_calor = TRUE
+                    )                                   AS lts_min_bonification,
+                    (
+                        SELECT rpwc.consumption_liters
+                        FROM res_partner_water_consumption rpwc
+                        WHERE rpwc.partner_id = rp.id
+                        AND rpwc.month = EXTRACT(MONTH FROM CURRENT_DATE)
+                        AND rpwc.year  = EXTRACT(YEAR  FROM CURRENT_DATE)
+                    )                                   AS consumption_liters,
+                    (
+                        SELECT COALESCE(SUM(am.amount_total_in_currency_signed), 0)
+                        FROM account_move am
+                        WHERE am.partner_id = rp.id
+                        AND am.move_type IN ('out_invoice', 'out_refund')
+                        AND am.state = 'posted'
+                        AND am.amount_residual != 0
+                        AND am.invoice_date_due <= CURRENT_DATE - INTERVAL '90 days'
+                    )                                   AS overdue_balance
                 FROM delivery_route_line drl
                 JOIN template_delivery_route tdr ON drl.template_route_id = tdr.id
                 JOIN res_partner rp ON drl.client_id = rp.id
@@ -134,8 +175,11 @@ class IvessRoadmapReport(models.Model):
         records = self.search(domain, order="customer_code").read([
             "customer_code",
             "day",
+            "receipt_required",
             "name",
             "avg_hour",
+            "partner_latitude",
+            "partner_longitude",
             "street",
             "street2",
             "street_number",
@@ -145,11 +189,18 @@ class IvessRoadmapReport(models.Model):
             "partner_type_id",
             "city",
             "phone",
+            "mobile_number",
             "delivery_number_id",
+            "address_details",
             "vat",
+            "final_balance",
             "state",
             "date_to",
             "date_from",
+            "frio_calor_count",
+            "lts_min_bonification",
+            "consumption_liters",
+            "overdue_balance",
         ])
 
         grouped = {}
@@ -158,8 +209,12 @@ class IvessRoadmapReport(models.Model):
             if code not in grouped:
                 grouped[code] = {
                     "customer_code": code,
+                    "day": rec["day"],
+                    "receipt_required": rec["receipt_required"],
                     "name": rec["name"],
                     "avg_hour": _format_float_time(rec["avg_hour"]),
+                    "partner_latitude": rec["partner_latitude"],
+                    "partner_longitude": rec["partner_longitude"],
                     "street": rec["street"],
                     "street2": rec["street2"],
                     "street_number": rec["street_number"],
@@ -168,20 +223,23 @@ class IvessRoadmapReport(models.Model):
                     "apartment": rec["apartment"],
                     "partner_type_id": rec["partner_type_id"],
                     "city": rec["city"],
+                    "frio_calor_count": rec["frio_calor_count"],
+                    "lts_min_bonification": rec["lts_min_bonification"],
+                    "consumption_liters": rec["consumption_liters"],
                     "phone": rec["phone"],
+                    "mobile_number": rec["mobile_number"],
+                    "delivery_number_id": rec["delivery_number_id"],
+                    "address_details": rec["address_details"],
                     "property_payment_term_id": False,
-                    "property_account_position_id": False,
                     "vat": rec["vat"],
+                    "final_balance": rec["final_balance"],
+                    "overdue_balance": rec["overdue_balance"],
+                    "property_account_position_id": False,
                     "state": rec["state"],
-                    "date_to": rec["date_to"],
                     "date_from": rec["date_from"],
-                    "routes": [],
+                    "date_to": rec["date_to"],
                 }
-            grouped[code]["routes"].append({
-                "day": rec["day"],
-                "delivery_number_id": rec["delivery_number_id"],
-            })
-            
+
         partners = self.env["res.partner"].search([("customer_code", "in", list(grouped.keys()))])
         for partner in partners:
             code = partner.customer_code

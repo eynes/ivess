@@ -14,7 +14,7 @@ class IvessContainerLoanReport(models.Model):
         [('prestado', 'Prestado'), ('en_comodato', 'En Comodato')],
         readonly=True,
     )
-    return_date   = fields.Date(readonly=True)
+    return_date   = fields.Date(readonly=True, compute="_compute_return_date")
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -26,14 +26,21 @@ class IvessContainerLoanReport(models.Model):
                     rp.customer_code AS customer_code,
                     pt.default_code  AS default_code,
                     wc.quantity      AS quantity,
-                    wc.state         AS state,
-                    wc.return_date   AS return_date
+                    wc.state         AS state
                 FROM water_container wc
                 JOIN res_partner      rp ON wc.partner_id = rp.id
                 JOIN product_template pt ON wc.product_id = pt.id
+                WHERE wc.state IN ('prestado', 'en_comodato')
+                AND pt.is_returnable = true
             )
             """.format(table=self._table)
         )
+
+    def _compute_return_date(self):
+        containers = {c.id: c for c in self.env["water.container"].browse(self.ids)}
+        for rec in self:
+            container = containers.get(rec.id)
+            rec.return_date = container.return_date if container else False
 
     @api.model
     def get_container_loans(self, **kwargs):

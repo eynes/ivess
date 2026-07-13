@@ -82,9 +82,14 @@ class WaterContainer(models.Model):
     )
 
     @api.depends('stock_move_ids', 'stock_move_ids.state', 'stock_move_ids.quantity',
-                 'stock_move_ids.picking_id.picking_type_code')
+                 'stock_move_ids.picking_id.picking_type_code',
+                 'is_frio_calor', 'frio_calor_picking_id', 'frio_calor_picking_id.state')
     def _compute_quantity(self):
         for rec in self:
+            if rec.is_frio_calor:
+                picking = rec.frio_calor_picking_id
+                rec.quantity = 1.0 if picking and picking.state == 'done' else 0.0
+                continue
             done_moves = rec.stock_move_ids.filtered(lambda m: m.state == 'done')
             qty_out = sum(
                 m.quantity for m in done_moves

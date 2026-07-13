@@ -4,32 +4,26 @@ from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
 from dateutil.rrule import rrule, WEEKLY
 from datetime import datetime, timedelta
-from collections import defaultdict
 
 
 WEEKDAY_MAPPING = {
     'monday': 0,
-    'tuesday': 1, 
-    'wednesday': 2, 
+    'tuesday': 1,
+    'wednesday': 2,
     'thursday': 3,
-    'friday': 4, 
-    'saturday': 5, 
+    'friday': 4,
+    'saturday': 5,
     'sunday': 6
-}
-
-FREQUENCY_MAPPING = {
-    'weekly': 1,
-    'biweekly': 2,
-    'monthly': 4, 
 }
 
 class DeliveryRouteMassCreateWizard(models.TransientModel):
     _name = 'delivery.route.mass.create.wizard'
+    _inherit = ['visit.schedule.mixin']
     _description = 'Wizard to mass create delivery routes'
 
-    date_from = fields.Date(string="Date from", required=True)
-    date_to = fields.Date(string="Date to", required=True)
-    template_delivery_route_id = fields.Many2one('template.delivery.route', string="Recorrido", required=True)
+    date_from = fields.Date(string="Fecha Desde", required=True)
+    date_to = fields.Date(string="Fecha Hasta", required=True)
+    template_delivery_route_id = fields.Many2one('template.delivery.route', string="Plantilla", required=True)
 
     def _validate_dates(self):
         """Valida que la fecha de inicio (date_from) no sea mayor que la fecha de fin (date_to).
@@ -49,8 +43,11 @@ class DeliveryRouteMassCreateWizard(models.TransientModel):
         self._validate_dates()
 
     def route_exists(self, date, template_delivery_route_id):
+        from datetime import date as date_type
+        if not isinstance(date, date_type):
+            date = date.date()
         return self.env['delivery.route'].search_count([
-            ('delivery_date', '=', date), 
+            ('delivery_date', '=', date),
             ('template_delivery_route_id', '=', template_delivery_route_id)
         ])
 
@@ -111,55 +108,88 @@ class DeliveryRouteMassCreateWizard(models.TransientModel):
 
         # Genera todas las fechas en el rango que coincidan con el día de la semana
         dates = self.get_dates(assigned_weekday_index)
+        if not dates:
+            raise ValidationError(_("The selected date range does not contain any occurrence of the template's weekday."))
+
         created_routes = self.env['delivery.route']
         for current_date in dates:
-            data = self.prepare_vals_delivery_route(date=current_date.date())  # Convertimos a `date`
-            route_exists = self.route_exists(current_date, data.get('template_delivery_route_id'))
-            if route_exists > 0:
+            date = current_date.date()
+            data = self.prepare_vals_delivery_route(date=date)
+            if self.route_exists(date, data.get('template_delivery_route_id')):
                 continue
             delivery_route = self.env['delivery.route'].with_context({'create_from_wizard': True}).create(data)
             created_routes |= delivery_route
-        
+
         self.set_client_to_visit(created_routes)
+
+        # Mostrar todas las rutas del template en el rango, no solo las nuevas
+        all_routes = self.env['delivery.route'].search([
+            ('template_delivery_route_id', '=', template_route.id),
+            ('delivery_date', '>=', self.date_from),
+            ('delivery_date', '<=', self.date_to),
+        ])
 
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Generated Delivery Routes'),
+            'name': _('Recorridos Generados'),
             'res_model': 'delivery.route',
-            'view_mode': 'tree,form',
-            'domain': [('id', 'in', created_routes.ids)],
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', all_routes.ids)],
             'target': 'current',
         }
 
     def set_client_to_visit(self, created_routes):
-        """Asigna los clientes a las rutas generadas según la frecuencia de visita.
-        - Si la frecuencia del cliente es mensual, se asigna solo a la primera fecha del mes disponible.
-        - Si la frecuencia es semanal o quincenal, se asignan fechas de acuerdo con el intervalo definido.
+        """Asigna los clientes a las rutas generadas según su próxima fecha
+        esperada de visita (partner.distribution.last_visit_date +
+        frecuencia), con el mismo criterio que
+        delivery.route._generate_next_week_route. Si el cliente nunca fue
+        visitado (last_visit_date vacío), se lo incluye en todas las fechas
+        candidatas del rango (criterio conservador).
         Args:
             created_routes (recordset): Conjunto de rutas de entrega creadas.
         """
         self.ensure_one()
+        template = self.template_delivery_route_id
         route_dates = sorted(route.delivery_date for route in created_routes)
-        
-        # Agrupar por mes para clientes mensuales
-        monthly_dates = defaultdict(list)
-        for date in route_dates:
-            monthly_dates[date.strftime("%Y-%m")].append(date)
+        if not route_dates:
+            return
 
-        for line in self.template_delivery_route_id.delivery_route_line_ids:
-            client = line.client_id
-            interval = FREQUENCY_MAPPING.get(client.frequency, 1)
+        distributions = self.env['partner.distribution'].search([
+            ('distribution', '=', template.id),
+        ])
 
-            if client.frequency == 'monthly':
-                # Tomar la primera fecha de cada mes
-                selected_dates = [dates[0] for dates in monthly_dates.values()]
+        lines_to_create = []
+        for dist in distributions:
+            client = dist.partner_id
+            if not client:
+                continue
+
+            if not dist.last_visit_date:
+                selected_dates = route_dates
             else:
-                # Para semanal y quincenal
-                selected_dates = route_dates[::interval]
+                selected_dates = []
+                cursor_date = dist.last_visit_date
+                for candidate in route_dates:
+                    expected = dist._compute_next_visit_date(
+                        cursor_date, dist.frequency, dist.visit_day
+                    )
+                    if expected and expected <= candidate:
+                        selected_dates.append(candidate)
+                        cursor_date = candidate
 
-            selected_routes = created_routes.filtered(lambda r: r.delivery_date in selected_dates)
+            for route in created_routes.filtered(lambda r: r.delivery_date in selected_dates):
+                rastrillo_exists = any(
+                    l.client_id.id == client.id and l.origin == 'rastrillo'
+                    for l in route.delivery_route_line_ids
+                )
+                if not rastrillo_exists:
+                    lines_to_create.append({
+                        'route_id': route.id,
+                        'client_id': client.id,
+                        'origin': 'plantilla',
+                        'visit_status_id': False,
+                        'no_purchase_reason_id': False,
+                    })
 
-            self.env['delivery.route.line'].create([
-                {'route_id': route.id, 'client_id': client.id}
-                for route in selected_routes
-            ])
+        if lines_to_create:
+            self.env['delivery.route.line'].create(lines_to_create)

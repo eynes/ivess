@@ -8,9 +8,8 @@
                 <field name="partner_id"/>
                 <field name="product_id"/>
                 <field name="quantity"/>
-                <!--<field name="lot_id"/>-->
+                <field name="lot_id"/>
                 <field name="assignment_date"/>
-                <field name="state"/>
             </list>
         </field>
     </record>
@@ -23,12 +22,10 @@
             <form string="Equipo Frio/Calor">
                 <sheet>
                     <group>
-                        <field name="name" readonly="1"/>
                         <field name="partner_id" readonly="1"/>
                         <field name="product_id"/>
                         <field name="lot_id"/>
                         <field name="assignment_date" readonly="1"/>
-                        <field name="state"/>
                     </group>
                 </sheet>
             </form>

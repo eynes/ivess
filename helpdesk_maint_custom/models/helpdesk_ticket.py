@@ -153,3 +153,4 @@ class HelpdeskTicket(models.Model):
     maps_location = fields.Char(string="Ubicación Maps")
     webhub_description = fields.Char(string="WebHub Descripción")
     warehouse_id = fields.Many2one('stock.warehouse', string="Planta")
+    intake_payload = fields.Html(string="Payload de ingreso", readonly=True, sanitize=False)

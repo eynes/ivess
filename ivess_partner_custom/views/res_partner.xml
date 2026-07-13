@@ -5,6 +5,11 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//page[@name='accounting']" position="inside">
+                <group name="group_requiere_comprobante">
+                    <field name="requiere_comprobante"/>
+                </group>
+            </xpath>
             <xpath expr="//field[@name='category_id']" position="after">
                 <field name="total_invoiced"/>
                 <field name="unbilled_balance"/>

@@ -1,4 +1,5 @@
-from odoo import models, fields, api, _
+from odoo import api, models, fields
+from odoo.exceptions import ValidationError
 
 
 class DeliveryRouteNumberCategory(models.Model):
@@ -12,13 +13,15 @@ class DeliveryRouteNumber(models.Model):
     _name = 'delivery.route.number'
     _description = 'Delivery Route Number'
     _rec_name = 'number'
-    _sql_constraints = [
-        (
-            'unique_delivery_route_number',
-            'UNIQUE(number)',
-            'The delivery route number must be unique.'
-        )
-    ]
+
+    _unique_delivery_route_number = models.Constraint(
+        'UNIQUE(number)',
+        'The delivery route number must be unique.',
+    )
+    _unique_location_id = models.Constraint(
+        'UNIQUE(location_id)',
+        'Esa ubicación ya está vinculada a otro reparto.',
+    )
 
     def _get_default_number(self):
         last_route = self.search([], order='number desc', limit=1)
@@ -96,5 +99,24 @@ class DeliveryRouteNumber(models.Model):
         'delivery.route.number.category',
         string='Categoría',
     )
+    location_id = fields.Many2one(
+        'stock.location',
+        string='Ubicación',
+    )
+
+    date_from = fields.Date(
+        string='Fecha Desde',
+    )
+    date_to = fields.Date(
+        string='Fecha Hasta',
+    )
+
+    @api.constrains('allow_previous_price', 'date_from', 'date_to')
+    def _check_date_from_to_required(self):
+        for record in self:
+            if record.allow_previous_price and not (record.date_from and record.date_to):
+                raise ValidationError(
+                    "Debe completar 'Fecha Desde' y 'Fecha Hasta' cuando 'Permitir precio anterior' está habilitado."
+                )
 
 

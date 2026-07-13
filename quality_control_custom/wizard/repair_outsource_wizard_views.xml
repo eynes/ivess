@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_repair_outsource_wizard_form" model="ir.ui.view">
+        <field name="name">repair.outsource.wizard.form</field>
+        <field name="model">repair.outsource.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Tercerizar Orden">
+                <group>
+                    <field name="repair_id" readonly="1"/>
+                    <field name="outsource_reason_id" options="{'no_create': True}"/>
+                </group>
+                <footer>
+                    <button name="action_confirm"
+                            type="object"
+                            string="Confirmar"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

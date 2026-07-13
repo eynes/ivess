@@ -27,10 +27,14 @@
                     </div>
                 </div>
             </xpath>
+            <xpath expr="//span[@name='address_name']" position="before">
+                <field name="mobile_number" class="w-100" widget="phone" placeholder="Celular" help="Número de teléfono móvil"/>
+                <field name="address_details" help="Observaciones sobre la dirección del cliente para facilitar la identificación"/>
+            </xpath>
             <xpath expr="//field[@name='express_id']" position="before">
                 <field name="state" />
-                <field name="date_from" invisible="state not in ['holidays','dont_pass']"/>
-                <field name="date_to" invisible="state not in ['holidays','dont_pass']"/>
+                <field name="date_from" invisible="state != 'holidays'"/>
+                <field name="date_to" invisible="state != 'holidays'"/>
                 <field name="current_month_water_liters"/>
                 <field name="current_year_water_liters"/>
                 <field name="registration_channel_id"/>
@@ -43,12 +47,13 @@
                 <group invisible="not id">
                     <group name="group_route" string="Recorrido">
                         <field name="partner_type_id"/>
-                        <field name="distribution"/>
+                        <field name="distribution" invisible="1"/>
                         <field name="distributions_ids">
                             <list>
                                 <field name="distribution"/>
                                 <field name="visit_day"/>
-                                <field name="frequency"/>
+                                <field name="frequency" required="1"/>
+                                <field name="last_visit_date" readonly="1"/>
                                 <field name="message_type" optional="show"/>
                                 <button name="action_open_message_wizard" type="object" icon="fa-envelope" title="Editar Mensaje"/>
                             </list>
@@ -71,7 +76,8 @@
                     <group>
                         <field name="distribution"/>
                         <field name="visit_day"/>
-                        <field name="frequency"/>
+                        <field name="frequency" required="1"/>
+                        <field name="last_visit_date" readonly="1"/>
                     </group>
                 </sheet>
             </form>

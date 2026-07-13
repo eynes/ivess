@@ -3,3 +3,8 @@ access_repair_order_revert_stage_wizard,repair.order.revert.stage.wizard,model_r
 access_repair_order_advance_stage_wizard,repair.order.advance.stage.wizard,model_repair_order_advance_stage_wizard,stock.group_stock_user,1,1,1,1
 access_repair_order_wizard_stage,repair.order.wizard.stage,model_repair_order_wizard_stage,stock.group_stock_user,1,1,1,1
 access_repair_order_stage_log,repair.order.stage.log,model_repair_order_stage_log,stock.group_stock_user,1,1,1,1
+access_repair_outsource_reason,repair.outsource.reason,model_repair_outsource_reason,stock.group_stock_user,1,0,0,0
+access_repair_outsource_reason_manager,repair.outsource.reason.manager,model_repair_outsource_reason,stock.group_stock_manager,1,1,1,1
+access_repair_outsource_wizard,repair.outsource.wizard,model_repair_outsource_wizard,stock.group_stock_user,1,1,1,1
+access_repair_receive_third_party_wizard,repair.receive.third.party.wizard,model_repair_receive_third_party_wizard,stock.group_stock_user,1,1,1,1
+access_repair_batch,repair.batch,model_repair_batch,stock.group_stock_user,1,1,1,1

@@ -14,7 +14,7 @@
                 decoration-primary="frio_calor_stage in ('hidrolavadora','pileta')" 
                 decoration-muted="frio_calor_stage == 'pintura'"
                 decoration-warning="frio_calor_stage in ('prueba','secado')" 
-                decoration-danger="frio_calor_stage == 'repair'"/>
+                decoration-danger="frio_calor_stage in ('repair', 'descarte')"/>
             </xpath>
 
         </field>
@@ -31,15 +31,38 @@
                 <field name="repair_equipment_type" invisible="1"/>
                 <field name="requires_painting" invisible="1"/>
                 <field name="frio_calor_stage" invisible="1"/>
+                <field name="stage_started" invisible="1"/>
             </xpath>
 
 
             <!-- Botones en el header (tercerizar/recibir) -->
             <xpath expr="//button[@name='action_validate']" position="before">
+                <button name="action_start_current_stage"
+                        type="object"
+                        string="Comenzar"
+                        class="oe_highlight"
+                        confirm="¿Confirmar inicio de la etapa actual?"
+                        invisible="repair_equipment_type != 'frio_calor' or stage_started or frio_calor_stage in ('finalizado', 'descarte') or is_outsourced or state == 'draft'"/>
+                <button name="action_confirm_descarte"
+                        type="object"
+                        string="Confirmar Descarte"
+                        class="btn-danger"
+                        confirm="¿Confirmar el descarte? Esta acción cancela la orden definitivamente y da de baja el equipo del stock."
+                        invisible="frio_calor_stage != 'descarte' or state == 'cancel'"/>
+                <button name="action_back_from_descarte"
+                        type="object"
+                        string="Volver de Descarte"
+                        invisible="frio_calor_stage != 'descarte' or state == 'cancel'"/>
+                <button name="action_send_to_descarte"
+                        type="object"
+                        string="Enviar a Descarte"
+                        class="btn-danger"
+                        confirm="¿Enviar a Descarte? El equipo será dado de baja al confirmar."
+                        invisible="repair_equipment_type != 'frio_calor' or frio_calor_stage in ('descarte', 'finalizado') or state in ['cancel', 'done']"/>
                 <button name="action_outsource"
                         type="object"
                         string="Tercerizar"
-                        invisible="repair_equipment_type != 'frio_calor' or is_outsourced"/>
+                        invisible="repair_equipment_type != 'frio_calor' or is_outsourced or (frio_calor_stage == 'descarte' and state == 'cancel')"/>
                 <button name="action_receive_from_third_party"
                         type="object"
                         string="Recibir de tercero"
@@ -51,12 +74,12 @@
                 <button name="action_init_repair"
                         type="object"
                         string="Enviar a reparación"
-                        invisible="frio_calor_stage == 'repair' or is_outsourced"/>
+                        invisible="frio_calor_stage == 'repair' or is_outsourced or not stage_started"/>
                 <button name="action_send_to_pintura"
                         type="object"
                         string="Requiere Pintura"
                         class="btn-warning"
-                        invisible="frio_calor_stage != 'armado' or is_outsourced"/>
+                        invisible="frio_calor_stage != 'armado' or is_outsourced or not stage_started"/>
                 <button name="action_back_from_pintura"
                         type="object"
                         string="Volver de Pintura"
@@ -71,7 +94,7 @@
                             type="object"
                             class="btn btn-link btn-sm px-1"
                             title="Revertir Etapa"
-                            invisible="frio_calor_stage in ('prueba_inicial', 'repair', 'finalizado', 'pintura') or is_outsourced">
+                            invisible="frio_calor_stage in ('prueba_inicial', 'repair', 'finalizado', 'pintura', 'descarte') or is_outsourced">
                         <i class="fa fa-chevron-left"/> Revertir Etapa
                     </button>
                     <field name="frio_calor_stage" widget="selection_badge" readonly="1"/>
@@ -91,7 +114,7 @@
                             type="object"
                             class="btn btn-link btn-sm px-1"
                             title="Avanzar Etapa"
-                            invisible="frio_calor_stage in ('armado', 'repair', 'finalizado', 'pintura') or is_outsourced or prueba_inicial_resultado == 'no_definido'">
+                            invisible="frio_calor_stage in ('armado', 'repair', 'finalizado', 'pintura', 'descarte') or is_outsourced or prueba_inicial_resultado == 'no_definido' or not stage_started">
                         <i class="fa fa-chevron-right"/><br/>Siguiente Etapa
                     </button>
                 </div>
@@ -128,15 +151,21 @@
                 </page>
             </xpath>
 
-            <!-- Pestaña Partes se oculta si el equipo no esta en estado 'Reparación'-->
+            <!-- Ocultar "Establecer como borrador" cuando fue descartado -->
+            <xpath expr="//button[@name='action_repair_cancel_draft']" position="attributes">
+                <attribute name="invisible">state != 'cancel' or frio_calor_stage == 'descarte'</attribute>
+            </xpath>
+
+            <!-- Pestaña Partes visible en etapa Reparación y Descarte -->
             <xpath expr="//notebook/page[@name='parts']" position="attributes">
-                <attribute name="invisible">frio_calor_stage != 'repair'</attribute>
+                <attribute name="invisible">frio_calor_stage not in ('repair', 'descarte')</attribute>
             </xpath>
 
             <!-- Campo quality_check_id y traslado de tercerización en el grupo derecho -->
             <xpath expr="//field[@name='tag_ids']" position="after">
                 <field name="quality_check_id" readonly="1" invisible="not quality_check_id"/>
                 <field name="outsource_transfer_id" readonly="1" invisible="not outsource_transfer_id"/>
+                <field name="outsource_reason_id" readonly="1" invisible="not is_outsourced"/>
             </xpath>
 
             <!-- Readonly en campos críticos cuando está tercerizado -->
@@ -169,6 +198,11 @@
             </xpath>
             <xpath expr="//field[@name='move_ids']" position="attributes">
                 <attribute name="readonly">is_outsourced</attribute>
+                <attribute name="context">{'default_repair_id': id, 'default_product_uom_qty': 1, 'default_company_id': company_id, 'default_date': schedule_date, 'default_repair_line_type': frio_calor_stage == 'descarte' and 'remove' or 'add', 'active_repair_id': id}</attribute>
+            </xpath>
+
+            <xpath expr="//page[@name='parts']//field[@name='repair_line_type']" position="attributes">
+                <attribute name="readonly">parent.frio_calor_stage == 'descarte'</attribute>
             </xpath>
             <xpath expr="//field[@name='product_uom']" position="attributes">
                 <attribute name="readonly">is_outsourced</attribute>

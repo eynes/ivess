@@ -1,16 +1,10 @@
 import logging
-from collections import defaultdict
+from datetime import timedelta
 
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 
 _logger = logging.getLogger(__name__)
-
-FREQUENCY_MAPPING = {
-    'weekly': 1,
-    'biweekly': 2,
-    'monthly': 4,
-}
 
 
 class ResPartner(models.Model):
@@ -46,13 +40,11 @@ class ResPartner(models.Model):
     )
     state = fields.Selection(
         selection=[
-            ('active', 'Active'),
             ('discharge_review', 'Discharge Review'),
-            ('dont_pass', "Don't pass"),
             ('holidays', 'Holidays'),
-            ('rake', 'Rake')
+            ('inactive', 'Inactive'),
         ],
-        default='active',
+        default=False,
         string='State',
         tracking=True,
     )
@@ -121,6 +113,12 @@ class ResPartner(models.Model):
     )
     is_important_client = fields.Boolean(
         string="Cliente Importante",
+    )
+    mobile_number = fields.Char(
+        string="Numero de Celular",
+    )
+    address_details = fields.Text(
+        string="Observaciones de Dirección",
     )
 
     @api.depends('customer_rank')
@@ -228,9 +226,6 @@ class ResPartner(models.Model):
             rec.qty_water_consumption = len(rec.water_consumption_ids)
 
     def write(self, vals):
-        old_distribution = {
-            'distribution': self.distribution.id if self.distribution and 'distribution' in vals else None}
-
         self._check_pending_water_containers_before_archiving(vals)
 
         if self.should_delete_related_lines(vals):
@@ -249,29 +244,20 @@ class ResPartner(models.Model):
                 for c in nonproductive:
                     c.message_post(body=_('Marcado como Improductivo: cliente dado de baja.'))
 
-        if 'distribution' in vals or 'frequency' in vals:
-            if vals.get('distribution'):
-                self._process_new_template_delivery(vals.get('distribution'))
-            if old_distribution.get('distribution'):
-                self._process_old_template_delivery(old_distribution.get('distribution'))
-
-            self._reprocess_delivery_routes(vals.get('distribution'), old_distribution.get('distribution'),
-                                            vals.get('frequency'))
-
         return res
 
     def unlink(self):
         for partner in self:
             partner._check_pending_water_containers_before_archiving()
+            partner._delete_route_lines()
+            partner.distributions_ids.unlink()
         return super().unlink()
 
     def empty_vals(self, vals):
         vals.update({
-                'distribution': False,
-                'visit_day': False,
-                'frequency': False,
-                'state': 'discharge_review',
-            })
+            'distributions_ids': [(5, 0, 0)],
+            'state': 'discharge_review',
+        })
         return vals
 
     def _check_pending_water_containers_before_archiving(self, vals=None):
@@ -304,75 +290,40 @@ class ResPartner(models.Model):
             'state' in vals and vals['state'] == 'discharge_review'
         )
 
-    def _process_new_template_delivery(self, distribution):
-        TemplateDeliveryRoute = self.env['template.delivery.route']
-        DeliveryRouteLine = self.env['delivery.route.line']
-
-        template_id = TemplateDeliveryRoute.browse(distribution)
-        existing_client = template_id.delivery_route_line_ids.filtered(lambda l: l.client_id.id == self.id)
-
-        if not existing_client:
-            new_line = DeliveryRouteLine.create({'client_id': self.id})
-            template_id.delivery_route_line_ids = [(4, new_line.id)]
-
-    def _process_old_template_delivery(self, distribution):
-        DeliveryRouteLine = self.env['delivery.route.line']
-        domain = [('template_route_id', '=', distribution), ('client_id', '=', self.id)]
-        route_lines = DeliveryRouteLine.search(domain)
-        if route_lines:
-            route_lines.unlink()
-
-    def _unlink_old_route_lines(self, today):
-        DeliveryRouteLine = self.env['delivery.route.line']
-        domain_route_line = [('route_id.delivery_date', '>', today),
-                             ('client_id', '=', self.id)]
-        filtered_routes_lines = DeliveryRouteLine.search(domain_route_line)
-        filtered_routes_lines.unlink()
-
-    def _reprocess_delivery_routes(self, distribution, old_distribution, frequency):
-        DeliveryRouteLine = self.env['delivery.route.line']
-        DeliveryRoute = self.env['delivery.route']
-        today = fields.Date.today()
-
-        if old_distribution or frequency:
-            self._unlink_old_route_lines(today)
-
-        if not distribution and not frequency:
-            return
-
-        distribution = distribution or self.distribution.id
-        frequency = frequency or self.frequency
-
-        domain_route = [('delivery_date', '>', today), ('template_delivery_route_id', '=', distribution)]
-        filtered_routes = DeliveryRoute.search(domain_route, order="delivery_date")
-        route_dates = sorted(route.delivery_date for route in filtered_routes)
-
-        monthly_dates = defaultdict(list)
-        for date in route_dates:
-            monthly_dates[date.strftime("%Y-%m")].append(date)
-
-        interval = FREQUENCY_MAPPING.get(frequency, 1)
-
-        if frequency == 'monthly':
-            selected_dates = [dates[0] for dates in monthly_dates.values()]
-        else:
-            selected_dates = route_dates[::interval]
-
-        selected_routes = filtered_routes.filtered(lambda r: r.delivery_date in selected_dates)
-
-        for route in selected_routes:
-            new_line = DeliveryRouteLine.create({'client_id': self.id})
-            route.delivery_route_line_ids = [(4, new_line.id)]
-
     def _cron_check_partner_state(self):
         _logger.info("Cron - Checking partner states")
         today = fields.Date.today()
 
-        domain = [('state', 'in', ['holidays', 'dont_pass']), ('date_to', '<', today)]
+        domain = [('state', '=', 'holidays'), ('date_to', '<', today)]
         partners_to_update = self.search(domain)
-        partners_to_update.write({'state': 'active', 'date_from': False, 'date_to': False})
+        partners_to_update.write({'state': False, 'date_from': False, 'date_to': False})
 
         _logger.info(f">>>>>>>>>> Checked and updated {len(partners_to_update)} partners states")
+
+    @api.model
+    def _cron_check_partner_inactivity(self):
+        _logger.info("Cron - Checking partner inactivity")
+        thirty_days_ago = fields.Date.today() - timedelta(days=30)
+
+        candidates = self.search([
+            ('is_customer', '=', True),
+            ('state', 'not in', ['holidays', 'discharge_review', 'inactive']),
+        ])
+
+        to_deactivate = self.env['res.partner']
+        for partner in candidates:
+            has_recent_sale = self.env['sale.order'].search_count([
+                ('partner_id', '=', partner.id),
+                ('state', 'in', ['sale', 'done']),
+                ('date_order', '>=', thirty_days_ago),
+            ])
+            if not has_recent_sale:
+                to_deactivate |= partner
+
+        if to_deactivate:
+            to_deactivate.write({'state': 'inactive'})
+
+        _logger.info(f">>>>>>>>>> Checked and marked {len(to_deactivate)} partners as inactive")
 
     def _delete_route_lines(self):
         for partner in self:

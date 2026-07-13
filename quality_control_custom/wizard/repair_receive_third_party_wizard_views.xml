@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_repair_receive_third_party_wizard_form" model="ir.ui.view">
+        <field name="name">repair.receive.third.party.wizard.form</field>
+        <field name="model">repair.receive.third.party.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Recibir de Tercero">
+                <group>
+                    <field name="repair_id" readonly="1"/>
+                    <field name="target_stage"/>
+                </group>
+                <footer>
+                    <button name="action_confirm"
+                            type="object"
+                            string="Confirmar"
+                            class="btn-primary"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

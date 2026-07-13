@@ -4,6 +4,7 @@ from . import client_type
 from . import template_delivery_route
 from . import delivery_route_region
 from . import delivery_route_number
+from . import visit_schedule_mixin
 from . import res_partner_distribution
 from . import delivery_route
 from . import no_purchase_reason
@@ -20,6 +21,8 @@ from . import water_container
 from . import res_company
 from . import purchase_order_line
 from . import registration_channel
+from . import stock_location
 from . import stock_move
 from . import stock_picking
 from . import sale_report
+from . import res_config_settings

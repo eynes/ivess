@@ -22,6 +22,9 @@ class ProductTemplate(models.Model):
         default=False,
         tracking=True,
     )
+    litros_min_bonificacion = fields.Integer(
+        string="Litros mínimos para bonificación"
+    )
     allows_replacement = fields.Boolean(string="Allows Replacement")
     is_regular_app = fields.Boolean(string="Is Regular (APP)")
     show_in_app = fields.Boolean(string="Mostrar en App")
@@ -40,11 +43,24 @@ class ProductTemplate(models.Model):
             ('repairable', 'Repairable'),
         ],
         string='Status',
-        required=True,
         copy=False,
         tracking=True,
         default='new',
     )
+
+    @api.constrains('purchase_ok', 'categ_id', 'state')
+    def _check_purchase_required_fields(self):
+        for rec in self:
+            if not rec.purchase_ok:
+                continue
+            if not rec.categ_id:
+                raise ValidationError(
+                    _("Product Category is required for purchase products.")
+                )
+            if not rec.state:
+                raise ValidationError(
+                    _("Status is required for purchase products.")
+                )
 
     @api.constrains('abbreviation')
     def _check_abbreviation(self):
@@ -115,9 +131,9 @@ class ProductTemplate(models.Model):
         Returns:
             str: The generated default_code based on the category's sequence, or an empty string if no sequence is available.
         """
-        categ = self.env['product.category'].browse(categ_id) if categ_id else False
-        if not categ:
-            raise ValidationError(_("Product category is required to generate the reference."))
+        if not categ_id:
+            return False
+        categ = self.env['product.category'].browse(categ_id)
         if state == 'new':
             if not categ.new_sequence_id:
                 raise ValidationError(

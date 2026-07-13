@@ -13,6 +13,7 @@
     """,
     'depends': [
         'base',
+        'mail',
         'repair',
         'quality_control',
         'quality_repair',
@@ -21,14 +22,21 @@
     ],
     'data': [
         'security/ir.model.access.csv',
+        'data/repair_batch_data.xml',
         'wizard/repair_order_revert_stage_wizard_views.xml',
         'wizard/repair_order_advance_stage_wizard_views.xml',
+        'wizard/repair_outsource_wizard_views.xml',
+        'wizard/repair_receive_third_party_wizard_views.xml',
+        'views/repair_outsource_reason_views.xml',
         'views/quality_point_views.xml',
         'views/product_template_views.xml',
         'views/quality_check_views.xml',
         'views/repair_order_views.xml',
         'views/res_company_views.xml',
         'views/repair_barcode_scanner_views.xml',
+        'views/stock_picking_type_views.xml',
+        'views/stock_picking_views.xml',
+        'views/repair_batch_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

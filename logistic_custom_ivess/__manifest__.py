@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': "Sale Custom Ivess",
-    'version': '19.0.0.0.10',
+    'version': '19.0.0.0.15',
     'description': """
     """,
     'author': "Eynes",
@@ -34,6 +34,7 @@
         'views/replacement_reason.xml',
         'views/res_partner_water_consumption.xml',
         'views/res_partner.xml',
+        'views/res_config_settings.xml',
         'views/role.xml',
         'views/res_company.xml',
         'views/sale_order.xml',
@@ -41,11 +42,14 @@
         'views/visit_status.xml',
         'views/water_container.xml',
         'views/frio_calor_container.xml',
+        'views/stock_location.xml',
         'views/stock_move.xml',
         'views/purchase_order.xml',
         'views/sale_report.xml',
         'views/menuitems.xml',
         'wizard/res_partner_message_wizard.xml',
+        'wizard/delivery_route_bis_wizard.xml',
+        'wizard/delivery_route_mass_create_wizard.xml',
     ],
     'demo': [],
     'test': [],

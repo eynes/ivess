@@ -9,12 +9,14 @@
               inherit_id="portal.portal_my_home"
               customize_show="True">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
-            <t t-call="portal.portal_docs_entry">
-                <t t-set="icon" t-value="'/repair_portal_ivess/static/src/img/water-dispenser.svg'"/>
-                <t t-set="title">Reparación Frio Calor</t>
-                <t t-set="text">Ver órdenes de reparación de Frio Calor</t>
-                <t t-set="url">/my/repairs</t>
-                <t t-set="placeholder_count">repair_count</t>
+            <t t-if="request.env.user.has_group('repair_portal_ivess.group_portal_repair')">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/repair_portal_ivess/static/src/img/water-dispenser.svg'"/>
+                    <t t-set="title">Reparación Frio Calor</t>
+                    <t t-set="text">Ver órdenes de reparación de Frio Calor</t>
+                    <t t-set="url">/my/repairs</t>
+                    <t t-set="placeholder_count">repair_count</t>
+                </t>
             </t>
         </xpath>
     </template>
@@ -107,6 +109,294 @@
 
 
     <!-- ============================================================
+         Vista lista de lotes: /my/repairs/batch
+         Lotes de procesamiento persistentes (hidrolavadora / pintura).
+    ============================================================ -->
+    <template id="portal_repair_batch_list" name="Lotes de Procesamiento">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/repairs">Órdenes de Reparación</a>
+                            </li>
+                            <li class="breadcrumb-item active">Lotes de Procesamiento</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="mb-0">
+                    <i class="fa fa-layer-group me-2" style="color: #875a7b;"/>
+                    Lotes de Procesamiento
+                </h4>
+                <form action="/my/repairs/batch/new" method="post">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fa fa-plus me-1"/> Nuevo Lote
+                    </button>
+                </form>
+            </div>
+            <p class="text-muted mb-3">
+                Solo aplica a las etapas Limpieza con hidrolavadora y Pintura. Todos los equipos de
+                un lote deben compartir exactamente la misma etapa. El lote queda guardado hasta que
+                se finalice la etapa que lo conformó.
+            </p>
+
+            <t t-if="not batches">
+                <div class="alert alert-warning mt-3">
+                    No hay lotes de procesamiento creados todavía.
+                </div>
+            </t>
+
+            <t t-if="batches">
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Referencia</th>
+                                    <th>Etapa</th>
+                                    <th>Estado</th>
+                                    <th>Equipos</th>
+                                    <th>Responsable</th>
+                                    <th>Creado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="batches" t-as="batch">
+                                    <tr>
+                                        <td>
+                                            <a t-attf-href="/my/repairs/batch/#{batch.id}">
+                                                <t t-esc="batch.name"/>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <span t-if="batch.stage" t-attf-class="badge rounded-pill text-bg-#{stage_badge.get(batch.stage, 'secondary')}">
+                                                <t t-esc="stage_labels.get(batch.stage, batch.stage)"/>
+                                            </span>
+                                            <span t-else="" class="text-muted">—</span>
+                                        </td>
+                                        <td>
+                                            <span t-attf-class="badge rounded-pill text-bg-#{batch_state_badge.get(batch.state, 'secondary')}">
+                                                <t t-esc="batch_state_labels.get(batch.state, batch.state)"/>
+                                            </span>
+                                        </td>
+                                        <td><t t-esc="batch.repair_count"/></td>
+                                        <td><t t-esc="batch.user_id.name or '—'"/></td>
+                                        <td><t t-esc="batch.create_date"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div t-if="pager" class="o_portal_pager text-center mt-3">
+                    <t t-call="portal.pager"/>
+                </div>
+            </t>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
+         Vista detalle de lote: /my/repairs/batch/<id>
+    ============================================================ -->
+    <template id="portal_repair_batch_detail" name="Detalle de Lote de Procesamiento">
+        <t t-call="portal.portal_layout">
+
+            <div class="row mt-3">
+                <div class="col">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="/my/repairs">Órdenes de Reparación</a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                <a href="/my/repairs/batch">Lotes de Procesamiento</a>
+                            </li>
+                            <li class="breadcrumb-item active"><t t-esc="batch.name"/></li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="row justify-content-center mt-2">
+                <div class="col-md-8">
+                    <div class="card shadow-sm">
+                        <div class="card-body p-4">
+
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h4 class="mb-1">
+                                        <i class="fa fa-layer-group me-2" style="color: #875a7b;"/>
+                                        <t t-esc="batch.name"/>
+                                    </h4>
+                                    <span t-if="batch.stage" t-attf-class="badge rounded-pill text-bg-#{stage_badge.get(batch.stage, 'secondary')} me-1">
+                                        <t t-esc="stage_labels.get(batch.stage, batch.stage)"/>
+                                    </span>
+                                    <span t-attf-class="badge rounded-pill text-bg-#{batch_state_badge.get(batch.state, 'secondary')}">
+                                        <t t-esc="batch_state_labels.get(batch.state, batch.state)"/>
+                                    </span>
+                                </div>
+                                <t t-if="batch.state == 'draft'">
+                                    <form t-attf-action="/my/repairs/batch/#{batch.id}/delete" method="post"
+                                          onsubmit="return confirm('¿Eliminar este lote?');">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                                            <i class="fa fa-trash me-1"/> Eliminar Lote
+                                        </button>
+                                    </form>
+                                </t>
+                            </div>
+
+                            <t t-if="add_error">
+                                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                    <t t-esc="add_error"/>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            </t>
+
+                            <!-- Escaneo: solo mientras el lote está en preparación -->
+                            <t t-if="batch.state == 'draft'">
+                                <p class="text-muted mb-3">
+                                    Escanee o ingrese los números de serie de los equipos a agregar al lote.
+                                    Todos deben compartir exactamente la misma etapa.
+                                </p>
+                                <form t-attf-action="/my/repairs/batch/#{batch.id}/add" method="post" id="batch_add_form">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <div class="d-flex gap-2 mb-3">
+                                        <button type="button" id="batch-scan-camera-btn" class="btn btn-primary">
+                                            <i class="fa fa-camera me-2"/> Escanear con cámara
+                                        </button>
+                                        <div class="input-group">
+                                            <input
+                                                id="batch_barcode_input"
+                                                type="text"
+                                                name="barcode"
+                                                class="form-control"
+                                                placeholder="O escribir N° de serie y presionar Enter..."
+                                                autocomplete="off"
+                                            />
+                                            <button type="submit" class="btn btn-outline-primary">
+                                                <i class="fa fa-plus"/>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </t>
+
+                            <div class="table-responsive mb-3">
+                                <table class="table table-hover table-sm mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>N° de Serie</th>
+                                            <th>Referencia</th>
+                                            <th>Etapa Actual</th>
+                                            <th t-if="batch.state != 'draft'">Iniciado</th>
+                                            <th t-if="batch.state == 'draft'"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-if="not batch.repair_ids">
+                                            <td colspan="4" class="text-center text-muted py-3">
+                                                Ningún equipo agregado todavía.
+                                            </td>
+                                        </tr>
+                                        <t t-foreach="batch.repair_ids" t-as="member">
+                                            <tr>
+                                                <td><t t-esc="member.lot_id.name or '—'"/></td>
+                                                <td>
+                                                    <a t-attf-href="/my/repairs/#{member.id}"><t t-esc="member.name"/></a>
+                                                </td>
+                                                <td>
+                                                    <span t-attf-class="badge rounded-pill text-bg-#{stage_badge.get(member.frio_calor_stage, 'secondary')}">
+                                                        <t t-esc="stage_labels.get(member.frio_calor_stage, member.frio_calor_stage)"/>
+                                                    </span>
+                                                </td>
+                                                <td t-if="batch.state != 'draft'">
+                                                    <i t-attf-class="fa #{'fa-check text-success' if member.stage_started else 'fa-clock text-muted'}"/>
+                                                </td>
+                                                <td t-if="batch.state == 'draft'">
+                                                    <form t-attf-action="/my/repairs/batch/#{batch.id}/remove" method="post">
+                                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                        <input type="hidden" name="repair_id" t-att-value="member.id"/>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Quitar del lote">
+                                                            <i class="fa fa-times"/>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-center gap-3">
+                                <t t-if="batch.state == 'draft'">
+                                    <form t-attf-action="/my/repairs/batch/#{batch.id}/start" method="post">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-success btn-lg px-4"
+                                                t-att-disabled="not batch.repair_ids or None"
+                                                onclick="return confirm('¿Confirmar inicio de la etapa para todo el lote?');">
+                                            <i class="fa fa-play me-2"/> Comenzar
+                                        </button>
+                                    </form>
+                                </t>
+                                <t t-if="batch.state == 'in_progress'">
+                                    <form t-attf-action="/my/repairs/batch/#{batch.id}/finish" method="post">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-primary btn-lg px-4"
+                                                onclick="return confirm('¿Confirmar fin de etapa para todo el lote?');">
+                                            Fin de Etapa <i class="fa fa-chevron-right ms-1"/>
+                                        </button>
+                                    </form>
+                                </t>
+                                <t t-if="batch.state == 'done'">
+                                    <span class="text-success"><i class="fa fa-check-circle me-1"/> Lote finalizado.</span>
+                                </t>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script type="text/javascript">
+                (function () {
+                    var input = document.getElementById('batch_barcode_input');
+                    var form = document.getElementById('batch_add_form');
+                    if (!input || !form) return;
+                    input.focus();
+                    input.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            form.submit();
+                        }
+                    });
+                    var cameraBtn = document.getElementById('batch-scan-camera-btn');
+                    if (cameraBtn) {
+                        cameraBtn.addEventListener('click', function () {
+                            if (!window.RepairScanner) return;
+                            window.RepairScanner.open(function (value) {
+                                input.value = value;
+                                form.submit();
+                            });
+                        });
+                    }
+                })();
+            </script>
+
+        </t>
+    </template>
+
+
+    <!-- ============================================================
          Vista lista: /my/repairs
     ============================================================ -->
     <template id="portal_my_repairs" name="Mis Órdenes de Reparación">
@@ -118,6 +408,9 @@
             </t>
 
             <div class="text-end mb-2">
+                <a href="/my/repairs/batch" class="btn btn-outline-secondary btn-sm me-2">
+                    <i class="fa fa-layer-group me-1"/> Procesar por lote
+                </a>
                 <a href="/my/repairs/scan" class="btn btn-outline-primary btn-sm">
                     <i class="fa fa-barcode me-1"/> Escanear N° de Serie
                 </a>
@@ -258,6 +551,19 @@
                         </div>
                     </t>
 
+                    <!-- Botón Comenzar: visible cuando la etapa aún no fue iniciada -->
+                    <t t-if="not repair.stage_started and repair.frio_calor_stage not in ('finalizado', 'descarte') and not repair.is_outsourced">
+                        <div class="mt-4">
+                            <form t-attf-action="/my/repairs/#{repair.id}/start_stage" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-success btn-lg px-5"
+                                        onclick="return confirm('¿Confirmar inicio de la etapa actual?')">
+                                    <i class="fa fa-play me-2"/> Comenzar
+                                </button>
+                            </form>
+                        </div>
+                    </t>
+
                     <!-- Botones de navegación de etapa -->
                     <t t-if="repair.frio_calor_stage not in ('repair', 'finalizado', 'pintura') and not repair.is_outsourced">
                     <div>
@@ -275,7 +581,7 @@
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <button type="submit"
                                         class="btn btn-primary"
-                                        t-att-disabled="(not can_go_next or (repair.frio_calor_stage == 'prueba_inicial' and repair.prueba_inicial_resultado == 'no_definido')) or None">
+                                        t-att-disabled="(not can_go_next or not repair.stage_started or (repair.frio_calor_stage == 'prueba_inicial' and repair.prueba_inicial_resultado == 'no_definido')) or None">
                                     Siguiente Etapa <i class="fa fa-chevron-right ms-1"/>
                                 </button>
                             </form>
@@ -300,12 +606,14 @@
                     </div>
                     </t>
                     <!-- Acciones de flujo: reparación y tercerización -->
-                    <div class="d-flex justify-content-center gap-2 mt-3 pt-3 border-top flex-wrap">
+                    <div class="d-flex justify-content-center gap-2 mt-3 pt-3 border-top flex-wrap"
+                         t-if="repair.frio_calor_stage != 'descarte'">
                         <!-- Requiere Pintura: solo desde 'armado' -->
                         <t t-if="repair.frio_calor_stage == 'armado' and not repair.is_outsourced">
                             <form t-attf-action="/my/repairs/#{repair.id}/send_to_pintura" method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit" class="btn btn-warning btn-sm">
+                                <button type="submit" class="btn btn-warning btn-sm"
+                                        t-att-disabled="not repair.stage_started or None">
                                     <i class="fa fa-paint-brush me-1"/> Requiere Pintura
                                 </button>
                             </form>
@@ -323,7 +631,8 @@
                         <t t-if="repair.frio_calor_stage == 'armado' and not repair.is_outsourced">
                             <form t-attf-action="/my/repairs/#{repair.id}/repair_end" method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit" class="btn btn-success btn-sm">
+                                <button type="submit" class="btn btn-success btn-sm"
+                                        t-att-disabled="not repair.stage_started or None">
                                     <i class="fa fa-check-circle me-1"/> Finalizar reparación
                                 </button>
                             </form>
@@ -332,7 +641,8 @@
                         <t t-if="repair.frio_calor_stage not in ('repair', 'finalizado') and not repair.is_outsourced">
                             <form t-attf-action="/my/repairs/#{repair.id}/init_repair" method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <button type="submit" class="btn btn-outline-danger btn-sm"
+                                        t-att-disabled="not repair.stage_started or None">
                                     <i class="fa fa-wrench me-1"/> Enviar a reparación
                                 </button>
                             </form>
@@ -348,19 +658,66 @@
                         </t>
                         <!-- Tercerizar: cuando NO está tercerizado NI finalizado -->
                         <t t-if="not repair.is_outsourced and repair.frio_calor_stage != 'finalizado'">
-                            <form t-attf-action="/my/repairs/#{repair.id}/outsource" method="post">
-                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit" class="btn btn-outline-warning btn-sm">
-                                    <i class="fa fa-share-square me-1"/> Tercerizar
-                                </button>
-                            </form>
+                            <button type="button"
+                                    class="btn btn-outline-warning btn-sm"
+                                    data-bs-toggle="collapse"
+                                    t-attf-data-bs-target="#outsource-collapse-#{repair.id}"
+                                    aria-expanded="false">
+                                <i class="fa fa-share-square me-1"/> Tercerizar
+                            </button>
+                            <div class="collapse w-100 mt-2" t-attf-id="outsource-collapse-#{repair.id}">
+                                <form t-attf-action="/my/repairs/#{repair.id}/outsource" method="post"
+                                      class="d-flex justify-content-center align-items-center gap-2">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <select name="reason_id" class="form-select form-select-sm" style="max-width:220px" required="required">
+                                        <option value="">— Seleccionar razón —</option>
+                                        <t t-foreach="outsource_reasons" t-as="reason">
+                                            <option t-att-value="reason.id">
+                                                <t t-esc="reason.name"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                    <button type="submit" class="btn btn-warning btn-sm text-nowrap"
+                                            t-att-disabled="not outsource_reasons or None">
+                                        <i class="fa fa-check me-1"/> Confirmar
+                                    </button>
+                                </form>
+                            </div>
                         </t>
                         <!-- Recibir de tercero: cuando está tercerizado -->
                         <t t-if="repair.is_outsourced">
-                            <form t-attf-action="/my/repairs/#{repair.id}/receive_from_third_party" method="post">
+                            <button type="button"
+                                    class="btn btn-outline-success btn-sm"
+                                    data-bs-toggle="collapse"
+                                    t-attf-data-bs-target="#receive-collapse-#{repair.id}"
+                                    aria-expanded="false">
+                                <i class="fa fa-sign-in me-1"/> Recibir de tercero
+                            </button>
+                            <div class="collapse w-100 mt-2" t-attf-id="receive-collapse-#{repair.id}">
+                                <form t-attf-action="/my/repairs/#{repair.id}/receive_from_third_party" method="post"
+                                      class="d-flex justify-content-center align-items-center gap-2">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <select name="target_stage" class="form-select form-select-sm" style="max-width:220px" required="required">
+                                        <t t-foreach="receive_stages" t-as="stage">
+                                            <option t-att-value="stage[0]"
+                                                    t-att-selected="stage[0] == 'hidrolavadora' or None">
+                                                <t t-esc="stage[1]"/>
+                                            </option>
+                                        </t>
+                                    </select>
+                                    <button type="submit" class="btn btn-success btn-sm text-nowrap">
+                                        <i class="fa fa-check me-1"/> Confirmar
+                                    </button>
+                                </form>
+                            </div>
+                        </t>
+                        <!-- Enviar a Descarte: desde cualquier etapa excepto finalizado y descarte -->
+                        <t t-if="repair.frio_calor_stage not in ('finalizado', 'descarte') and repair.state not in ('cancel', 'done')">
+                            <form t-attf-action="/my/repairs/#{repair.id}/send_to_descarte" method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                <button type="submit" class="btn btn-outline-success btn-sm">
-                                    <i class="fa fa-sign-in me-1"/> Recibir de tercero
+                                <button type="submit" class="btn btn-dark btn-sm"
+                                        onclick="return confirm('¿Enviar a Descarte? El equipo será dado de baja al confirmar.')">
+                                    <i class="fa fa-trash me-1"/> Enviar a Descarte
                                 </button>
                             </form>
                         </t>
@@ -385,6 +742,206 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Sección Descarte -->
+            <t t-if="repair.frio_calor_stage == 'descarte'">
+                <div class="card mt-3 border-danger">
+                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="fa fa-trash me-2"/>Descarte</h6>
+                        <span class="badge bg-white text-danger">Solo se permite retirar partes</span>
+                    </div>
+
+                    <div class="card-body pb-0">
+                        <p class="text-muted small mb-3">
+                            Registre aquí los componentes que se retiran del equipo antes de descartarlo definitivamente.
+                        </p>
+                    </div>
+
+                    <!-- Lista de partes retiradas -->
+                    <t t-if="descarte_parts">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th class="text-end">Cantidad</th>
+                                        <th>UdM</th>
+                                        <th>Lote / N° de Serie</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="descarte_parts" t-as="move">
+                                        <tr>
+                                            <td><t t-esc="move.product_id.display_name"/></td>
+                                            <td class="text-end">
+                                                <form t-attf-action="/my/repairs/#{repair.id}/update_part_qty" method="post" class="d-inline-flex align-items-center gap-1">
+                                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                    <input type="hidden" name="move_id" t-att-value="move.id"/>
+                                                    <input type="number" name="quantity"
+                                                           t-att-value="move.quantity or move.product_uom_qty"
+                                                           class="form-control form-control-sm text-end"
+                                                           style="width:80px" min="0" step="0.01"/>
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary p-1" title="Guardar">
+                                                        <i class="fa fa-save"/>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                            <td><t t-esc="move.product_uom.name"/></td>
+                                            <td>
+                                                <t t-if="move.lot_ids">
+                                                    <t t-foreach="move.lot_ids" t-as="lot">
+                                                        <span class="badge text-bg-light border me-1"><t t-esc="lot.name"/></span>
+                                                    </t>
+                                                </t>
+                                                <t t-else="">—</t>
+                                            </td>
+                                            <td>
+                                                <form t-attf-action="/my/repairs/#{repair.id}/delete_part" method="post" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                    <input type="hidden" name="move_id" t-att-value="move.id"/>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger p-1" title="Eliminar">
+                                                        <i class="fa fa-trash"/>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </t>
+
+                    <!-- Formulario agregar parte a retirar -->
+                    <t t-if="add_error == 'no_product'">
+                        <div class="alert alert-warning mx-3 mt-3 mb-0" role="alert">
+                            <i class="fa fa-exclamation-triangle me-1"/> Seleccione un producto de la lista desplegable.
+                        </div>
+                    </t>
+                    <t t-elif="add_error == 'create_failed'">
+                        <div class="alert alert-danger mx-3 mt-3 mb-0" role="alert">
+                            <i class="fa fa-times-circle me-1"/> No se pudo agregar la parte. Verifique que el producto esté correctamente configurado.
+                        </div>
+                    </t>
+                    <div class="card-footer border-top pt-3">
+                        <h6 class="mb-3 text-muted"><i class="fa fa-plus-circle me-1"/>Agregar parte a retirar</h6>
+                        <form t-attf-action="/my/repairs/#{repair.id}/add_part" method="post" id="add_descarte_part_form">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="repair_line_type" value="remove"/>
+                            <input type="hidden" name="product_id" id="descarte_product_id"/>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-7">
+                                    <label class="form-label form-label-sm mb-1">Producto</label>
+                                    <input id="descarte_product_input" type="text"
+                                           class="form-control form-control-sm"
+                                           placeholder="Buscar producto..." autocomplete="off"/>
+                                    <div id="descarte_product_dropdown"
+                                         class="dropdown-menu p-0 shadow"
+                                         style="display:none; max-height:220px; overflow-y:auto;"/>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label form-label-sm mb-1">Cantidad</label>
+                                    <input type="number" name="product_uom_qty"
+                                           class="form-control form-control-sm"
+                                           value="1" min="0.01" step="0.01"/>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="submit" class="btn btn-sm btn-danger w-100"
+                                            id="descarte_add_submit" disabled="disabled">
+                                        <i class="fa fa-plus me-1"/>Retirar parte
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <script type="text/javascript">
+                        (function () {
+                            var input = document.getElementById('descarte_product_input');
+                            var hiddenId = document.getElementById('descarte_product_id');
+                            var dropdown = document.getElementById('descarte_product_dropdown');
+                            var submitBtn = document.getElementById('descarte_add_submit');
+                            var timer;
+                            document.body.appendChild(dropdown);
+                            dropdown.style.position = 'fixed';
+                            dropdown.style.zIndex = '9999';
+                            function positionDropdown() {
+                                var r = input.getBoundingClientRect();
+                                dropdown.style.top = r.bottom + 'px';
+                                dropdown.style.left = r.left + 'px';
+                                dropdown.style.width = r.width + 'px';
+                            }
+                            function showDropdown(products) {
+                                dropdown.innerHTML = '';
+                                if (!products.length) {
+                                    var empty = document.createElement('div');
+                                    empty.className = 'px-3 py-2 text-muted small';
+                                    empty.textContent = 'Sin resultados';
+                                    dropdown.appendChild(empty);
+                                } else {
+                                    products.forEach(function (p) {
+                                        var item = document.createElement('a');
+                                        item.className = 'dropdown-item small py-2';
+                                        item.href = '#';
+                                        item.textContent = p.name + (p.uom ? ' (' + p.uom + ')' : '');
+                                        item.addEventListener('click', function (e) {
+                                            e.preventDefault();
+                                            input.value = p.name;
+                                            hiddenId.value = p.id;
+                                            submitBtn.disabled = false;
+                                            dropdown.style.display = 'none';
+                                        });
+                                        dropdown.appendChild(item);
+                                    });
+                                }
+                                positionDropdown();
+                                dropdown.style.display = 'block';
+                            }
+                            input.addEventListener('input', function () {
+                                hiddenId.value = '';
+                                submitBtn.disabled = true;
+                                clearTimeout(timer);
+                                var q = this.value.trim();
+                                if (q.length &lt; 2) { dropdown.style.display = 'none'; return; }
+                                timer = setTimeout(function () {
+                                    fetch('/my/repairs/products/search', {
+                                        method: 'POST',
+                                        headers: {'Content-Type': 'application/json'},
+                                        body: JSON.stringify({jsonrpc: '2.0', method: 'call', id: 1, params: {query: q}}),
+                                    }).then(function (r) { return r.json(); })
+                                      .then(function (d) { showDropdown(d.result || []); })
+                                      .catch(function () { dropdown.style.display = 'none'; });
+                                }, 300);
+                            });
+                            window.addEventListener('scroll', function () {
+                                if (dropdown.style.display !== 'none') positionDropdown();
+                            }, { passive: true });
+                            document.addEventListener('click', function (e) {
+                                if (e.target !== input &amp;&amp; !dropdown.contains(e.target)) {
+                                    dropdown.style.display = 'none';
+                                }
+                            });
+                        })();
+                    </script>
+
+                    <!-- Botones de acción Descarte -->
+                    <div class="card-footer d-flex justify-content-center gap-3 pt-3">
+                        <form t-attf-action="/my/repairs/#{repair.id}/back_from_descarte" method="post">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <button type="submit" class="btn btn-outline-secondary">
+                                <i class="fa fa-arrow-left me-1"/> Volver
+                            </button>
+                        </form>
+                        <form t-attf-action="/my/repairs/#{repair.id}/confirm_descarte" method="post">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <button type="submit" class="btn btn-danger"
+                                    onclick="return confirm('¿Confirmar Descarte? Esta acción cancela la orden y da de baja el equipo del stock. No se puede deshacer.')">
+                                <i class="fa fa-trash me-1"/> Confirmar Descarte
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </t>
 
             <!-- Piezas -->
             <t t-if="repair.frio_calor_stage == 'repair' and not repair.is_outsourced">
