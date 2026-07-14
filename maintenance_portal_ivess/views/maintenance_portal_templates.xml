@@ -719,15 +719,16 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Equipo</label>
-                                <select name="equipment_id" class="form-select">
-                                    <option value="">— Sin equipo —</option>
-                                    <t t-foreach="equipment_list" t-as="eq">
-                                        <option t-att-value="eq.id"
-                                                t-att-selected="'selected' if maint_request.equipment_id.id == eq.id else None">
-                                            <t t-esc="eq.name"/>
-                                        </option>
-                                    </t>
-                                </select>
+                                <div class="position-relative">
+                                    <input type="text" id="maint_equip_name" class="form-control"
+                                           t-att-value="maint_request.equipment_id.display_name or ''"
+                                           autocomplete="off" placeholder="Buscar equipo..."/>
+                                    <input type="hidden" name="equipment_id" id="maint_equip_id"
+                                           t-att-value="maint_request.equipment_id.id or ''"/>
+                                    <div id="maint_equip_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
                                 <t t-if="maint_request.category_id">
                                     <small class="text-muted">
                                         Categoría actual: <t t-esc="maint_request.category_id.name"/>
@@ -848,6 +849,53 @@
                                     e.preventDefault();
                                     nameInput.value = p.name;
                                     idInput.value = p.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(() => { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
+            <script>
+            (function () {
+                const nameInput = document.getElementById('maint_equip_name');
+                const idInput = document.getElementById('maint_equip_id');
+                const suggestions = document.getElementById('maint_equip_suggestions');
+                if (!nameInput) return;
+                let timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    idInput.value = '';
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/equipment/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(eq => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = eq.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = eq.name;
+                                    idInput.value = eq.id;
                                     suggestions.style.display = 'none';
                                 });
                                 suggestions.appendChild(item);
@@ -1588,15 +1636,16 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Equipo</label>
-                                <select name="equipment_id" class="form-select">
-                                    <option value="">— Sin equipo —</option>
-                                    <t t-foreach="equipment_list" t-as="eq">
-                                        <option t-att-value="eq.id"
-                                                t-att-selected="'selected' if maint_request.equipment_id.id == eq.id else None">
-                                            <t t-esc="eq.name"/>
-                                        </option>
-                                    </t>
-                                </select>
+                                <div class="position-relative">
+                                    <input type="text" id="ws_equip_name" class="form-control"
+                                           t-att-value="maint_request.equipment_id.display_name or ''"
+                                           autocomplete="off" placeholder="Buscar equipo..."/>
+                                    <input type="hidden" name="equipment_id" id="ws_equip_id"
+                                           t-att-value="maint_request.equipment_id.id or ''"/>
+                                    <div id="ws_equip_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
                                 <t t-if="maint_request.category_id">
                                     <small class="text-muted">
                                         Categoría actual: <t t-esc="maint_request.category_id.name"/>
@@ -1729,6 +1778,53 @@
             })();
             </script>
 
+            <script>
+            (function () {
+                const nameInput = document.getElementById('ws_equip_name');
+                const idInput = document.getElementById('ws_equip_id');
+                const suggestions = document.getElementById('ws_equip_suggestions');
+                if (!nameInput) return;
+                let timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    idInput.value = '';
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/equipment/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(eq => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = eq.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = eq.name;
+                                    idInput.value = eq.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(() => { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
         </t>
     </template>
 
@@ -1843,14 +1939,14 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Equipo <span class="text-danger">*</span></label>
-                                <select name="equipment_id" class="form-select" required="required">
-                                    <option value="">— Seleccionar equipo —</option>
-                                    <t t-foreach="equipment_list" t-as="eq">
-                                        <option t-att-value="eq.id">
-                                            <t t-esc="eq.name"/>
-                                        </option>
-                                    </t>
-                                </select>
+                                <div class="position-relative">
+                                    <input type="text" id="ws_new_equip_name" class="form-control" required="required"
+                                           autocomplete="off" placeholder="Buscar equipo..."/>
+                                    <input type="hidden" name="equipment_id" id="ws_new_equip_id" value=""/>
+                                    <div id="ws_new_equip_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Centro de trabajo</label>
@@ -1959,6 +2055,53 @@
                 });
                 repeatType.addEventListener('change', function () {
                     untilCol.style.display = this.value === 'until' ? 'block' : 'none';
+                });
+            })();
+            </script>
+
+            <script>
+            (function () {
+                const nameInput = document.getElementById('ws_new_equip_name');
+                const idInput = document.getElementById('ws_new_equip_id');
+                const suggestions = document.getElementById('ws_new_equip_suggestions');
+                if (!nameInput) return;
+                let timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    idInput.value = '';
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/equipment/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(eq => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = eq.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = eq.name;
+                                    idInput.value = eq.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(() => { suggestions.style.display = 'none'; }, 200);
                 });
             })();
             </script>
@@ -2077,14 +2220,14 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Equipo <span class="text-danger">*</span></label>
-                                <select name="equipment_id" class="form-select" required="required">
-                                    <option value="">— Seleccionar equipo —</option>
-                                    <t t-foreach="equipment_list" t-as="eq">
-                                        <option t-att-value="eq.id">
-                                            <t t-esc="eq.name"/>
-                                        </option>
-                                    </t>
-                                </select>
+                                <div class="position-relative">
+                                    <input type="text" id="maint_new_equip_name" class="form-control" required="required"
+                                           autocomplete="off" placeholder="Buscar equipo..."/>
+                                    <input type="hidden" name="equipment_id" id="maint_new_equip_id" value=""/>
+                                    <div id="maint_new_equip_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Centro de trabajo</label>
@@ -2249,6 +2392,53 @@
                                     e.preventDefault();
                                     nameInput.value = p.name;
                                     idInput.value = p.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(function () { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(function () { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
+            <script>
+            (function () {
+                var nameInput = document.getElementById('maint_new_equip_name');
+                var idInput = document.getElementById('maint_new_equip_id');
+                var suggestions = document.getElementById('maint_new_equip_suggestions');
+                if (!nameInput) return;
+                var timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    idInput.value = '';
+                    var q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/equipment/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            suggestions.innerHTML = '';
+                            var results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(function (eq) {
+                                var item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = eq.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = eq.name;
+                                    idInput.value = eq.id;
                                     suggestions.style.display = 'none';
                                 });
                                 suggestions.appendChild(item);

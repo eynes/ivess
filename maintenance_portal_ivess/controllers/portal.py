@@ -82,21 +82,23 @@ class MaintenancePortalController(CustomerPortal):
 
     # ── Shared helpers ─────────────────────────────────────────────────────────
 
-    def _maint_edit_context(self):
+    def _maint_edit_context(self, is_workshop=False):
         """Values needed to render the edit form select controls."""
         stages = request.env['maintenance.stage'].sudo().search([], order='sequence')
         teams = request.env['maintenance.team'].sudo().search([], order='name')
-        users = request.env['res.users'].sudo().search(
-            [('share', '=', False), ('active', '=', True)],
-            order='name', limit=200,
+        group_xmlid = (
+            'maintenance_portal_ivess.group_portal_workshop' if is_workshop
+            else 'maintenance_portal_ivess.group_portal_maintenance'
         )
-        equipment = request.env['maintenance.equipment'].sudo().search([], order='name', limit=200)
+        group = request.env.ref(group_xmlid, raise_if_not_found=False)
+        users = request.env['res.users'].sudo().search(
+            [('all_group_ids', 'in', group.id)], order='name',
+        ) if group else request.env['res.users']
         workcenters = request.env['mrp.workcenter'].sudo().search([], order='name', limit=100)
         return {
             'stages': stages,
             'teams': teams,
             'users': users,
-            'equipment_list': equipment,
             'workcenters': workcenters,
             'maintenance_type_options': _MAINTENANCE_TYPE_OPTIONS,
             'priority_options': _PRIORITY_OPTIONS,
@@ -478,7 +480,7 @@ class MaintenancePortalController(CustomerPortal):
             self._maint_write_from_post(maint_request, post)
             return request.redirect(f'/my/maintenance/{request_id}')
         values = self._prepare_portal_layout_values()
-        values.update(self._maint_edit_context())
+        values.update(self._maint_edit_context(is_workshop=False))
         values.update({
             'maint_request': maint_request,
             'page_name': 'maintenance_edit',
@@ -566,7 +568,7 @@ class MaintenancePortalController(CustomerPortal):
             [('name', 'ilike', 'Mantenimiento interno')], limit=1,
         )
         values = self._prepare_portal_layout_values()
-        values.update(self._maint_edit_context())
+        values.update(self._maint_edit_context(is_workshop=False))
         values.update({
             'page_name': 'maintenance_new',
             'back_url': '/my/maintenance',
@@ -681,7 +683,7 @@ class MaintenancePortalController(CustomerPortal):
         )
 
         values = self._prepare_portal_layout_values()
-        values.update(self._maint_edit_context())
+        values.update(self._maint_edit_context(is_workshop=True))
         values.update({
             'page_name': 'workshop_new',
             'back_url': '/my/workshop',
@@ -707,7 +709,7 @@ class MaintenancePortalController(CustomerPortal):
             self._maint_write_from_post(maint_request, post)
             return request.redirect(f'/my/workshop/{request_id}')
         values = self._prepare_portal_layout_values()
-        values.update(self._maint_edit_context())
+        values.update(self._maint_edit_context(is_workshop=True))
         values.update({
             'maint_request': maint_request,
             'page_name': 'workshop_edit',
@@ -793,6 +795,23 @@ class MaintenancePortalController(CustomerPortal):
             limit=15, order='id desc',
         )
         return [{'id': p.id, 'name': p.display_name} for p in productions]
+
+    @http.route(
+        ['/my/maintenance/equipment/search'],
+        type='json', auth='user', website=True,
+    )
+    def portal_maintenance_equipment_search(self, query=''):
+        user = request.env.user
+        if not (user.has_group('maintenance_portal_ivess.group_portal_maintenance') or
+                user.has_group('maintenance_portal_ivess.group_portal_workshop')):
+            return []
+        if len((query or '').strip()) < 2:
+            return []
+        equipment = request.env['maintenance.equipment'].sudo().search(
+            [('name', 'ilike', query.strip())],
+            limit=15, order='name',
+        )
+        return [{'id': e.id, 'name': e.display_name} for e in equipment]
 
     # ── Adjuntos: apertura/descarga desde el portal ───────────────────────────
 
