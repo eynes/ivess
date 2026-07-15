@@ -10,7 +10,7 @@ class IvessProductsReport(models.Model):
     allows_replacement   = fields.Boolean(readonly=True)
     abbreviation         = fields.Char(readonly=True)
     volume               = fields.Float(readonly=True)
-    is_regular_app       = fields.Boolean(readonly=True)
+    exclude_from_regular = fields.Boolean(readonly=True)
     is_returnable        = fields.Boolean(readonly=True)
     type                 = fields.Char(readonly=True)
     order                = fields.Integer(readonly=True)
@@ -28,7 +28,7 @@ class IvessProductsReport(models.Model):
                     pt.allows_replacement,
                     pt.abbreviation,
                     pt.volume,
-                    pt.is_regular_app,
+                    pt.exclude_from_regular,
                     pt.is_returnable,
                     pt.type,
                     pt."order",
@@ -58,7 +58,7 @@ class IvessProductsReport(models.Model):
             "allows_replacement",
             "abbreviation",
             "volume",
-            "is_regular_app",
+            "exclude_from_regular",
             "is_returnable",
             "type",
             "order",
@@ -73,7 +73,7 @@ class IvessProductsReport(models.Model):
                 "allows_replacement": r["allows_replacement"],
                 "abbreviation": r["abbreviation"],
                 "volume": r["volume"],
-                "is_regular_app": r["is_regular_app"],
+                "exclude_from_regular": r["exclude_from_regular"],
                 "is_returnable": r["is_returnable"],
                 "type": r["type"],
                 "order": r["order"],
