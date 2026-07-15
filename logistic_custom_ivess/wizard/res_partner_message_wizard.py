@@ -1,4 +1,5 @@
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class ResPartnerMessageWizard(models.TransientModel):
@@ -6,6 +7,8 @@ class ResPartnerMessageWizard(models.TransientModel):
     _description = 'Partner Message Wizard'
 
     partner_distribution_id = fields.Many2one('partner.distribution', required=True)
+    route_id = fields.Many2one('delivery.route', string='Recorrido', readonly=True, required=True)
+    message_id = fields.Many2one('partner.distribution.message')
     message_type = fields.Selection(
         selection=[
             ('LL', 'Llamado'),
@@ -21,14 +24,31 @@ class ResPartnerMessageWizard(models.TransientModel):
         res = super().default_get(fields_list)
         distribution_id = self.env.context.get('active_id')
         if distribution_id:
-            res['partner_distribution_id'] = distribution_id
             distribution = self.env['partner.distribution'].browse(distribution_id)
-            res['message_type'] = distribution.message_type or False
-            res['message_text'] = distribution.message_text or False
+            route = distribution._get_target_route()
+            if not route:
+                raise UserError(_(
+                    "No hay un recorrido en curso ni programado para la plantilla %(template)s. "
+                    "No se puede asociar un mensaje."
+                ) % {'template': distribution.distribution.name})
+            res['partner_distribution_id'] = distribution_id
+            res['route_id'] = route.id
+            message = distribution.message_ids.filtered(lambda m: m.route_id == route)
+            res['message_id'] = message.id if message else False
+            res['message_type'] = message.message_type if message else False
+            res['message_text'] = message.message_text if message else False
         return res
 
     def action_confirm(self):
-        self.partner_distribution_id.write({
-            'message_type': self.message_type,
-            'message_text': self.message_text,
-        })
+        if self.message_id:
+            self.message_id.write({
+                'message_type': self.message_type,
+                'message_text': self.message_text,
+            })
+        else:
+            self.env['partner.distribution.message'].create({
+                'partner_distribution_id': self.partner_distribution_id.id,
+                'route_id': self.route_id.id,
+                'message_type': self.message_type,
+                'message_text': self.message_text,
+            })

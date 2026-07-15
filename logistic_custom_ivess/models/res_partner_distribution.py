@@ -43,20 +43,63 @@ class PartnerDistributions(models.Model):
         tracking=True,
     )
     partner_id = fields.Many2one('res.partner', string='Partner', tracking=True)
-    
-    message_type = fields.Selection(
+
+    message_ids = fields.One2many(
+        'partner.distribution.message',
+        'partner_distribution_id',
+        string='Mensajes',
+    )
+    current_route_id = fields.Many2one(
+        'delivery.route',
+        string='Recorrido Actual',
+        compute='_compute_current_message',
+    )
+    current_message_type = fields.Selection(
         selection=[
             ('LL', 'Llamado'),
             ('CI', 'Carta Interna'),
         ],
         string='Tipo de Mensaje',
+        compute='_compute_current_message',
     )
-    message_text = fields.Text(
+    current_message_text = fields.Text(
         string='Mensaje',
+        compute='_compute_current_message',
     )
+
+    def _get_target_route(self):
+        self.ensure_one()
+        if not self.distribution:
+            return self.env['delivery.route']
+        today = fields.Date.today()
+        route = self.env['delivery.route'].search([
+            ('template_delivery_route_id', '=', self.distribution.id),
+            ('state', '=', 'in_progress'),
+        ], order='delivery_date desc', limit=1)
+        if route:
+            return route
+        return self.env['delivery.route'].search([
+            ('template_delivery_route_id', '=', self.distribution.id),
+            ('state', 'in', ('draft', 'sincronizado')),
+            ('delivery_date', '>=', today),
+        ], order='delivery_date asc', limit=1)
+
+    @api.depends('message_ids', 'message_ids.route_id', 'message_ids.message_type', 'message_ids.message_text')
+    def _compute_current_message(self):
+        for record in self:
+            route = record._get_target_route()
+            message = record.message_ids.filtered(lambda m: m.route_id == route) if route else False
+            record.current_route_id = route
+            record.current_message_type = message.message_type if message else False
+            record.current_message_text = message.message_text if message else False
 
     def action_open_message_wizard(self):
         self.ensure_one()
+        if not self._get_target_route():
+            raise ValidationError(_(
+                "No hay un recorrido en curso ni programado para la plantilla %(template)s. "
+                "No se puede asociar un mensaje."
+            ) % {'template': self.distribution.name})
         return {
             'type': 'ir.actions.act_window',
             'name': 'Mensaje',
@@ -206,3 +249,42 @@ class PartnerDistributions(models.Model):
             ('route_id.delivery_date', '>', today),
             ('route_id.template_delivery_route_id', '=', distribution_id),
         ]).unlink()
+
+
+class PartnerDistributionMessage(models.Model):
+    _name = 'partner.distribution.message'
+    _description = 'Mensaje de Distribución por Recorrido'
+
+    partner_distribution_id = fields.Many2one(
+        'partner.distribution',
+        string='Distribución',
+        required=True,
+        ondelete='cascade',
+        index=True,
+    )
+    route_id = fields.Many2one(
+        'delivery.route',
+        string='Recorrido',
+        required=True,
+        ondelete='cascade',
+        index=True,
+    )
+    message_type = fields.Selection(
+        selection=[
+            ('LL', 'Llamado'),
+            ('CI', 'Carta Interna'),
+        ],
+        string='Tipo de Mensaje',
+        required=True,
+    )
+    message_text = fields.Text(
+        string='Mensaje',
+    )
+
+    _sql_constraints = [
+        (
+            'partner_distribution_route_uniq',
+            'unique(partner_distribution_id, route_id)',
+            'Ya existe un mensaje para este recorrido en esta distribución.',
+        ),
+    ]
