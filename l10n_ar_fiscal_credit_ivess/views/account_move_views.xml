@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <!-- En facturas de venta el credito fiscal no aplica: se oculta la columna -->
+    <record id="view_move_form_fiscal_credit_ivess" model="ir.ui.view">
+        <field name="name">account.move.view.form.fiscal.credit.ivess</field>
+        <field name="model">account.move</field>
+        <field
+            name="inherit_id"
+            ref="l10n_ar_eynes.account_move_view_form_inherit_l10n_ar_eynes"
+        />
+        <field name="arch" type="xml">
+            <xpath
+                expr="//field[@name='invoice_line_ids']/list/field[@name='fiscal_credit']"
+                position="attributes"
+            >
+                <attribute name="column_invisible">
+                    not parent.show_fiscal_credit or parent.move_type in ('out_invoice', 'out_refund')
+                </attribute>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

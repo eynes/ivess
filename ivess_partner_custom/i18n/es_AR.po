@@ -1,0 +1,39 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* ivess_partner_custom
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-09 00:00+0000\n"
+"PO-Revision-Date: 2026-06-09 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: es_AR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: ivess_partner_custom
+#: model:ir.model.fields,field_description:ivess_partner_custom.field_res_partner__unbilled_balance
+msgid "Unbilled Balance"
+msgstr "Saldo no facturado"
+
+#. module: ivess_partner_custom
+#: model:ir.model.fields,field_description:ivess_partner_custom.field_res_partner__final_balance
+msgid "Final Balance"
+msgstr "Saldo final"
+
+#. module: ivess_partner_custom
+#. odoo-python
+#: code:addons/ivess_partner_custom/models/res_partner.py:0
+msgid "This customer has %s water containers pending return."
+msgstr "Este cliente tiene %s envases pendientes de devolución."
+
+#. module: ivess_partner_custom
+#. odoo-python
+#: code:addons/ivess_partner_custom/models/res_partner.py:0
+msgid "This customer has %s unpaid or partially paid invoice(s)."
+msgstr "Este cliente tiene %s factura(s) sin pagar o parcialmente pagadas."

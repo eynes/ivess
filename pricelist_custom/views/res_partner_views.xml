@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_inherit_pricelist_custom" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.pricelist.custom</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Agrega % de descuento en la solapa Ventas y Compras, junto a la lista de precios -->
+            <xpath expr="//field[@name='property_product_pricelist']" position="after">
+                <field name="customer_discount_percentage"/>
+            </xpath>
+
+            <!-- Nueva solapa: Precios Especiales -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Precios Especiales" name="special_prices">
+                    <group>
+                        <div class="o_setting_box" colspan="2">
+                            <div class="o_setting_left_pane"/>
+                            <div class="o_setting_right_pane">
+                                <span class="o_form_label fw-bold fs-5">Precios Especiales por Producto</span>
+                                <div class="text-muted">
+                                    Precios que se aplican con máxima prioridad sobre cualquier lista de precios para este cliente.
+                                </div>
+                            </div>
+                        </div>
+                    </group>
+                    <separator/>
+                    <field name="special_price_ids" nolabel="1">
+                        <list editable="bottom" string="Precios Especiales">
+                            <field name="product_id" string="Producto" optional="show"/>
+                            <field name="currency_id" column_invisible="1"/>
+                            <field name="special_price" widget="monetary" string="Precio Especial" optional="show"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>

@@ -1,17 +1,27 @@
-from odoo import models, fields, api, _
+from odoo import api, models, fields
+from odoo.exceptions import ValidationError
+
+
+class DeliveryRouteNumberCategory(models.Model):
+    _name = 'delivery.route.number.category'
+    _description = 'Delivery Route Number Category'
+
+    name = fields.Char(string="Nombre", required=True)
 
 
 class DeliveryRouteNumber(models.Model):
     _name = 'delivery.route.number'
     _description = 'Delivery Route Number'
     _rec_name = 'number'
-    _sql_constraints = [
-        (
-            'unique_delivery_route_number',
-            'UNIQUE(number)',
-            'The delivery route number must be unique.'
-        )
-    ]
+
+    _unique_delivery_route_number = models.Constraint(
+        'UNIQUE(number)',
+        'The delivery route number must be unique.',
+    )
+    _unique_location_id = models.Constraint(
+        'UNIQUE(location_id)',
+        'Esa ubicación ya está vinculada a otro reparto.',
+    )
 
     def _get_default_number(self):
         last_route = self.search([], order='number desc', limit=1)
@@ -34,7 +44,7 @@ class DeliveryRouteNumber(models.Model):
     allow_previous_price = fields.Boolean(string='Allow Previous Price')
     allow_sale_without_stock = fields.Boolean(string='Allow sale without stock')
     allow_closing_with_rake = fields.Boolean(string='Allow closing with rake')
-    is_cold_hot_delivery = fields.Boolean(string="Is cold hot delivery")
+    is_cold_hot_delivery = fields.Boolean(string="Is cold hot delivery", default=False)
     allow_cash_sale = fields.Boolean(
         string='Allow Cash Sale',
         required=True,
@@ -47,5 +57,66 @@ class DeliveryRouteNumber(models.Model):
         default=True,
         help="If checked, customers can enter a manual address for this delivery."
     )
+    remittance_sequence_ids = fields.Many2many(
+        'ir.sequence',
+        relation='delivery_route_number_ir_sequence_rel',
+        column1='route_number_id',
+        column2='sequence_id',
+        string='Remittance Booklet',
+    )
+    collection_journal_id = fields.Many2one(
+        'account.journal',
+        string='Collection Booklet',
+        domain=[('type', 'in', ['receipt'])],
+    )
+    repair_order_sequence_id = fields.Many2one(
+        'ir.sequence' ,
+        string='Repair Orders Booklet',
+    )
+    region_id = fields.Many2one(
+        'delivery.route.region',
+        string='Región',
+    )
+    license_plate = fields.Char(
+        string='Patente',
+        related='truck_id.license_plate',
+        store=True,
+        readonly=True,
+    )
+    supervisor_id = fields.Many2one(
+        'res.partner',
+        string='Supervisor',
+    )
+    conductor_id = fields.Many2one(
+        'res.partner',
+        string='Conductor',
+    )
+    ayudante_id = fields.Many2one(
+        'res.partner',
+        string='Ayudante',
+    )
+    category_id = fields.Many2one(
+        'delivery.route.number.category',
+        string='Categoría',
+    )
+    location_id = fields.Many2one(
+        'stock.location',
+        string='Ubicación',
+    )
+
+    date_from = fields.Date(
+        string='Fecha Desde',
+    )
+    date_to = fields.Date(
+        string='Fecha Hasta',
+    )
+
+    @api.constrains('allow_previous_price', 'date_from', 'date_to')
+    def _check_date_from_to_required(self):
+        for record in self:
+            if record.allow_previous_price and not (record.date_from and record.date_to):
+                raise ValidationError(
+                    "Debe completar 'Fecha Desde' y 'Fecha Hasta' cuando 'Permitir precio anterior' está habilitado."
+                )
 
 

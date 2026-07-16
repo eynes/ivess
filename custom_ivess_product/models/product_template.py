@@ -14,14 +14,27 @@ class ProductTemplate(models.Model):
     is_returnable = fields.Boolean(
         string="Is returnable",
         required=True,
+        default=False,
         tracking=True,
     )
+    is_frio_calor = fields.Boolean(
+        string="Es Frio/Calor",
+        default=False,
+        tracking=True,
+    )
+    litros_min_bonificacion = fields.Integer(
+        string="Litros mínimos para bonificación"
+    )
+    allows_replacement = fields.Boolean(string="Allows Replacement")
+    exclude_from_regular = fields.Boolean(string="Exclude from Regular")
+    show_in_app = fields.Boolean(string="Mostrar en App")
+    is_promo = fields.Boolean(string="Is Promo")
 
     _sql_constraints = [
         (
             'unique_abbreviation',
             'unique(abbreviation)',
-            _('The abbreviation must be unique.')
+            _('Duplicate abbreviation.')
         )
     ]
 
@@ -31,17 +44,37 @@ class ProductTemplate(models.Model):
             ('repairable', 'Repairable'),
         ],
         string='Status',
-        required=True,
         copy=False,
         tracking=True,
         default='new',
     )
 
-    @api.constrains('abbreviation')
-    def _check_abbreviation_length(self):
+    @api.constrains('purchase_ok', 'categ_id', 'state')
+    def _check_purchase_required_fields(self):
         for rec in self:
-            if rec.abbreviation and len(rec.abbreviation) > 10:
-                raise ValidationError(_("The abbreviation cannot exceed 10 characters."))
+            if not rec.purchase_ok:
+                continue
+            if not rec.categ_id:
+                raise ValidationError(
+                    _("Product Category is required for purchase products.")
+                )
+            if not rec.state:
+                raise ValidationError(
+                    _("Status is required for purchase products.")
+                )
+
+    @api.constrains('abbreviation')
+    def _check_abbreviation(self):
+        for rec in self:
+            if rec.abbreviation:
+                if len(rec.abbreviation) > 10:
+                    raise ValidationError(_("The abbreviation cannot exceed 10 characters."))
+                duplicate = self.search([
+                    ('abbreviation', '=', rec.abbreviation),
+                    ('id', '!=', rec.id),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(_("Duplicate abbreviation."))
 
     def create(self, vals):
         """
@@ -99,9 +132,9 @@ class ProductTemplate(models.Model):
         Returns:
             str: The generated default_code based on the category's sequence, or an empty string if no sequence is available.
         """
-        categ = self.env['product.category'].browse(categ_id) if categ_id else False
-        if not categ:
-            raise ValidationError(_("Product category is required to generate the reference."))
+        if not categ_id:
+            return False
+        categ = self.env['product.category'].browse(categ_id)
         if state == 'new':
             if not categ.new_sequence_id:
                 raise ValidationError(

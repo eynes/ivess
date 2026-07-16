@@ -1,6 +1,6 @@
 <odoo>
       <menuitem id="menu_delivery_route_root"
-            name="Delivery Routes"
+            name="Rutas"
             parent="sale.sale_menu_root"
             sequence="10"
             action="action_delivery_route" />
@@ -18,7 +18,7 @@
             action="action_visit_status" />
 
       <menuitem id="menu_tempalte_delivery_route"
-            name="Repartos"
+            name="Recorridos"
             parent="sale.menu_sale_config"
             sequence="23"
             action="action_template_delivery_route" />
@@ -43,7 +43,7 @@
             action="action_no_purchase_reason_list" />
 
       <menuitem id="menu_delivery_route_number"
-            name="Route Numbers"
+            name="Repartos"
             parent="sale.menu_sale_config"
             action="action_delivery_route_number" />
 

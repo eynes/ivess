@@ -8,7 +8,9 @@
                 <group name="logistic_sale">
                     <group name="name">
                         <field name="allow_free_of_charge"/>
+                        <field name="monthly_limit_free_of_charge" invisible="not allow_free_of_charge"/>
                         <field name="liter_quantity"/>
+                        <field name="container_type" invisible="not is_returnable"/>
                     </group>
                 </group>
             </xpath>

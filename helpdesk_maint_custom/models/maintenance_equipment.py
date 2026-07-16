@@ -8,6 +8,7 @@ class MaintenanceEquipment(models.Model):
     _inherit = 'maintenance.equipment'
 
     is_vehicle = fields.Boolean(string="Es vehículo")
+    license_plate = fields.Char(string="Patente")
     supply_location_id = fields.Many2one(
         comodel_name='stock.location',
         string='Ubicación de insumos',

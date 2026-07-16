@@ -29,6 +29,7 @@ class MaintenanceRequest(models.Model):
                 record._action_reserve_materials()
             elif record.stage_id.done:
                 record._action_done_materials()
+                record._action_close_ticket()
         return res
 
     def _get_consumption_location(self):
@@ -104,3 +105,14 @@ class MaintenanceRequest(models.Model):
                 for ml in move.move_line_ids:
                     ml.picked = True
             move._action_done()
+
+    def _action_close_ticket(self):
+        if not self.ticket_id:
+            return
+        ticket = self.ticket_id
+        closed_stage = self.env['helpdesk.stage'].search([
+            ('team_ids', 'in', ticket.team_id.id),
+            ('fold', '=', True),
+        ], limit=1)
+        if closed_stage:
+            ticket.stage_id = closed_stage

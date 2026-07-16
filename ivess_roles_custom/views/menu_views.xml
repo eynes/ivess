@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    MENÚS — Compras y Abastecimiento - Control de Accesos
+    ─────────────────────────────────────────────────────
+    Los menús nativos de Compra e Inventario son automáticamente
+    accesibles a los grupos nativos de Odoo:
+      · Menú Compra       → purchase.group_purchase_user (y manager)
+      · Menú Inventario   → stock.group_stock_user (y manager)
+      · Menú Stock Req.   → stock_request.group_stock_request_user (y manager)
+
+    Solo se interviene sobre los menús del módulo OCA stock_request
+    para garantizar visibilidad al Administrador de Inventario y al sistema.
+-->
+<odoo>
+
+    <!--
+        Menú raíz de Stock Requests: agregar visibilidad a
+        Administrador Inventario (stock_manager) y system.
+    -->
+    <record id="stock_request.menu_stock_request_root" model="ir.ui.menu">
+        <field name="group_ids" eval="[
+            (4, ref('stock_request.group_stock_request_user')),
+            (4, ref('stock_request.group_stock_request_manager')),
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+    </record>
+
+    <!--
+        Menú operaciones de Stock Requests: igual alcance que el raíz.
+    -->
+    <record id="stock_request.menu_stock_request_operations" model="ir.ui.menu">
+        <field name="group_ids" eval="[
+            (4, ref('stock_request.group_stock_request_user')),
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+    </record>
+
+    <!--
+        Ajustes de inventario: restringir a Administrador Inventario y system.
+        El Usuario Inventario (stock_user) no debe acceder a este menú.
+    -->
+    <record id="stock.menu_stock_adjustments" model="ir.ui.menu">
+        <field name="group_ids" eval="[
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+    </record>
+
+    <record id="stock.menu_action_inventory_tree" model="ir.ui.menu">
+        <field name="group_ids" eval="[
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+    </record>
+
+    <record id="stock.menu_stock_scrap" model="ir.ui.menu">
+        <field name="group_ids" eval="[
+            (4, ref('stock.group_stock_manager')),
+            (4, ref('base.group_system')),
+        ]"/>
+    </record>
+
+</odoo>

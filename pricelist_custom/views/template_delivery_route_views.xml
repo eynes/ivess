@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_template_delivery_route_form_inherit_pricelist" model="ir.ui.view">
+        <field name="name">template.delivery.route.form.inherit.pricelist</field>
+        <field name="model">template.delivery.route</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_template_delivery_route_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='delivery_number_id']" position="after">
+                <field name="pricelist_id" required="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

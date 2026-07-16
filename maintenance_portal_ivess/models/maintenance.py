@@ -32,6 +32,11 @@ class MaintenanceRequest(models.Model):
         string='Departamento'
     )
 
+    responsable_ids = fields.Many2many(
+        'res.users',
+        string='Responsables',
+    )
+
     def action_mark_as_repaired(self):
         repaired_stage = self.env['maintenance.stage'].search(
             [('done', '=', True)], order='sequence asc', limit=1

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="ir_cron_validar_pickings_salida_aguas_fc" model="ir.cron">
+        <field name="name">Aguas FC — Validar pickings de salida del día anterior</field>
+        <field name="model_id" ref="repair.model_repair_order"/>
+        <field name="state">code</field>
+        <field name="code">model._aguas_fc_cron_validar_salida()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="nextcall" eval="(datetime.now().replace(hour=23, minute=0, second=0)).strftime('%Y-%m-%d %H:%M:%S')"/>
+        <field name="active">True</field>
+    </record>
+</odoo>

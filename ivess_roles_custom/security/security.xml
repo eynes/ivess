@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔══════════════════════════════════════════════════════════════════════════════╗
+║   IVESS — ROLES PERSONALIZADOS COMPRAS Y ABASTECIMIENTO                     ║
+║   Fuente: "Roles Compras y Abastecimiento (1).csv"                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Este módulo NO crea grupos nuevos salvo el indicado a continuación.
+Todos los permisos se asignan directamente sobre los grupos nativos de Odoo:
+
+  · Usuario Compras           → purchase.group_purchase_user
+  · Administrador Compras     → purchase.group_purchase_manager
+  · Usuario Inventario        → stock.group_stock_user
+  · Administrador Inventario  → stock.group_stock_manager
+  · Usuario Solicitudes       → stock_request.group_stock_request_user
+  · Administrador Admin.      → base.group_system
+  · Administrador TOTAL       → base.group_system
+
+ÚNICO GRUPO NUEVO: "Usuario Administración"
+  No tiene equivalente nativo en Odoo. Solo aparece en el CSV en la
+  funcionalidad "Gestionar Catálogo de Proveedores" con permiso de
+  actualización (read + write) sobre res.partner.
+
+NOTA v19: res.groups ya no tiene 'category_id'. El campo correcto es
+  'privilege_id', que apunta a un registro de res.groups.privilege.
+  Es res.groups.privilege quien tiene 'category_id'.
+-->
+<odoo>
+    <data>
+
+        <!--
+        ══════════════════════════════════════════════════════════════════
+        PRIVILEGE (v19): agrupa el rol en la categoría Supply Chain
+        ══════════════════════════════════════════════════════════════════
+        -->
+        <record model="res.groups.privilege" id="privilege_admin_usuario">
+            <field name="name">Administración Compras y Abastecimiento</field>
+            <field name="category_id" ref="base.module_category_supply_chain"/>
+        </record>
+
+        <!--
+        ══════════════════════════════════════════════════════════════════
+        GRUPO ÚNICO CUSTOM: Usuario Administración
+        ══════════════════════════════════════════════════════════════════
+        Permisos (del CSV — columna G, única fila con valor):
+          ✅ R+W   res.partner — "Gestionar Catálogo de Proveedores"
+                  (Actualizar: puede modificar datos de proveedor,
+                  pero no crear ni eliminar socios)
+        Hereda:   base.group_user (usuario interno básico de Odoo)
+        -->
+        <record id="group_admin_user" model="res.groups">
+            <field name="name">Usuario Administración</field>
+            <field name="privilege_id" ref="privilege_admin_usuario"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+    </data>
+</odoo>

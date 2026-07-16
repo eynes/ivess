@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <template id="report_purchasequotation_document" inherit_id="purchase.report_purchasequotation_document">
+        <xpath expr="//t[@t-set='address']/div[@t-field='o.partner_id']" position="replace" />
+    </template>
+</odoo>

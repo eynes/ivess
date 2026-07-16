@@ -8,6 +8,7 @@
             <!-- is_vehicle and supply_location_id in main form -->
             <xpath expr="//group[@name='service_info_group']/group[1]" position="inside">
                 <field name="is_vehicle"/>
+                <field name="license_plate" invisible="not is_vehicle"/>
                 <field name="supply_location_id" invisible="not is_vehicle"/>
             </xpath>
             <!-- Infracciones tab -->

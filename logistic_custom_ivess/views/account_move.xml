@@ -39,7 +39,7 @@
         <field name="arch" type="xml">
         <xpath expr="//page[@name='other_info']" position="inside">
             <div>
-                <separator string="Repartos"/>
+                <separator string="Rutas"/>
                 <group>
                 </group>
                 <field name="delivery_route_ids" nolabel="1" invisible="move_type not in ['out_invoice', 'out_refund', 'out_receipt']">

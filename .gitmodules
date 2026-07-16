@@ -30,3 +30,7 @@
 	path = server-tools
 	url = https://github.com/OCA/server-tools.git
 	branch = 19.0
+[submodule "account_import_clearance"]
+	path = account_import_clearance
+	url = https://gitlab.eynes.com.ar/jenck/account_import_clearance.git
+	branch = 19.0-ivess

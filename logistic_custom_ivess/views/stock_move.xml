@@ -1,0 +1,17 @@
+<odoo>
+    <record id="stock_picking_form_inherit_container" model="ir.ui.view">
+        <field name="name">stock.picking.form.inherit.container</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='move_ids']/list/field[@name='picked']" position="after">
+                <field name="is_returnable" column_invisible="1"/>
+                <field name="water_container_id" optional="show"
+                       invisible="not is_returnable"
+                       domain="[('partner_id', '=', parent.partner_id)]"/>
+                <field name="container_state" optional="show"
+                       invisible="not is_returnable"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,14 @@
+<odoo>
+    <record id="view_location_form_inherit_distribution" model="ir.ui.view">
+        <field name="name">stock.location.form.inherit.distribution</field>
+        <field name="model">stock.location</field>
+        <field name="inherit_id" ref="stock.view_location_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group" position="inside">
+                <group string="Recorridos">
+                    <field name="delivery_route_number_id" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

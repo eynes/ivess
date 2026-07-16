@@ -6,7 +6,7 @@ class AccountMove(models.Model):
     
     delivery_route_ids = fields.Many2many(
         comodel_name='delivery.route',
-        string='Reparto',
+        string='Ruta',
         compute='_compute_delivery_route_ids',
         store=True,
         readonly=True,
