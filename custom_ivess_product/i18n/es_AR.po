@@ -181,9 +181,9 @@ msgid "Duplicate abbreviation."
 msgstr "Abreviatura repetida."
 
 #. module: custom_ivess_product
-#: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__is_regular_app
-msgid "Is Regular (APP)"
-msgstr "Es Habitual (APP)"
+#: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__exclude_from_regular
+msgid "Exclude from Regular"
+msgstr "Excluir de habituales"
 
 #. module: custom_ivess_product
 #: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__allows_replacement
@@ -200,3 +200,8 @@ msgstr "La abreviatura no puede superar los 10 caracteres."
 #: model:ir.model,name:custom_ivess_product.model_res_users
 msgid "Users"
 msgstr "Usuario"
+
+#. module: custom_ivess_product
+#: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__is_promo
+msgid "Is Promo"
+msgstr "Es Promo"
