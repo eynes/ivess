@@ -83,7 +83,7 @@ class IvessProductsReport(models.Model):
                 if bom:
                     for line in bom.bom_line_ids:
                         components.append({
-                            "product_id": line.product_id.id,
+                            "component_id": line.product_id.id,
                             "default_code": line.product_id.default_code,
                             "lst_price": line.product_id.lst_price,
                             "product_qty": line.product_qty,
