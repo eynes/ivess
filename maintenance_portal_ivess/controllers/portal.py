@@ -822,16 +822,19 @@ class MaintenancePortalController(CustomerPortal):
         ['/my/maintenance/equipment/search'],
         type='json', auth='user', website=True,
     )
-    def portal_maintenance_equipment_search(self, query=''):
+    def portal_maintenance_equipment_search(self, query='', is_workshop=False):
         user = request.env.user
         if not (user.has_group('maintenance_portal_ivess.group_portal_maintenance') or
                 user.has_group('maintenance_portal_ivess.group_portal_workshop')):
             return []
         if len((query or '').strip()) < 2:
             return []
+        domain = [
+            ('name', 'ilike', query.strip()),
+            ('is_vehicle', '=', bool(is_workshop)),
+        ]
         equipment = request.env['maintenance.equipment'].sudo().search(
-            [('name', 'ilike', query.strip())],
-            limit=15, order='name',
+            domain, limit=15, order='name',
         )
         return [{'id': e.id, 'name': e.display_name} for e in equipment]
 
