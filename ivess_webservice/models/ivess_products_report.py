@@ -6,11 +6,13 @@ class IvessProductsReport(models.Model):
     _auto = False
 
     default_code         = fields.Char(readonly=True)
+    name                 = fields.Char(readonly=True)
+    is_promo             = fields.Boolean(readonly=True)    
     allow_free_of_charge = fields.Boolean(readonly=True)
     allows_replacement   = fields.Boolean(readonly=True)
     abbreviation         = fields.Char(readonly=True)
     volume               = fields.Float(readonly=True)
-    is_regular_app       = fields.Boolean(readonly=True)
+    exclude_from_regular = fields.Boolean(readonly=True)
     is_returnable        = fields.Boolean(readonly=True)
     type                 = fields.Char(readonly=True)
     order                = fields.Integer(readonly=True)
@@ -24,11 +26,13 @@ class IvessProductsReport(models.Model):
                 SELECT
                     pt.id,
                     pt.default_code,
+                    COALESCE(pt.name->>'es_AR', pt.name->>'en_US') AS name,
+                    pt.is_promo,
                     pt.allow_free_of_charge,
                     pt.allows_replacement,
                     pt.abbreviation,
                     pt.volume,
-                    pt.is_regular_app,
+                    pt.exclude_from_regular,
                     pt.is_returnable,
                     pt.type,
                     pt."order",
@@ -54,29 +58,51 @@ class IvessProductsReport(models.Model):
         records = self.search([]).read([
             "id",
             "default_code",
+            "name",
+            "is_promo",
             "allow_free_of_charge",
             "allows_replacement",
             "abbreviation",
             "volume",
-            "is_regular_app",
+            "exclude_from_regular",
             "is_returnable",
             "type",
             "order",
             "tax_amount",
         ])
+
+        promo_tmpl_ids = [r["id"] for r in records if r["is_promo"]]
+        boms = self.env["mrp.bom"].search([("product_tmpl_id", "in", promo_tmpl_ids)])
+        bom_by_tmpl_id = {bom.product_tmpl_id.id: bom for bom in boms}
+
         final_records = []
         for r in records:
+            components = []
+            if r["is_promo"]:
+                bom = bom_by_tmpl_id.get(r["id"])
+                if bom:
+                    for line in bom.bom_line_ids:
+                        components.append({
+                            "component_id": line.product_id.id,
+                            "default_code": line.product_id.default_code,
+                            "lst_price": line.product_id.lst_price,
+                            "product_qty": line.product_qty,
+                            "is_returnable": line.product_id.product_tmpl_id.is_returnable,
+                        })
             final_records.append({
                 "product_id": r["id"],
                 "default_code": r["default_code"],
+                "name": r["name"],
+                "is_promo": r["is_promo"],
                 "allow_free_of_charge": r["allow_free_of_charge"],
                 "allows_replacement": r["allows_replacement"],
                 "abbreviation": r["abbreviation"],
                 "volume": r["volume"],
-                "is_regular_app": r["is_regular_app"],
+                "exclude_from_regular": r["exclude_from_regular"],
                 "is_returnable": r["is_returnable"],
                 "type": r["type"],
                 "order": r["order"],
                 "tax_amount": r["tax_amount"],
+                "components": components,
             })
         return final_records
