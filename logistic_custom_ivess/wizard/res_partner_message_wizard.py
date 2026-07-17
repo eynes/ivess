@@ -9,14 +9,6 @@ class ResPartnerMessageWizard(models.TransientModel):
     partner_distribution_id = fields.Many2one('partner.distribution', required=True)
     route_id = fields.Many2one('delivery.route', string='Recorrido', readonly=True, required=True)
     message_id = fields.Many2one('partner.distribution.message')
-    message_type = fields.Selection(
-        selection=[
-            ('LL', 'Llamado'),
-            ('CI', 'Carta Interna'),
-        ],
-        string='Tipo de Mensaje',
-        required=True,
-    )
     message_text = fields.Text(string='Mensaje')
 
     @api.model
@@ -35,20 +27,17 @@ class ResPartnerMessageWizard(models.TransientModel):
             res['route_id'] = route.id
             message = distribution.message_ids.filtered(lambda m: m.route_id == route)
             res['message_id'] = message.id if message else False
-            res['message_type'] = message.message_type if message else False
             res['message_text'] = message.message_text if message else False
         return res
 
     def action_confirm(self):
         if self.message_id:
             self.message_id.write({
-                'message_type': self.message_type,
                 'message_text': self.message_text,
             })
         else:
             self.env['partner.distribution.message'].create({
                 'partner_distribution_id': self.partner_distribution_id.id,
                 'route_id': self.route_id.id,
-                'message_type': self.message_type,
                 'message_text': self.message_text,
             })

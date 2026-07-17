@@ -560,6 +560,20 @@ class DeliveryRouteLine(models.Model):
         store=True,
         readonly=True,
     )
+    message_ids = fields.One2many(
+        'partner.distribution.message',
+        'route_line_id',
+        string='Mensajes',
+    )
+    message_text = fields.Text(
+        string='Mensaje',
+        compute='_compute_message_text',
+    )
+
+    @api.depends('message_ids', 'message_ids.message_text')
+    def _compute_message_text(self):
+        for rec in self:
+            rec.message_text = rec.message_ids[:1].message_text if rec.message_ids else False
 
     def _is_client_on_vacation(self, delivery_date):
         """El cliente está de vacaciones para esa fecha si su estado es

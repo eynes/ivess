@@ -54,14 +54,6 @@ class PartnerDistributions(models.Model):
         string='Recorrido Actual',
         compute='_compute_current_message',
     )
-    current_message_type = fields.Selection(
-        selection=[
-            ('LL', 'Llamado'),
-            ('CI', 'Carta Interna'),
-        ],
-        string='Tipo de Mensaje',
-        compute='_compute_current_message',
-    )
     current_message_text = fields.Text(
         string='Mensaje',
         compute='_compute_current_message',
@@ -69,12 +61,13 @@ class PartnerDistributions(models.Model):
 
     def _get_target_route(self):
         self.ensure_one()
-        if not self.distribution:
+        if not self.distribution or not self.partner_id:
             return self.env['delivery.route']
         today = fields.Date.today()
         route = self.env['delivery.route'].search([
             ('template_delivery_route_id', '=', self.distribution.id),
             ('state', '=', 'in_progress'),
+            ('delivery_route_line_ids.client_id', '=', self.partner_id.id),
         ], order='delivery_date desc', limit=1)
         if route:
             return route
@@ -82,15 +75,15 @@ class PartnerDistributions(models.Model):
             ('template_delivery_route_id', '=', self.distribution.id),
             ('state', 'in', ('draft', 'sincronizado')),
             ('delivery_date', '>=', today),
+            ('delivery_route_line_ids.client_id', '=', self.partner_id.id),
         ], order='delivery_date asc', limit=1)
 
-    @api.depends('message_ids', 'message_ids.route_id', 'message_ids.message_type', 'message_ids.message_text')
+    @api.depends('message_ids', 'message_ids.route_id', 'message_ids.message_text')
     def _compute_current_message(self):
         for record in self:
             route = record._get_target_route()
             message = record.message_ids.filtered(lambda m: m.route_id == route) if route else False
             record.current_route_id = route
-            record.current_message_type = message.message_type if message else False
             record.current_message_text = message.message_text if message else False
 
     def action_open_message_wizard(self):
@@ -269,13 +262,12 @@ class PartnerDistributionMessage(models.Model):
         ondelete='cascade',
         index=True,
     )
-    message_type = fields.Selection(
-        selection=[
-            ('LL', 'Llamado'),
-            ('CI', 'Carta Interna'),
-        ],
-        string='Tipo de Mensaje',
-        required=True,
+    route_line_id = fields.Many2one(
+        'delivery.route.line',
+        string='Línea de Recorrido',
+        compute='_compute_route_line_id',
+        store=True,
+        index=True,
     )
     message_text = fields.Text(
         string='Mensaje',
@@ -288,3 +280,15 @@ class PartnerDistributionMessage(models.Model):
             'Ya existe un mensaje para este recorrido en esta distribución.',
         ),
     ]
+
+    @api.depends('route_id', 'partner_distribution_id.partner_id')
+    def _compute_route_line_id(self):
+        for message in self:
+            partner = message.partner_distribution_id.partner_id
+            if not message.route_id or not partner:
+                message.route_line_id = False
+                continue
+            message.route_line_id = self.env['delivery.route.line'].search([
+                ('route_id', '=', message.route_id.id),
+                ('client_id', '=', partner.id),
+            ], limit=1)
