@@ -31,7 +31,19 @@
             <!-- Origen field after equipment_id -->
             <field name="equipment_id" position="after">
                 <field name="request_origin"/>
+                <field name="team_type" invisible="1"/>
             </field>
+            <!-- Items tab (mirrored from the originating ticket) -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Ítems" name="maint_items" invisible="team_type != 'workshop'">
+                    <field name="item_ids" string="Ítems" nolabel="1" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="value"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
             <!-- Materials tab -->
             <xpath expr="//notebook" position="inside">
                 <page string="Materiales" name="maint_materials">
