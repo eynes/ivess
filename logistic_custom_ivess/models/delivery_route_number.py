@@ -1,4 +1,4 @@
-from odoo import api, models, fields
+from odoo import _, api, models, fields
 from odoo.exceptions import ValidationError
 
 
@@ -118,5 +118,30 @@ class DeliveryRouteNumber(models.Model):
                 raise ValidationError(
                     "Debe completar 'Fecha Desde' y 'Fecha Hasta' cuando 'Permitir precio anterior' está habilitado."
                 )
+
+
+class DeliveryRouteNumberMessage(models.Model):
+    _name = 'delivery.route.number.message'
+    _description = 'Mensaje General por Reparto'
+
+    delivery_route_number_ids = fields.Many2many(
+        'delivery.route.number',
+        string='Reparto',
+    )
+    message_text = fields.Text(
+        string='Mensaje',
+        required=True,
+    )
+    apply_to_all = fields.Boolean(
+        string='Todos / Aplicar a todos',
+    )
+
+    @api.constrains('apply_to_all', 'delivery_route_number_ids')
+    def _check_delivery_route_number_ids(self):
+        for record in self:
+            if not record.apply_to_all and not record.delivery_route_number_ids:
+                raise ValidationError(_(
+                    "Debe seleccionar al menos un reparto o marcar 'Todos / Aplicar a todos'."
+                ))
 
 

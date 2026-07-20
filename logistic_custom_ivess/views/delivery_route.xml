@@ -74,6 +74,15 @@
                                 <field name="allow_manual_address"/>
                             </group>
                         </page>
+                        <page name="general_messages_page" string="Mensajes">
+                            <field name="message_general_ids" readonly="1">
+                                <list>
+                                    <field name="message_text"/>
+                                    <field name="apply_to_all"/>
+                                    <field name="delivery_route_number_ids" widget="many2many_tags"/>
+                                </list>
+                            </field>
+                        </page>
                     </notebook>
                 </sheet>
                 <chatter/>
