@@ -47,6 +47,7 @@
         'views/purchase_order.xml',
         'views/sale_report.xml',
         'views/menuitems.xml',
+        'wizard/res_partner_message_wizard.xml',
         'wizard/delivery_route_bis_wizard.xml',
         'wizard/delivery_route_mass_create_wizard.xml',
     ],
