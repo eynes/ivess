@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!--
+        En l10n_ar_eynes.retention_certificate_qweb (report/retention_certificate.xml)
+        la Alicuota se imprime con el float sin formato (ej. "0.0"). Se
+        formatea a 2 decimales con coma, sin modificar l10n_ar_eynes.
+    -->
+    <template id="retention_certificate_alicuota_precision" inherit_id="l10n_ar_eynes.retention_certificate_qweb">
+        <xpath expr="//t[@t-set='applied_aliquot']" position="attributes">
+            <attribute name="t-value">('%.2f' % r.applied_aliquot).replace('.', ',')</attribute>
+        </xpath>
+    </template>
+
+    <!--
+        Se oculta la fila "Monto del comprobante que origina la Retención",
+        solo en la vista del reporte (no se toca el campo ni el modelo).
+    -->
+    <template id="retention_certificate_hide_related_moves_amount" inherit_id="l10n_ar_eynes.retention_certificate_qweb">
+        <xpath expr="//t[@t-set='related_moves_amount']/ancestor::tr" position="replace" />
+    </template>
+</odoo>
