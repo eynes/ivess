@@ -50,6 +50,7 @@
         'wizard/res_partner_message_wizard.xml',
         'wizard/delivery_route_bis_wizard.xml',
         'wizard/delivery_route_mass_create_wizard.xml',
+        'wizard/delivery_route_number_message_wizard.xml',
     ],
     'demo': [],
     'test': [],
