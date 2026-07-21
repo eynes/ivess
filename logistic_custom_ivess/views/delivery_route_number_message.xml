@@ -3,7 +3,7 @@
         <field name="name">delivery.route.number.message.form</field>
         <field name="model">delivery.route.number.message</field>
         <field name="arch" type="xml">
-            <form string="Mensaje General por Reparto">
+            <form string="Mensaje General por Reparto" create="false">
                 <sheet>
                     <group>
                         <field name="delivery_route_number_ids" widget="many2many_tags"
@@ -21,7 +21,7 @@
         <field name="name">delivery.route.number.message.list</field>
         <field name="model">delivery.route.number.message</field>
         <field name="arch" type="xml">
-            <list string="Historial de Mensajes">
+            <list string="Historial de Mensajes" create="false">
                 <field name="message_text"/>
                 <field name="apply_to_all"/>
                 <field name="delivery_route_number_ids" widget="many2many_tags"/>
