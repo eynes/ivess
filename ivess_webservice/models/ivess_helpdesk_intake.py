@@ -10,7 +10,7 @@ class IvessHelpdeskIntake(models.Model):
         patente = kwargs.get("patente", "")
         items = kwargs.get("items") or []
         intake_user = kwargs.get("user", "")
-        dispatch = kwargs.get("dispatch")
+        dispatch = kwargs.get("dispatch", "")
 
         team = self._get_workshop_team()
         if not team:
@@ -61,13 +61,16 @@ class IvessHelpdeskIntake(models.Model):
             for k, v in item.items()
         ]
 
-    def _build_ticket_name(self, items, patente):
+    def _build_ticket_name(self, items, patente, dispatch_route=None):
         descriptions = [k for item in items for k in item.keys()]
-        return " - ".join(descriptions + [patente]) if descriptions else patente
+        parts = descriptions + [patente] if descriptions else [patente]
+        if dispatch_route:
+            parts = [dispatch_route.display_name] + parts
+        return " - ".join(parts)
 
     def _create_helpdesk_ticket(self, team, equipment, patente, items, intake_user="", payload=None, dispatch_route=None):
         return self.env["helpdesk.ticket"].create({
-            "name": self._build_ticket_name(items, patente),
+            "name": self._build_ticket_name(items, patente, dispatch_route),
             "user_id": self.env.user.id,
             "equipment_id": equipment.id,
             "ticket_source": "other",
