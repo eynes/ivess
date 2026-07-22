@@ -159,7 +159,7 @@ class HelpdeskTicket(models.Model):
 
     # Workshop (Taller Mecánico) fields
     intake_user = fields.Char(string="Usuario JMobile")
-    dispatch = fields.Char(string="Reparto")
+    dispatch = fields.Many2one("delivery.route.number", string="Reparto")
     webhub_dispatch = fields.Char(string="Reparto Webhub")
     driver_name = fields.Char(string="Nombre")
     vehicle_model = fields.Char(string="Modelo")

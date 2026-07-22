@@ -26,11 +26,10 @@ class PartnerDistributions(models.Model):
     _inherit = ['visit.schedule.mixin']
     _description = 'Distributions'
 
-    distribution = fields.Many2one('template.delivery.route', tracking=True)
+    distribution = fields.Many2one('template.delivery.route')
     visit_day = fields.Selection(
         related='distribution.day',
         string='Visit Day',
-        tracking=True,
     )
     frequency = fields.Selection(
         selection=[
@@ -40,9 +39,8 @@ class PartnerDistributions(models.Model):
         ],
         default=False,
         string='Frequency',
-        tracking=True,
     )
-    partner_id = fields.Many2one('res.partner', string='Partner', tracking=True)
+    partner_id = fields.Many2one('res.partner', string='Partner')
 
     message_ids = fields.One2many(
         'partner.distribution.message',
@@ -111,7 +109,6 @@ class PartnerDistributions(models.Model):
         string='Última Visita',
         copy=False,
         readonly=True,
-        tracking=True,
     )
 
     @api.constrains('partner_id', 'distribution')
