@@ -119,6 +119,22 @@ class DeliveryRouteNumber(models.Model):
                     "Debe completar 'Fecha Desde' y 'Fecha Hasta' cuando 'Permitir precio anterior' está habilitado."
                 )
 
+    def _get_target_route(self):
+        self.ensure_one()
+        number_id = self._origin.id
+        today = fields.Date.today()
+        route = self.env['delivery.route'].search([
+            ('delivery_number_id', '=', number_id),
+            ('state', '=', 'in_progress'),
+        ], order='delivery_date desc', limit=1)
+        if route:
+            return route
+        return self.env['delivery.route'].search([
+            ('delivery_number_id', '=', number_id),
+            ('state', 'in', ('draft', 'sincronizado')),
+            ('delivery_date', '>=', today),
+        ], order='delivery_date asc', limit=1)
+
 
 class DeliveryRouteNumberMessage(models.Model):
     _name = 'delivery.route.number.message'
@@ -127,6 +143,11 @@ class DeliveryRouteNumberMessage(models.Model):
     delivery_route_number_ids = fields.Many2many(
         'delivery.route.number',
         string='Reparto',
+    )
+    route_ids = fields.Many2many(
+        'delivery.route',
+        string='Recorrido',
+        readonly=True,
     )
     message_text = fields.Text(
         string='Mensaje',

@@ -47,15 +47,6 @@ class PartnerDistributions(models.Model):
         'partner_distribution_id',
         string='Mensajes',
     )
-    current_route_id = fields.Many2one(
-        'delivery.route',
-        string='Recorrido Actual',
-        compute='_compute_current_message',
-    )
-    current_message_text = fields.Text(
-        string='Mensaje',
-        compute='_compute_current_message',
-    )
 
     def _get_target_route(self):
         self.ensure_one()
@@ -75,14 +66,6 @@ class PartnerDistributions(models.Model):
             ('delivery_date', '>=', today),
             ('delivery_route_line_ids.client_id', '=', self.partner_id.id),
         ], order='delivery_date asc', limit=1)
-
-    @api.depends('message_ids', 'message_ids.route_id', 'message_ids.message_text')
-    def _compute_current_message(self):
-        for record in self:
-            route = record._get_target_route()
-            message = record.message_ids.filtered(lambda m: m.route_id == route) if route else False
-            record.current_route_id = route
-            record.current_message_text = message.message_text if message else False
 
     def action_open_message_wizard(self):
         self.ensure_one()
