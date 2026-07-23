@@ -26,9 +26,8 @@ class ProductTemplate(models.Model):
         string="Litros mínimos para bonificación"
     )
     allows_replacement = fields.Boolean(string="Allows Replacement")
-    exclude_from_regular = fields.Boolean(string="Exclude from Regular")
+    is_regular_app = fields.Boolean(string="Is Regular (APP)")
     show_in_app = fields.Boolean(string="Mostrar en App")
-    is_promo = fields.Boolean(string="Is Promo")
 
     _sql_constraints = [
         (

@@ -15,10 +15,7 @@
                 <field name="is_frio_calor"/>
                 <field name="litros_min_bonificacion" invisible="not is_frio_calor"/>
                 <field name="allows_replacement"/>
-                <field name="exclude_from_regular"/>
-            </field>
-            <field name="type" position="after">
-                <field name="is_promo"/>
+                <field name="is_regular_app"/>
             </field>
         </field>
     </record>

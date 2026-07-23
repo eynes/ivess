@@ -15,7 +15,6 @@
         "stock",
         "helpdesk_repair",
         "repair",
-        "logistic_custom_ivess",
     ],
     "data": [
         "security/groups.xml",

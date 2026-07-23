@@ -31,19 +31,7 @@
             <!-- Origen field after equipment_id -->
             <field name="equipment_id" position="after">
                 <field name="request_origin"/>
-                <field name="team_type" invisible="1"/>
             </field>
-            <!-- Items tab (mirrored from the originating ticket) -->
-            <xpath expr="//notebook" position="inside">
-                <page string="Ítems" name="maint_items" invisible="team_type != 'workshop'">
-                    <field name="item_ids" string="Ítems" nolabel="1" readonly="1">
-                        <list>
-                            <field name="name"/>
-                            <field name="value"/>
-                        </list>
-                    </field>
-                </page>
-            </xpath>
             <!-- Materials tab -->
             <xpath expr="//notebook" position="inside">
                 <page string="Materiales" name="maint_materials">
@@ -68,20 +56,6 @@
                     </field>
                 </page>
             </xpath>
-        </field>
-    </record>
-
-    <!-- Higher priority than maintenance_portal_ivess's view so it applies after it,
-         placing dispatch right next to equipment_id ahead of department_id. -->
-    <record id="maintenance_request_view_form_inherit_dispatch" model="ir.ui.view">
-        <field name="name">maintenance.request.form.inherit.dispatch</field>
-        <field name="inherit_id" ref="maintenance.hr_equipment_request_view_form"/>
-        <field name="model">maintenance.request</field>
-        <field name="priority">18</field>
-        <field name="arch" type="xml">
-            <field name="equipment_id" position="after">
-                <field name="dispatch" invisible="team_type != 'workshop'" readonly="1"/>
-            </field>
         </field>
     </record>
 </odoo>

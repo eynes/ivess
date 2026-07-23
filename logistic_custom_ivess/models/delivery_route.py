@@ -159,24 +159,6 @@ class DeliveryRoute(models.Model):
         tracking=True,
         # help="Reflects the cash‑sale setting of the associated delivery number."
     )
-    message_general_ids = fields.Many2many(
-        'delivery.route.number.message',
-        compute='_compute_message_general_ids',
-        string='Mensajes Generales',
-    )
-
-    @api.depends('delivery_number_id')
-    def _compute_message_general_ids(self):
-        message = self.env['delivery.route.number.message']
-        for rec in self:
-            if not rec.delivery_number_id:
-                rec.message_general_ids = message
-                continue
-            rec.message_general_ids = message.search([
-                '|',
-                ('apply_to_all', '=', True),
-                ('delivery_route_number_ids', '=', rec.delivery_number_id.id),
-            ])
 
     # @api.depends('truck_id')
     # def _compute_allowed_person(self):
@@ -578,20 +560,6 @@ class DeliveryRouteLine(models.Model):
         store=True,
         readonly=True,
     )
-    message_ids = fields.One2many(
-        'partner.distribution.message',
-        'route_line_id',
-        string='Mensajes',
-    )
-    message_text = fields.Text(
-        string='Mensaje',
-        compute='_compute_message_text',
-    )
-
-    @api.depends('message_ids', 'message_ids.message_text')
-    def _compute_message_text(self):
-        for rec in self:
-            rec.message_text = rec.message_ids[:1].message_text if rec.message_ids else False
 
     def _is_client_on_vacation(self, delivery_date):
         """El cliente está de vacaciones para esa fecha si su estado es

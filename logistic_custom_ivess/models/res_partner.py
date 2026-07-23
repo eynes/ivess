@@ -366,4 +366,3 @@ class ResPartner(models.Model):
         action['domain'] = [('partner_id', '=', self.id)]
         action['context'] = {'default_partner_id': self.id}
         return action
-

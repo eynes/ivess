@@ -134,11 +134,6 @@
                 <field name="department_id" options="{'no_create': True}"/>
             </xpath>
 
-            <xpath expr="//field[@name='user_id']" position="after">
-                <field name="responsable_ids" widget="many2many_tags"
-                       invisible="not is_internal_maintenance"/>
-            </xpath>
-
         </field>
     </record>
 
