@@ -54,7 +54,6 @@
                                 <field name="visit_day"/>
                                 <field name="frequency" required="1"/>
                                 <field name="last_visit_date" readonly="1"/>
-                                <button name="action_open_message_wizard" type="object" icon="fa-envelope" title="Editar Mensaje"/>
                             </list>
                         </field>
                         <field name="average_hour" widget="float_time"/>
@@ -78,13 +77,6 @@
                         <field name="frequency" required="1"/>
                         <field name="last_visit_date" readonly="1"/>
                     </group>
-                    <separator string="Historial de Mensajes"/>
-                    <field name="message_ids" nolabel="1">
-                        <list create="0">
-                            <field name="route_id"/>
-                            <field name="message_text"/>
-                        </list>
-                    </field>
                 </sheet>
             </form>
         </field>

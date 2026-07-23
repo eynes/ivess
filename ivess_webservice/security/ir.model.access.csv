@@ -1,7 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 
-access_ivess_helpdesk_intake_user,ivess.helpdesk.intake.user,model_ivess_helpdesk_intake,ivess_webservice.group_ivess_webservice_user,1,0,1,0
-access_ivess_breakdown_intake_user,ivess.breakdown.intake.user,model_ivess_breakdown_intake,ivess_webservice.group_ivess_webservice_user,1,0,1,0
+access_ivess_helpdesk_intake_user,ivess.helpdesk.intake.user,model_ivess_helpdesk_intake,base.group_user,1,0,1,0
+access_ivess_breakdown_intake_user,ivess.breakdown.intake.user,model_ivess_breakdown_intake,base.group_user,1,0,1,0
 
 access_res_partner_bot,res.partner.bot,base.model_res_partner,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 access_template_delivery_route_bot,template.delivery.route.bot,logistic_custom_ivess.model_template_delivery_route,ivess_webservice.group_ivess_webservice_user,1,0,0,0

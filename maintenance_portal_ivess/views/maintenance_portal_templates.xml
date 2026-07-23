@@ -77,7 +77,7 @@
                                 <span>
                                     <i class="fa fa-calendar me-1"/>
                                     <t t-if="req.request_date">
-                                        <t t-esc="req.request_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
+                                        <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </span>
@@ -218,13 +218,6 @@
                                     <t t-esc="maint_request.user_id.name or '—'"/>
                                 </dd>
 
-                                <t t-if="maint_request.responsable_ids">
-                                    <dt class="col-sm-5 text-muted">Responsables</dt>
-                                    <dd class="col-sm-7">
-                                        <t t-esc="', '.join(maint_request.responsable_ids.mapped('name'))"/>
-                                    </dd>
-                                </t>
-
                                 <dt class="col-sm-5 text-muted">Equipo mant.</dt>
                                 <dd class="col-sm-7">
                                     <t t-esc="maint_request.maintenance_team_id.name or '—'"/>
@@ -233,7 +226,7 @@
                                 <dt class="col-sm-5 text-muted">Fecha solicitud</dt>
                                 <dd class="col-sm-7">
                                     <t t-if="maint_request.request_date">
-                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
+                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </dd>
@@ -241,7 +234,7 @@
                                 <dt class="col-sm-5 text-muted">Fecha programada</dt>
                                 <dd class="col-sm-7">
                                     <t t-if="maint_request.schedule_date">
-                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
+                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </dd>
@@ -249,14 +242,14 @@
                                 <t t-if="maint_request.schedule_end">
                                     <dt class="col-sm-5 text-muted">Fin programado</dt>
                                     <dd class="col-sm-7">
-                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
+                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime"}'/>
                                     </dd>
                                 </t>
 
                                 <t t-if="maint_request.close_date">
                                     <dt class="col-sm-5 text-muted">Fecha cierre</dt>
                                     <dd class="col-sm-7">
-                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
+                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date"}'/>
                                     </dd>
                                 </t>
                             </dl>
@@ -285,7 +278,7 @@
                                     <dl class="row mb-0">
                                         <dt class="col-sm-5 text-muted">Hasta</dt>
                                         <dd class="col-sm-7">
-                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
+                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date"}'/>
                                         </dd>
                                     </dl>
                                 </div>
@@ -754,23 +747,6 @@
                             </div>
                         </div>
 
-                        <!-- Responsables -->
-                        <input type="hidden" name="responsable_ids_present" value="1"/>
-                        <div class="row g-3 mb-3">
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Responsables</label>
-                                <div id="maint_resp_tags" class="d-flex flex-wrap gap-1 mb-2"/>
-                                <div class="position-relative">
-                                    <input type="text" id="maint_resp_search" class="form-control form-control-sm"
-                                           placeholder="Buscar responsable..." autocomplete="off"/>
-                                    <div id="maint_resp_suggestions"
-                                         class="list-group position-absolute w-100 shadow-sm"
-                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
-                                </div>
-                                <span id="maint_resp_data" style="display:none" t-att-data-initial="responsables_json"/>
-                            </div>
-                        </div>
-
                         <!-- Origen -->
                         <!-- Para / Centro de trabajo / Orden de fabricación -->
                         <div class="row g-3 mb-3">
@@ -904,7 +880,7 @@
                         fetch('/my/maintenance/equipment/search', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q, is_workshop: false}}),
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
                         })
                         .then(r => r.json())
                         .then(data => {
@@ -931,90 +907,6 @@
                 });
                 nameInput.addEventListener('blur', function () {
                     setTimeout(() => { suggestions.style.display = 'none'; }, 200);
-                });
-            })();
-            </script>
-
-            <script>
-            (function () {
-                const searchInput = document.getElementById('maint_resp_search');
-                const suggestions = document.getElementById('maint_resp_suggestions');
-                const container = document.getElementById('maint_resp_tags');
-                const dataEl = document.getElementById('maint_resp_data');
-                if (!searchInput) return;
-
-                const selected = new Map();
-                try {
-                    JSON.parse(dataEl.dataset.initial || '[]').forEach(function (u) {
-                        selected.set(u.id, u.name);
-                    });
-                } catch (e) { /* ignore */ }
-
-                function renderTags() {
-                    container.innerHTML = '';
-                    selected.forEach(function (name, id) {
-                        const tag = document.createElement('span');
-                        tag.className = 'badge text-bg-primary d-inline-flex align-items-center gap-1 py-1 px-2';
-                        const label = document.createElement('span');
-                        label.textContent = name;
-                        const removeBtn = document.createElement('button');
-                        removeBtn.type = 'button';
-                        removeBtn.className = 'btn-close btn-close-white';
-                        removeBtn.style.fontSize = '0.55rem';
-                        removeBtn.setAttribute('aria-label', 'Quitar');
-                        removeBtn.addEventListener('click', function () {
-                            selected.delete(id);
-                            renderTags();
-                        });
-                        const hidden = document.createElement('input');
-                        hidden.type = 'hidden';
-                        hidden.name = 'responsable_ids';
-                        hidden.value = id;
-                        tag.appendChild(label);
-                        tag.appendChild(removeBtn);
-                        tag.appendChild(hidden);
-                        container.appendChild(tag);
-                    });
-                }
-                renderTags();
-
-                let timer;
-                searchInput.addEventListener('input', function () {
-                    clearTimeout(timer);
-                    const q = this.value.trim();
-                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
-                    timer = setTimeout(function () {
-                        fetch('/my/maintenance/users/search', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
-                        })
-                        .then(function (r) { return r.json(); })
-                        .then(function (data) {
-                            suggestions.innerHTML = '';
-                            const results = (data.result || []).filter(function (u) { return !selected.has(u.id); });
-                            if (!results.length) { suggestions.style.display = 'none'; return; }
-                            results.forEach(function (u) {
-                                const item = document.createElement('a');
-                                item.href = '#';
-                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
-                                item.textContent = u.name;
-                                item.addEventListener('click', function (e) {
-                                    e.preventDefault();
-                                    selected.set(u.id, u.name);
-                                    renderTags();
-                                    searchInput.value = '';
-                                    suggestions.style.display = 'none';
-                                });
-                                suggestions.appendChild(item);
-                            });
-                            suggestions.style.display = 'block';
-                        })
-                        .catch(function () { suggestions.style.display = 'none'; });
-                    }, 250);
-                });
-                searchInput.addEventListener('blur', function () {
-                    setTimeout(function () { suggestions.style.display = 'none'; }, 200);
                 });
             })();
             </script>
@@ -1115,7 +1007,7 @@
                                 <span>
                                     <i class="fa fa-calendar me-1"/>
                                     <t t-if="req.request_date">
-                                        <t t-esc="req.request_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
+                                        <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </span>
@@ -1259,7 +1151,7 @@
                                 <dt class="col-sm-5 text-muted">Fecha solicitud</dt>
                                 <dd class="col-sm-7">
                                     <t t-if="maint_request.request_date">
-                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
+                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </dd>
@@ -1267,7 +1159,7 @@
                                 <dt class="col-sm-5 text-muted">Fecha programada</dt>
                                 <dd class="col-sm-7">
                                     <t t-if="maint_request.schedule_date">
-                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
+                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </dd>
@@ -1275,14 +1167,14 @@
                                 <t t-if="maint_request.schedule_end">
                                     <dt class="col-sm-5 text-muted">Fin programado</dt>
                                     <dd class="col-sm-7">
-                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
+                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime"}'/>
                                     </dd>
                                 </t>
 
                                 <t t-if="maint_request.close_date">
                                     <dt class="col-sm-5 text-muted">Fecha cierre</dt>
                                     <dd class="col-sm-7">
-                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
+                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date"}'/>
                                     </dd>
                                 </t>
                             </dl>
@@ -1309,7 +1201,7 @@
                                     <dl class="row mb-0">
                                         <dt class="col-sm-5 text-muted">Hasta</dt>
                                         <dd class="col-sm-7">
-                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
+                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date"}'/>
                                         </dd>
                                     </dl>
                                 </div>
@@ -1902,7 +1794,7 @@
                         fetch('/my/maintenance/equipment/search', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q, is_workshop: true}}),
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
                         })
                         .then(r => r.json())
                         .then(data => {
@@ -2183,7 +2075,7 @@
                         fetch('/my/maintenance/equipment/search', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q, is_workshop: true}}),
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
                         })
                         .then(r => r.json())
                         .then(data => {
@@ -2347,23 +2239,6 @@
                                         </option>
                                     </t>
                                 </select>
-                            </div>
-                        </div>
-
-                        <!-- Responsables -->
-                        <input type="hidden" name="responsable_ids_present" value="1"/>
-                        <div class="row g-3 mb-3">
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Responsables</label>
-                                <div id="maint_new_resp_tags" class="d-flex flex-wrap gap-1 mb-2"/>
-                                <div class="position-relative">
-                                    <input type="text" id="maint_new_resp_search" class="form-control form-control-sm"
-                                           placeholder="Buscar responsable..." autocomplete="off"/>
-                                    <div id="maint_new_resp_suggestions"
-                                         class="list-group position-absolute w-100 shadow-sm"
-                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
-                                </div>
-                                <span id="maint_new_resp_data" style="display:none" t-att-data-initial="responsables_json"/>
                             </div>
                         </div>
 
@@ -2548,7 +2423,7 @@
                         fetch('/my/maintenance/equipment/search', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q, is_workshop: false}}),
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
                         })
                         .then(function (r) { return r.json(); })
                         .then(function (data) {
@@ -2574,90 +2449,6 @@
                     }, 250);
                 });
                 nameInput.addEventListener('blur', function () {
-                    setTimeout(function () { suggestions.style.display = 'none'; }, 200);
-                });
-            })();
-            </script>
-
-            <script>
-            (function () {
-                var searchInput = document.getElementById('maint_new_resp_search');
-                var suggestions = document.getElementById('maint_new_resp_suggestions');
-                var container = document.getElementById('maint_new_resp_tags');
-                var dataEl = document.getElementById('maint_new_resp_data');
-                if (!searchInput) return;
-
-                var selected = new Map();
-                try {
-                    JSON.parse(dataEl.dataset.initial || '[]').forEach(function (u) {
-                        selected.set(u.id, u.name);
-                    });
-                } catch (e) { /* ignore */ }
-
-                function renderTags() {
-                    container.innerHTML = '';
-                    selected.forEach(function (name, id) {
-                        var tag = document.createElement('span');
-                        tag.className = 'badge text-bg-primary d-inline-flex align-items-center gap-1 py-1 px-2';
-                        var label = document.createElement('span');
-                        label.textContent = name;
-                        var removeBtn = document.createElement('button');
-                        removeBtn.type = 'button';
-                        removeBtn.className = 'btn-close btn-close-white';
-                        removeBtn.style.fontSize = '0.55rem';
-                        removeBtn.setAttribute('aria-label', 'Quitar');
-                        removeBtn.addEventListener('click', function () {
-                            selected.delete(id);
-                            renderTags();
-                        });
-                        var hidden = document.createElement('input');
-                        hidden.type = 'hidden';
-                        hidden.name = 'responsable_ids';
-                        hidden.value = id;
-                        tag.appendChild(label);
-                        tag.appendChild(removeBtn);
-                        tag.appendChild(hidden);
-                        container.appendChild(tag);
-                    });
-                }
-                renderTags();
-
-                var timer;
-                searchInput.addEventListener('input', function () {
-                    clearTimeout(timer);
-                    var q = this.value.trim();
-                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
-                    timer = setTimeout(function () {
-                        fetch('/my/maintenance/users/search', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
-                        })
-                        .then(function (r) { return r.json(); })
-                        .then(function (data) {
-                            suggestions.innerHTML = '';
-                            var results = (data.result || []).filter(function (u) { return !selected.has(u.id); });
-                            if (!results.length) { suggestions.style.display = 'none'; return; }
-                            results.forEach(function (u) {
-                                var item = document.createElement('a');
-                                item.href = '#';
-                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
-                                item.textContent = u.name;
-                                item.addEventListener('click', function (e) {
-                                    e.preventDefault();
-                                    selected.set(u.id, u.name);
-                                    renderTags();
-                                    searchInput.value = '';
-                                    suggestions.style.display = 'none';
-                                });
-                                suggestions.appendChild(item);
-                            });
-                            suggestions.style.display = 'block';
-                        })
-                        .catch(function () { suggestions.style.display = 'none'; });
-                    }, 250);
-                });
-                searchInput.addEventListener('blur', function () {
                     setTimeout(function () { suggestions.style.display = 'none'; }, 200);
                 });
             })();

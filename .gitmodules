@@ -34,7 +34,3 @@
 	path = account_import_clearance
 	url = https://gitlab.eynes.com.ar/jenck/account_import_clearance.git
 	branch = 19.0-ivess
-[submodule "account_financial_reporting"]
-	path = account_financial_reporting
-	url = https://github.com/OCA/account-financial-reporting.git
-	branch = 19.0
