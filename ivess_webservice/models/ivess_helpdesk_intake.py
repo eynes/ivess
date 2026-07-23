@@ -62,7 +62,11 @@ class IvessHelpdeskIntake(models.Model):
         ]
 
     def _build_ticket_name(self, items, patente, dispatch_route=None):
-        descriptions = [k for item in items for k in item.keys()]
+        descriptions = [
+            str(v) if k.strip().casefold() == "observaciones" else k
+            for item in items
+            for k, v in item.items()
+        ]
         parts = descriptions + [patente] if descriptions else [patente]
         if dispatch_route:
             parts = [dispatch_route.display_name] + parts
