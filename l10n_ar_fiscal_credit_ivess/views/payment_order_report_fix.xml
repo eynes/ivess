@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!--
+        En l10n_ar_eynes.payment_order (report/payment_order.xml) el
+        template llama a weblearns_layout_1 con `<div t-call="...">`.
+        Odoo 19 ya no permite `t-call` sobre un elemento que no sea `<t>`
+        (SyntaxError: "t-call must be on a <t> element"). Sin modificar el
+        módulo l10n_ar_eynes, insertamos un `<t t-call>` válido, movemos el
+        contenido original hacia adentro y eliminamos el `<div>` roto.
+    -->
+    <template id="payment_order_fix_tcall_on_div" inherit_id="l10n_ar_eynes.payment_order">
+        <xpath expr="//div[@t-call='l10n_ar_eynes.weblearns_layout_1']" position="before">
+            <t t-call="l10n_ar_eynes.weblearns_layout_1" />
+        </xpath>
+        <xpath expr="//t[@t-call='l10n_ar_eynes.weblearns_layout_1']" position="inside">
+            <xpath expr="//div[@t-call='l10n_ar_eynes.weblearns_layout_1']/div[@class='page']" position="move" />
+            <xpath expr="//div[@t-call='l10n_ar_eynes.weblearns_layout_1']/style" position="move" />
+        </xpath>
+        <xpath expr="//div[@t-call='l10n_ar_eynes.weblearns_layout_1']" position="replace" />
+    </template>
+</odoo>
