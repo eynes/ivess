@@ -49,6 +49,8 @@ class ProductTemplate(models.Model):
         default='new',
     )
 
+    authorize_for_technical_service = fields.Boolean(string="Authorize for Technical Service")
+
     @api.constrains('purchase_ok', 'categ_id', 'state')
     def _check_purchase_required_fields(self):
         for rec in self:

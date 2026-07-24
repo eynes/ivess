@@ -77,7 +77,7 @@
                                 <span>
                                     <i class="fa fa-calendar me-1"/>
                                     <t t-if="req.request_date">
-                                        <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
+                                        <t t-esc="req.request_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </span>
@@ -218,6 +218,13 @@
                                     <t t-esc="maint_request.user_id.name or '—'"/>
                                 </dd>
 
+                                <t t-if="maint_request.responsable_ids">
+                                    <dt class="col-sm-5 text-muted">Responsables</dt>
+                                    <dd class="col-sm-7">
+                                        <t t-esc="', '.join(maint_request.responsable_ids.mapped('name'))"/>
+                                    </dd>
+                                </t>
+
                                 <dt class="col-sm-5 text-muted">Equipo mant.</dt>
                                 <dd class="col-sm-7">
                                     <t t-esc="maint_request.maintenance_team_id.name or '—'"/>
@@ -226,7 +233,7 @@
                                 <dt class="col-sm-5 text-muted">Fecha solicitud</dt>
                                 <dd class="col-sm-7">
                                     <t t-if="maint_request.request_date">
-                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date"}'/>
+                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </dd>
@@ -234,7 +241,7 @@
                                 <dt class="col-sm-5 text-muted">Fecha programada</dt>
                                 <dd class="col-sm-7">
                                     <t t-if="maint_request.schedule_date">
-                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime"}'/>
+                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </dd>
@@ -242,14 +249,14 @@
                                 <t t-if="maint_request.schedule_end">
                                     <dt class="col-sm-5 text-muted">Fin programado</dt>
                                     <dd class="col-sm-7">
-                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime"}'/>
+                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
                                     </dd>
                                 </t>
 
                                 <t t-if="maint_request.close_date">
                                     <dt class="col-sm-5 text-muted">Fecha cierre</dt>
                                     <dd class="col-sm-7">
-                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date"}'/>
+                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
                                     </dd>
                                 </t>
                             </dl>
@@ -278,7 +285,7 @@
                                     <dl class="row mb-0">
                                         <dt class="col-sm-5 text-muted">Hasta</dt>
                                         <dd class="col-sm-7">
-                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date"}'/>
+                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
                                         </dd>
                                     </dl>
                                 </div>
@@ -302,6 +309,22 @@
                             <i class="fa fa-check-circle text-success"/>
                             <small class="text-muted">Motivo de cierre:</small>
                             <strong><t t-esc="maint_request.closure_reason_id.name"/></strong>
+                        </div>
+                    </t>
+
+                    <!-- Adjuntos -->
+                    <t t-if="maint_attachments">
+                        <hr/>
+                        <h6 class="text-muted mb-2">Adjuntos</h6>
+                        <div class="list-group">
+                            <t t-foreach="maint_attachments" t-as="att">
+                                <a t-attf-href="/my/maintenance/attachment/#{att.id}"
+                                   target="_blank"
+                                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fa fa-paperclip me-2 text-muted"/><t t-esc="att.name"/></span>
+                                    <i class="fa fa-external-link text-muted"/>
+                                </a>
+                            </t>
                         </div>
                     </t>
                 </div>
@@ -703,15 +726,16 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Equipo</label>
-                                <select name="equipment_id" class="form-select">
-                                    <option value="">— Sin equipo —</option>
-                                    <t t-foreach="equipment_list" t-as="eq">
-                                        <option t-att-value="eq.id"
-                                                t-att-selected="'selected' if maint_request.equipment_id.id == eq.id else None">
-                                            <t t-esc="eq.name"/>
-                                        </option>
-                                    </t>
-                                </select>
+                                <div class="position-relative">
+                                    <input type="text" id="maint_equip_name" class="form-control"
+                                           t-att-value="maint_request.equipment_id.display_name or ''"
+                                           autocomplete="off" placeholder="Buscar equipo..."/>
+                                    <input type="hidden" name="equipment_id" id="maint_equip_id"
+                                           t-att-value="maint_request.equipment_id.id or ''"/>
+                                    <div id="maint_equip_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
                                 <t t-if="maint_request.category_id">
                                     <small class="text-muted">
                                         Categoría actual: <t t-esc="maint_request.category_id.name"/>
@@ -727,6 +751,23 @@
                                 <label class="form-label fw-semibold">Finalización programada</label>
                                 <input type="datetime-local" name="schedule_end" class="form-control"
                                        t-att-value="maint_request.schedule_end.strftime('%Y-%m-%dT%H:%M') if maint_request.schedule_end else ''"/>
+                            </div>
+                        </div>
+
+                        <!-- Responsables -->
+                        <input type="hidden" name="responsable_ids_present" value="1"/>
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Responsables</label>
+                                <div id="maint_resp_tags" class="d-flex flex-wrap gap-1 mb-2"/>
+                                <div class="position-relative">
+                                    <input type="text" id="maint_resp_search" class="form-control form-control-sm"
+                                           placeholder="Buscar responsable..." autocomplete="off"/>
+                                    <div id="maint_resp_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
+                                <span id="maint_resp_data" style="display:none" t-att-data-initial="responsables_json"/>
                             </div>
                         </div>
 
@@ -847,6 +888,137 @@
             })();
             </script>
 
+            <script>
+            (function () {
+                const nameInput = document.getElementById('maint_equip_name');
+                const idInput = document.getElementById('maint_equip_id');
+                const suggestions = document.getElementById('maint_equip_suggestions');
+                if (!nameInput) return;
+                let timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    idInput.value = '';
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/equipment/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q, is_workshop: false}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(eq => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = eq.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = eq.name;
+                                    idInput.value = eq.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(() => { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
+            <script>
+            (function () {
+                const searchInput = document.getElementById('maint_resp_search');
+                const suggestions = document.getElementById('maint_resp_suggestions');
+                const container = document.getElementById('maint_resp_tags');
+                const dataEl = document.getElementById('maint_resp_data');
+                if (!searchInput) return;
+
+                const selected = new Map();
+                try {
+                    JSON.parse(dataEl.dataset.initial || '[]').forEach(function (u) {
+                        selected.set(u.id, u.name);
+                    });
+                } catch (e) { /* ignore */ }
+
+                function renderTags() {
+                    container.innerHTML = '';
+                    selected.forEach(function (name, id) {
+                        const tag = document.createElement('span');
+                        tag.className = 'badge text-bg-primary d-inline-flex align-items-center gap-1 py-1 px-2';
+                        const label = document.createElement('span');
+                        label.textContent = name;
+                        const removeBtn = document.createElement('button');
+                        removeBtn.type = 'button';
+                        removeBtn.className = 'btn-close btn-close-white';
+                        removeBtn.style.fontSize = '0.55rem';
+                        removeBtn.setAttribute('aria-label', 'Quitar');
+                        removeBtn.addEventListener('click', function () {
+                            selected.delete(id);
+                            renderTags();
+                        });
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = 'responsable_ids';
+                        hidden.value = id;
+                        tag.appendChild(label);
+                        tag.appendChild(removeBtn);
+                        tag.appendChild(hidden);
+                        container.appendChild(tag);
+                    });
+                }
+                renderTags();
+
+                let timer;
+                searchInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/users/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            suggestions.innerHTML = '';
+                            const results = (data.result || []).filter(function (u) { return !selected.has(u.id); });
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(function (u) {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = u.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    selected.set(u.id, u.name);
+                                    renderTags();
+                                    searchInput.value = '';
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(function () { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                searchInput.addEventListener('blur', function () {
+                    setTimeout(function () { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
         </t>
     </template>
 
@@ -943,7 +1115,7 @@
                                 <span>
                                     <i class="fa fa-calendar me-1"/>
                                     <t t-if="req.request_date">
-                                        <t t-esc="req.request_date" t-options='{"widget": "date"}'/>
+                                        <t t-esc="req.request_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </span>
@@ -1087,7 +1259,7 @@
                                 <dt class="col-sm-5 text-muted">Fecha solicitud</dt>
                                 <dd class="col-sm-7">
                                     <t t-if="maint_request.request_date">
-                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date"}'/>
+                                        <t t-esc="maint_request.request_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </dd>
@@ -1095,7 +1267,7 @@
                                 <dt class="col-sm-5 text-muted">Fecha programada</dt>
                                 <dd class="col-sm-7">
                                     <t t-if="maint_request.schedule_date">
-                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime"}'/>
+                                        <t t-esc="maint_request.schedule_date" t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
                                     </t>
                                     <t t-else="">—</t>
                                 </dd>
@@ -1103,14 +1275,14 @@
                                 <t t-if="maint_request.schedule_end">
                                     <dt class="col-sm-5 text-muted">Fin programado</dt>
                                     <dd class="col-sm-7">
-                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime"}'/>
+                                        <t t-esc="maint_request.schedule_end" t-options='{"widget": "datetime", "format": "dd/MM/yyyy HH:mm"}'/>
                                     </dd>
                                 </t>
 
                                 <t t-if="maint_request.close_date">
                                     <dt class="col-sm-5 text-muted">Fecha cierre</dt>
                                     <dd class="col-sm-7">
-                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date"}'/>
+                                        <t t-esc="maint_request.close_date" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
                                     </dd>
                                 </t>
                             </dl>
@@ -1137,7 +1309,7 @@
                                     <dl class="row mb-0">
                                         <dt class="col-sm-5 text-muted">Hasta</dt>
                                         <dd class="col-sm-7">
-                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date"}'/>
+                                            <t t-esc="maint_request.repeat_until" t-options='{"widget": "date", "format": "dd/MM/yyyy"}'/>
                                         </dd>
                                     </dl>
                                 </div>
@@ -1160,6 +1332,22 @@
                             <i class="fa fa-check-circle text-success"/>
                             <small class="text-muted">Motivo de cierre:</small>
                             <strong><t t-esc="maint_request.closure_reason_id.name"/></strong>
+                        </div>
+                    </t>
+
+                    <!-- Adjuntos -->
+                    <t t-if="maint_attachments">
+                        <hr/>
+                        <h6 class="text-muted mb-2">Adjuntos</h6>
+                        <div class="list-group">
+                            <t t-foreach="maint_attachments" t-as="att">
+                                <a t-attf-href="/my/maintenance/attachment/#{att.id}"
+                                   target="_blank"
+                                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fa fa-paperclip me-2 text-muted"/><t t-esc="att.name"/></span>
+                                    <i class="fa fa-external-link text-muted"/>
+                                </a>
+                            </t>
                         </div>
                     </t>
                 </div>
@@ -1556,15 +1744,16 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Equipo</label>
-                                <select name="equipment_id" class="form-select">
-                                    <option value="">— Sin equipo —</option>
-                                    <t t-foreach="equipment_list" t-as="eq">
-                                        <option t-att-value="eq.id"
-                                                t-att-selected="'selected' if maint_request.equipment_id.id == eq.id else None">
-                                            <t t-esc="eq.name"/>
-                                        </option>
-                                    </t>
-                                </select>
+                                <div class="position-relative">
+                                    <input type="text" id="ws_equip_name" class="form-control"
+                                           t-att-value="maint_request.equipment_id.display_name or ''"
+                                           autocomplete="off" placeholder="Buscar equipo..."/>
+                                    <input type="hidden" name="equipment_id" id="ws_equip_id"
+                                           t-att-value="maint_request.equipment_id.id or ''"/>
+                                    <div id="ws_equip_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
                                 <t t-if="maint_request.category_id">
                                     <small class="text-muted">
                                         Categoría actual: <t t-esc="maint_request.category_id.name"/>
@@ -1697,6 +1886,53 @@
             })();
             </script>
 
+            <script>
+            (function () {
+                const nameInput = document.getElementById('ws_equip_name');
+                const idInput = document.getElementById('ws_equip_id');
+                const suggestions = document.getElementById('ws_equip_suggestions');
+                if (!nameInput) return;
+                let timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    idInput.value = '';
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/equipment/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q, is_workshop: true}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(eq => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = eq.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = eq.name;
+                                    idInput.value = eq.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(() => { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
         </t>
     </template>
 
@@ -1811,14 +2047,14 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Equipo <span class="text-danger">*</span></label>
-                                <select name="equipment_id" class="form-select" required="required">
-                                    <option value="">— Seleccionar equipo —</option>
-                                    <t t-foreach="equipment_list" t-as="eq">
-                                        <option t-att-value="eq.id">
-                                            <t t-esc="eq.name"/>
-                                        </option>
-                                    </t>
-                                </select>
+                                <div class="position-relative">
+                                    <input type="text" id="ws_new_equip_name" class="form-control" required="required"
+                                           autocomplete="off" placeholder="Buscar equipo..."/>
+                                    <input type="hidden" name="equipment_id" id="ws_new_equip_id" value=""/>
+                                    <div id="ws_new_equip_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Centro de trabajo</label>
@@ -1927,6 +2163,53 @@
                 });
                 repeatType.addEventListener('change', function () {
                     untilCol.style.display = this.value === 'until' ? 'block' : 'none';
+                });
+            })();
+            </script>
+
+            <script>
+            (function () {
+                const nameInput = document.getElementById('ws_new_equip_name');
+                const idInput = document.getElementById('ws_new_equip_id');
+                const suggestions = document.getElementById('ws_new_equip_suggestions');
+                if (!nameInput) return;
+                let timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    idInput.value = '';
+                    const q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/equipment/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q, is_workshop: true}}),
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            suggestions.innerHTML = '';
+                            const results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(eq => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = eq.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = eq.name;
+                                    idInput.value = eq.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(() => { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(() => { suggestions.style.display = 'none'; }, 200);
                 });
             })();
             </script>
@@ -2045,14 +2328,14 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Equipo <span class="text-danger">*</span></label>
-                                <select name="equipment_id" class="form-select" required="required">
-                                    <option value="">— Seleccionar equipo —</option>
-                                    <t t-foreach="equipment_list" t-as="eq">
-                                        <option t-att-value="eq.id">
-                                            <t t-esc="eq.name"/>
-                                        </option>
-                                    </t>
-                                </select>
+                                <div class="position-relative">
+                                    <input type="text" id="maint_new_equip_name" class="form-control" required="required"
+                                           autocomplete="off" placeholder="Buscar equipo..."/>
+                                    <input type="hidden" name="equipment_id" id="maint_new_equip_id" value=""/>
+                                    <div id="maint_new_equip_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Centro de trabajo</label>
@@ -2064,6 +2347,23 @@
                                         </option>
                                     </t>
                                 </select>
+                            </div>
+                        </div>
+
+                        <!-- Responsables -->
+                        <input type="hidden" name="responsable_ids_present" value="1"/>
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Responsables</label>
+                                <div id="maint_new_resp_tags" class="d-flex flex-wrap gap-1 mb-2"/>
+                                <div class="position-relative">
+                                    <input type="text" id="maint_new_resp_search" class="form-control form-control-sm"
+                                           placeholder="Buscar responsable..." autocomplete="off"/>
+                                    <div id="maint_new_resp_suggestions"
+                                         class="list-group position-absolute w-100 shadow-sm"
+                                         style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
+                                </div>
+                                <span id="maint_new_resp_data" style="display:none" t-att-data-initial="responsables_json"/>
                             </div>
                         </div>
 
@@ -2227,6 +2527,137 @@
                     }, 250);
                 });
                 nameInput.addEventListener('blur', function () {
+                    setTimeout(function () { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
+            <script>
+            (function () {
+                var nameInput = document.getElementById('maint_new_equip_name');
+                var idInput = document.getElementById('maint_new_equip_id');
+                var suggestions = document.getElementById('maint_new_equip_suggestions');
+                if (!nameInput) return;
+                var timer;
+                nameInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    idInput.value = '';
+                    var q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/equipment/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q, is_workshop: false}}),
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            suggestions.innerHTML = '';
+                            var results = data.result || [];
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(function (eq) {
+                                var item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = eq.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    nameInput.value = eq.name;
+                                    idInput.value = eq.id;
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(function () { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                nameInput.addEventListener('blur', function () {
+                    setTimeout(function () { suggestions.style.display = 'none'; }, 200);
+                });
+            })();
+            </script>
+
+            <script>
+            (function () {
+                var searchInput = document.getElementById('maint_new_resp_search');
+                var suggestions = document.getElementById('maint_new_resp_suggestions');
+                var container = document.getElementById('maint_new_resp_tags');
+                var dataEl = document.getElementById('maint_new_resp_data');
+                if (!searchInput) return;
+
+                var selected = new Map();
+                try {
+                    JSON.parse(dataEl.dataset.initial || '[]').forEach(function (u) {
+                        selected.set(u.id, u.name);
+                    });
+                } catch (e) { /* ignore */ }
+
+                function renderTags() {
+                    container.innerHTML = '';
+                    selected.forEach(function (name, id) {
+                        var tag = document.createElement('span');
+                        tag.className = 'badge text-bg-primary d-inline-flex align-items-center gap-1 py-1 px-2';
+                        var label = document.createElement('span');
+                        label.textContent = name;
+                        var removeBtn = document.createElement('button');
+                        removeBtn.type = 'button';
+                        removeBtn.className = 'btn-close btn-close-white';
+                        removeBtn.style.fontSize = '0.55rem';
+                        removeBtn.setAttribute('aria-label', 'Quitar');
+                        removeBtn.addEventListener('click', function () {
+                            selected.delete(id);
+                            renderTags();
+                        });
+                        var hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = 'responsable_ids';
+                        hidden.value = id;
+                        tag.appendChild(label);
+                        tag.appendChild(removeBtn);
+                        tag.appendChild(hidden);
+                        container.appendChild(tag);
+                    });
+                }
+                renderTags();
+
+                var timer;
+                searchInput.addEventListener('input', function () {
+                    clearTimeout(timer);
+                    var q = this.value.trim();
+                    if (q.length &lt; 2) { suggestions.style.display = 'none'; return; }
+                    timer = setTimeout(function () {
+                        fetch('/my/maintenance/users/search', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({jsonrpc: '2.0', method: 'call', params: {query: q}}),
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            suggestions.innerHTML = '';
+                            var results = (data.result || []).filter(function (u) { return !selected.has(u.id); });
+                            if (!results.length) { suggestions.style.display = 'none'; return; }
+                            results.forEach(function (u) {
+                                var item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-1 px-2 small';
+                                item.textContent = u.name;
+                                item.addEventListener('click', function (e) {
+                                    e.preventDefault();
+                                    selected.set(u.id, u.name);
+                                    renderTags();
+                                    searchInput.value = '';
+                                    suggestions.style.display = 'none';
+                                });
+                                suggestions.appendChild(item);
+                            });
+                            suggestions.style.display = 'block';
+                        })
+                        .catch(function () { suggestions.style.display = 'none'; });
+                    }, 250);
+                });
+                searchInput.addEventListener('blur', function () {
                     setTimeout(function () { suggestions.style.display = 'none'; }, 200);
                 });
             })();

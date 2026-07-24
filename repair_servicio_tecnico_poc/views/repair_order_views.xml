@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Esta vista hereda la MISMA vista nativa que ya hereda
+        quality_control_custom (repair.view_repair_order_form), con una
+        priority más alta para que se aplique después. No modifica ningún
+        archivo de quality_control_custom: solo pisa, para las órdenes que
+        tienen sale_order_id (servicio técnico originado en una venta), los
+        mismos atributos "invisible" que ese módulo dejó fijos únicamente
+        para el pipeline de taller Frío/Calor.
+    -->
+    <record id="view_repair_order_form_inherit_poc" model="ir.ui.view">
+        <field name="name">repair.order.form.inherit.servicio_tecnico_poc</field>
+        <field name="model">repair.order</field>
+        <field name="inherit_id" ref="repair.view_repair_order_form"/>
+        <field name="priority" eval="20"/>
+        <field name="arch" type="xml">
+
+            <!-- Pestaña nativa "Piezas utilizadas": quality_control_custom la oculta
+                 salvo en las etapas 'repair'/'descarte' de su propio pipeline. Para
+                 las órdenes de servicio técnico (sale_order_id) debe verse siempre. -->
+            <xpath expr="//notebook/page[@name='parts']" position="attributes">
+                <attribute name="invisible">frio_calor_stage not in ('repair', 'descarte') and not sale_order_id</attribute>
+            </xpath>
+
+            <!-- Franja de etapa Frío/Calor (badge + revertir/avanzar etapa): no aplica
+                 a un servicio técnico que no recorre esas etapas de taller. -->
+            <xpath expr="//button[@name='action_open_revert_stage_wizard']/parent::div" position="attributes">
+                <attribute name="invisible">repair_equipment_type != 'frio_calor' or sale_order_id</attribute>
+            </xpath>
+
+            <!-- Botones específicos del pipeline de taller: ocultos si la orden
+                 viene de una venta. -->
+            <xpath expr="//button[@name='action_start_current_stage']" position="attributes">
+                <attribute name="invisible">repair_equipment_type != 'frio_calor' or stage_started or frio_calor_stage in ('finalizado', 'descarte') or is_outsourced or state == 'draft' or sale_order_id</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_outsource']" position="attributes">
+                <attribute name="invisible">repair_equipment_type != 'frio_calor' or is_outsourced or (frio_calor_stage == 'descarte' and state == 'cancel') or sale_order_id</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_send_to_descarte']" position="attributes">
+                <attribute name="invisible">repair_equipment_type != 'frio_calor' or frio_calor_stage in ('descarte', 'finalizado') or state in ['cancel', 'done'] or sale_order_id</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_init_repair']" position="attributes">
+                <attribute name="invisible">frio_calor_stage == 'repair' or is_outsourced or not stage_started or sale_order_id</attribute>
+            </xpath>
+            <xpath expr="//button[@name='action_send_to_pintura']" position="attributes">
+                <attribute name="invisible">frio_calor_stage != 'armado' or is_outsourced or not stage_started or sale_order_id</attribute>
+            </xpath>
+
+            <!-- Campos auxiliares del pipeline de taller: ocultos si la orden
+                 viene de una venta. -->
+            <xpath expr="//field[@name='is_outsourced']" position="attributes">
+                <attribute name="invisible">repair_equipment_type != 'frio_calor' or sale_order_id</attribute>
+            </xpath>
+            <xpath expr="//field[@name='requires_painting']" position="attributes">
+                <attribute name="invisible">repair_equipment_type != 'frio_calor' or sale_order_id</attribute>
+            </xpath>
+            <xpath expr="//field[@name='parts_availability']/following-sibling::field[@name='prueba_inicial_resultado']" position="attributes">
+                <attribute name="invisible">repair_equipment_type != 'frio_calor' or sale_order_id</attribute>
+            </xpath>
+
+            <!-- Historial de etapas de taller: no corresponde a un servicio técnico. -->
+            <xpath expr="//page[@name='stage_history']" position="attributes">
+                <attribute name="invisible">repair_equipment_type != 'frio_calor' or sale_order_id</attribute>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
