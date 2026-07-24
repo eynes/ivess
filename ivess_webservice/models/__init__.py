@@ -16,3 +16,4 @@ from . import ivess_stock_report
 from . import ivess_delivery_and_assigned_route_report
 from . import ivess_customer_fc_report
 from . import ivess_fc_stock_in_truck
+from . import ivess_messages_report

@@ -53,3 +53,6 @@ access_ivess_delivery_and_assigned_route_report_bot,ivess.delivery.and.assigned.
 access_ivess_customer_fc_report_bot,ivess.customer.fc.report.bot,model_ivess_customer_fc_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_fc_stock_in_truck_bot,ivess.fc.stock.in.truck.bot,model_ivess_fc_stock_in_truck,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+
+access_ivess_messages_report_bot,ivess.messages.report.bot,model_ivess_messages_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_delivery_route_number_message_bot,delivery.route.number.message.bot,logistic_custom_ivess.model_delivery_route_number_message,ivess_webservice.group_ivess_webservice_user,1,0,0,0
