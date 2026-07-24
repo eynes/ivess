@@ -69,10 +69,19 @@ class AccountPaymentOrder(models.Model):
 
         for order in valid_orders:
             template, attachments = order._get_mass_email_template_and_attachments()
+            # Some templates keep the subject on its own indented XML line,
+            # which leaves stray newlines in the rendered value; the compose
+            # wizard silently drops those (single-line input), but send_mail
+            # sends them as-is and the mail server rejects the header.
+            subject = template._render_field("subject", order.ids)[order.id]
+            subject = " ".join((subject or "").split())
             template.send_mail(
                 order.id,
                 force_send=True,
-                email_values={"attachment_ids": [(6, 0, attachments)]},
+                email_values={
+                    "subject": subject,
+                    "attachment_ids": [(6, 0, attachments)],
+                },
                 email_layout_xmlid="mail.mail_notification_light",
             )
 
@@ -81,7 +90,10 @@ class AccountPaymentOrder(models.Model):
                 "Se enviaron %(sent)s email(s). Se omitieron las siguientes "
                 "órdenes por no estar validadas: %(numbers)s.",
                 sent=len(valid_orders),
-                numbers=", ".join(invalid_orders.mapped("number")),
+                numbers=", ".join(
+                    order.number or order.display_name or str(order.id)
+                    for order in invalid_orders
+                ),
             )
             notification_type = "warning" if valid_orders else "danger"
         else:
