@@ -22,10 +22,10 @@ class IvessMessagesReport(models.Model):
                 JOIN delivery_route dr
                     ON dr.id = drl.route_id
                     AND dr.state != 'closed'
-                LEFT JOIN partner_distribution pd
+                JOIN partner_distribution pd
                     ON pd.distribution = dr.template_delivery_route_id
                     AND pd.partner_id = drl.client_id
-                LEFT JOIN partner_distribution_message pdm
+                JOIN partner_distribution_message pdm
                     ON pdm.partner_distribution_id = pd.id
                     AND pdm.route_id = dr.id
             )
