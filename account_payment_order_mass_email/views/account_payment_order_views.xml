@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="account_payment_order_view_tree_mass_email" model="ir.ui.view">
+        <field name="name">account.payment.order.view.tree.mass.email</field>
+        <field name="model">account.payment.order</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.account_payment_order_view_tree" />
+        <field name="arch" type="xml">
+            <list position="inside">
+                <header>
+                    <button
+            name="action_send_email_mass"
+            string="Enviar por e-mail"
+            type="object"
+            class="oe_highlight"
+          />
+                </header>
+            </list>
+        </field>
+    </record>
+
+</odoo>
