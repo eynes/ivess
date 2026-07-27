@@ -57,11 +57,8 @@ class DeliveryRouteNumber(models.Model):
         default=True,
         help="If checked, customers can enter a manual address for this delivery."
     )
-    remittance_sequence_ids = fields.Many2many(
+    remittance_sequence_id = fields.Many2one(
         'ir.sequence',
-        relation='delivery_route_number_ir_sequence_rel',
-        column1='route_number_id',
-        column2='sequence_id',
         string='Remittance Booklet',
     )
     collection_journal_id = fields.Many2one(
