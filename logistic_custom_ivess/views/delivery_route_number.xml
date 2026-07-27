@@ -10,7 +10,7 @@
                 <field name="allow_price_editing"/>
                 <field name="allow_free_of_charge"/>
                 <field name="allow_reordering"/>
-                <field name="is_cold_hot_delivery"/>
+                <field name="is_technical_delivery"/>
                 <field name="allow_previous_price"/>
                 <field name="allow_cash_sale"/>
                 <field name="allow_manual_address"/>
@@ -60,9 +60,9 @@
                         <group>
                             <field name="allow_sale_without_stock"/>
                             <field name="allow_cash_sale"/>
-                            <field name="is_cold_hot_delivery"/>
+                            <field name="is_technical_delivery"/>
                             <field name="allow_manual_address"/>
-                            <field name="allow_closing_with_rake" invisible="is_cold_hot_delivery == False"/>
+                            <field name="allow_closing_with_rake" invisible="is_technical_delivery == False"/>
                         </group>
                     </group>
                     <notebook>
@@ -71,7 +71,7 @@
                                 <group>
                                     <field name="remittance_sequence_ids" widget="many2many_tags"/>
                                     <field name="collection_journal_id"/>
-                                    <field name="repair_order_sequence_id" invisible="is_cold_hot_delivery == False"/>
+                                    <field name="repair_order_sequence_id" invisible="is_technical_delivery == False"/>
                                 </group>
                             </group>
                         </page>

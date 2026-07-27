@@ -44,7 +44,7 @@ class DeliveryRouteNumber(models.Model):
     allow_previous_price = fields.Boolean(string='Allow Previous Price')
     allow_sale_without_stock = fields.Boolean(string='Allow sale without stock')
     allow_closing_with_rake = fields.Boolean(string='Allow closing with rake')
-    is_cold_hot_delivery = fields.Boolean(string="Is cold hot delivery", default=False)
+    is_technical_delivery = fields.Boolean(string="Is Technical Delivery", default=False)
     allow_cash_sale = fields.Boolean(
         string='Allow Cash Sale',
         required=True,

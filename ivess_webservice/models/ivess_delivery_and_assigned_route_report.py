@@ -18,7 +18,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
     delivery_number_id = fields.Many2one('delivery.route.number', readonly=True)
     allow_price_editing = fields.Boolean(readonly=True)
     allow_free_of_charge = fields.Boolean(readonly=True)
-    is_cold_hot_delivery = fields.Boolean(readonly=True)
+    is_technical_delivery = fields.Boolean(readonly=True)
     number = fields.Integer(readonly=True)
     allow_cash_sale = fields.Boolean(readonly=True)
     allow_manual_address = fields.Boolean(readonly=True)
@@ -56,7 +56,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
                     drn.id AS delivery_number_id,
                     drn.allow_price_editing AS allow_price_editing,
                     drn.allow_free_of_charge AS allow_free_of_charge,
-                    drn.is_cold_hot_delivery AS is_cold_hot_delivery,
+                    drn.is_technical_delivery AS is_technical_delivery,
                     drn.number AS number,
                     drn.allow_cash_sale AS allow_cash_sale,
                     drn.allow_manual_address AS allow_manual_address,
@@ -113,7 +113,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             'delivery_number_id',
             'allow_price_editing',
             'allow_free_of_charge',
-            'is_cold_hot_delivery',
+            'is_technical_delivery',
             'number',
             'allow_cash_sale',
             'allow_manual_address',

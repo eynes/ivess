@@ -638,9 +638,9 @@ msgid "Is Rake"
 msgstr "Es Rastrillo"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__is_cold_hot_delivery
-msgid "Is cold hot delivery"
-msgstr "Es reparto frío/calor"
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__is_technical_delivery
+msgid "Is Technical Delivery"
+msgstr "Es Reparto Tecnico"
 
 #. module: logistic_custom_ivess
 #: model:ir.model,name:logistic_custom_ivess.model_account_move
