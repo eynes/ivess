@@ -83,7 +83,8 @@ class IvessProductsReport(models.Model):
             if r["authorize_for_technical_service"]:
                 final_records.append({
                     "product_id": r["id"],
-                    "name": r["name"]
+                    "name": r["name"],
+                    "is_service": r["authorize_for_technical_service"],
                     })
                 continue
 
