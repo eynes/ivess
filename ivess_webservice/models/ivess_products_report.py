@@ -17,6 +17,7 @@ class IvessProductsReport(models.Model):
     type                 = fields.Char(readonly=True)
     order                = fields.Integer(readonly=True)
     tax_amount           = fields.Float(readonly=True)
+    authorize_for_technical_service = fields.Boolean(readonly=True)
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -44,7 +45,8 @@ class IvessProductsReport(models.Model):
                         WHERE ptr.prod_id = pt.id
                             AND atg.group_type = 'internals'
                         LIMIT 1
-                    ), 0) AS tax_amount
+                    ), 0) AS tax_amount, 
+                    pt.authorize_for_technical_service
                 FROM product_template pt
                 WHERE pt.show_in_app = True
             )
@@ -69,6 +71,7 @@ class IvessProductsReport(models.Model):
             "type",
             "order",
             "tax_amount",
+            "authorize_for_technical_service"
         ])
 
         promo_tmpl_ids = [r["id"] for r in records if r["is_promo"]]
@@ -77,6 +80,13 @@ class IvessProductsReport(models.Model):
 
         final_records = []
         for r in records:
+            if r["authorize_for_technical_service"]:
+                final_records.append({
+                    "product_id": r["id"],
+                    "name": r["name"]
+                    })
+                continue
+
             components = []
             if r["is_promo"]:
                 bom = bom_by_tmpl_id.get(r["id"])
@@ -89,6 +99,7 @@ class IvessProductsReport(models.Model):
                             "product_qty": line.product_qty,
                             "is_returnable": line.product_id.product_tmpl_id.is_returnable,
                         })
+
             final_records.append({
                 "product_id": r["id"],
                 "default_code": r["default_code"],
