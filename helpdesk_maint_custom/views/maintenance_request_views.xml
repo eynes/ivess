@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <odoo>
+    <!-- Must come first so the DB view arch (renamed dispatch -> dispatch_id) is updated
+         before other views for maintenance.request are validated. -->
+    <record id="maintenance_request_view_form_inherit_dispatch" model="ir.ui.view">
+        <field name="name">maintenance.request.form.inherit.dispatch</field>
+        <field name="inherit_id" ref="maintenance.hr_equipment_request_view_form"/>
+        <field name="model">maintenance.request</field>
+        <field name="priority">18</field>
+        <field name="arch" type="xml">
+            <field name="equipment_id" position="after">
+                <field name="dispatch_id" invisible="team_type != 'workshop'" readonly="1"/>
+            </field>
+        </field>
+    </record>
+
     <!-- Agregar campo in_progress al listado de etapas de mantenimiento -->
     <record id="maintenance_stage_view_list_inherit_in_progress" model="ir.ui.view">
         <field name="name">maintenance.stage.list.inherit.in.progress</field>
@@ -68,20 +82,6 @@
                     </field>
                 </page>
             </xpath>
-        </field>
-    </record>
-
-    <!-- Higher priority than maintenance_portal_ivess's view so it applies after it,
-         placing dispatch right next to equipment_id ahead of department_id. -->
-    <record id="maintenance_request_view_form_inherit_dispatch" model="ir.ui.view">
-        <field name="name">maintenance.request.form.inherit.dispatch</field>
-        <field name="inherit_id" ref="maintenance.hr_equipment_request_view_form"/>
-        <field name="model">maintenance.request</field>
-        <field name="priority">18</field>
-        <field name="arch" type="xml">
-            <field name="equipment_id" position="after">
-                <field name="dispatch" invisible="team_type != 'workshop'" readonly="1"/>
-            </field>
         </field>
     </record>
 </odoo>

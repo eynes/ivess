@@ -23,7 +23,9 @@ class IvessHelpdeskIntake(models.Model):
         dispatch_route = self._get_dispatch_route(dispatch)
 
         payload = self._format_payload(kwargs)
-        ticket = self._create_helpdesk_ticket(team, equipment, patente, items, intake_user, payload, dispatch_route)
+        ticket = self._create_helpdesk_ticket(
+            team, equipment, patente, items, intake_user, payload, dispatch_route, dispatch
+        )
         return {"ticket_id": ticket.id, "ticket_name": ticket.name}
 
     def _get_workshop_team(self):
@@ -72,7 +74,8 @@ class IvessHelpdeskIntake(models.Model):
             parts = [dispatch_route.display_name] + parts
         return " - ".join(parts)
 
-    def _create_helpdesk_ticket(self, team, equipment, patente, items, intake_user="", payload=None, dispatch_route=None):
+    def _create_helpdesk_ticket(self, team, equipment, patente, items, intake_user="", payload=None,
+                                 dispatch_route=None, dispatch=""):
         return self.env["helpdesk.ticket"].create({
             "name": self._build_ticket_name(items, patente, dispatch_route),
             "user_id": self.env.user.id,
@@ -82,5 +85,6 @@ class IvessHelpdeskIntake(models.Model):
             "item_ids": self._build_item_lines(items),
             "intake_user": intake_user,
             "intake_payload": payload,
-            "dispatch": dispatch_route.id if dispatch_route else False,
+            "dispatch_id": dispatch_route.id if dispatch_route else False,
+            "dispatch": dispatch,
         })
