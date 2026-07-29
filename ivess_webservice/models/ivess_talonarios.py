@@ -81,12 +81,17 @@ class IvessTalonariosReport(models.Model):
 
         record = self.browse(delivery.id)
 
+        #chequeo de talonarios asociados (ver si estan configurados en el reparto)
+        has_remittance_sequence = bool(record.remittance_sequence_id)
+        has_collection_journal = bool(record.collection_journal_id)
+        has_repair_order_sequence = bool(record.repair_order_sequence_id)
+
         return {
             "distribution": distribution,
-            "rem_next_number": record.rem_next_number,
-            "rem_prefix": record.rem_prefix,
-            "rec_next_number": record.rec_next_number,
-            "rec_prefix": record.rec_prefix,
-            "or_next_number": record.or_next_number,
-            "or_prefix": record.or_prefix
+            "rem_next_number": record.rem_next_number if has_remittance_sequence else None,
+            "rem_prefix": record.rem_prefix if has_remittance_sequence else None,
+            "rec_next_number": record.rec_next_number if has_collection_journal else None,
+            "rec_prefix": record.rec_prefix if has_collection_journal else None,
+            "or_next_number": record.or_next_number if has_repair_order_sequence else None,
+            "or_prefix": record.or_prefix if has_repair_order_sequence else None
         }
