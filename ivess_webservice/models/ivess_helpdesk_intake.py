@@ -34,6 +34,12 @@ class IvessHelpdeskIntake(models.Model):
             limit=1,
         )
 
+    def _get_workshop_maintenance_team(self):
+        return self.env["maintenance.team"].search(
+            [("is_workshop", "=", True)],
+            limit=1,
+        )
+
     def _get_equipment(self, patente):
         return self.env["maintenance.equipment"].with_context(lang="es_AR").search(
             [("name", "=", patente)],
@@ -76,7 +82,11 @@ class IvessHelpdeskIntake(models.Model):
 
     def _create_helpdesk_ticket(self, team, equipment, patente, items, intake_user="", payload=None,
                                  dispatch_route=None, dispatch=""):
-        return self.env["helpdesk.ticket"].create({
+        workshop_maintenance_team = self._get_workshop_maintenance_team()
+        create_ctx = {}
+        if workshop_maintenance_team:
+            create_ctx["maintenance_team_id_ctx"] = workshop_maintenance_team.id
+        return self.env["helpdesk.ticket"].with_context(**create_ctx).create({
             "name": self._build_ticket_name(items, patente, dispatch_route),
             "user_id": self.env.user.id,
             "equipment_id": equipment.id,
