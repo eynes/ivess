@@ -2,6 +2,11 @@
       <menuitem id="menu_delivery_route_root"
             name="Rutas"
             parent="sale.sale_menu_root"
+            sequence="10" />
+
+      <menuitem id="menu_delivery_route_list"
+            name="Recorridos"
+            parent="menu_delivery_route_root"
             sequence="10"
             action="action_delivery_route" />
 
