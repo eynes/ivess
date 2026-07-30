@@ -42,7 +42,48 @@ class PartnerDistributions(models.Model):
         string='Frequency',
         tracking=True,
     )
-    partner_id = fields.Many2one('res.partner', string='Partner', tracking=True)
+    partner_id = fields.Many2one('res.partner', string='Partner')
+
+    message_ids = fields.One2many(
+        'partner.distribution.message',
+        'partner_distribution_id',
+        string='Mensajes',
+    )
+
+    def _get_target_route(self):
+        self.ensure_one()
+        if not self.distribution or not self.partner_id:
+            return self.env['delivery.route']
+        today = fields.Date.today()
+        route = self.env['delivery.route'].search([
+            ('template_delivery_route_id', '=', self.distribution.id),
+            ('state', '=', 'in_progress'),
+            ('delivery_route_line_ids.client_id', '=', self.partner_id.id),
+        ], order='delivery_date desc', limit=1)
+        if route:
+            return route
+        return self.env['delivery.route'].search([
+            ('template_delivery_route_id', '=', self.distribution.id),
+            ('state', 'in', ('draft', 'sincronizado')),
+            ('delivery_date', '>=', today),
+            ('delivery_route_line_ids.client_id', '=', self.partner_id.id),
+        ], order='delivery_date asc', limit=1)
+
+    def action_open_message_wizard(self):
+        self.ensure_one()
+        if not self._get_target_route():
+            raise ValidationError(_(
+                "No hay un recorrido en curso ni programado para la plantilla %(template)s. "
+                "No se puede asociar un mensaje."
+            ) % {'template': self.distribution.name})
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Mensaje',
+            'res_model': 'res.partner.message.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'active_id': self.id},
+        }
     route_line_id = fields.Many2one(
         'delivery.route.line',
         string='Route Line',

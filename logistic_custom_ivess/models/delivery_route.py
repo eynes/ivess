@@ -159,6 +159,11 @@ class DeliveryRoute(models.Model):
         tracking=True,
         # help="Reflects the cash‑sale setting of the associated delivery number."
     )
+    message_general_ids = fields.Many2many(
+        'delivery.route.number.message',
+        string='Mensajes Generales',
+        readonly=True,
+    )
 
     # @api.depends('truck_id')
     # def _compute_allowed_person(self):

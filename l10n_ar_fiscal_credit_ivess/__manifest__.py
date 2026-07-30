@@ -25,6 +25,8 @@
     ],
     "data": [
         "views/account_move_views.xml",
+        "views/report_subjournal_apportionable_vat.xml",
+        "views/retention_certificate_report_fix.xml",
     ],
     "installable": True,
     "license": "AGPL-3",

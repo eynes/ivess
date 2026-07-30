@@ -32,6 +32,8 @@
             </xpath>
             <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="before">
                 <field name="free_of_charge" optional="show"/>
+                <field name="fecha_programada" optional="show" invisible="product_type != 'service'"/>
+                <field name="turno" optional="show" invisible="product_type != 'service'"/>
             </xpath>
         </field>
     </record>

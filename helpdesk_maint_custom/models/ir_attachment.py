@@ -1,7 +1,7 @@
 # Copyright 2024 Eynes
 # License LGPL-3.0 or later (https://www.gnu.org/licenses/lgpl.html).
 
-from odoo import models
+from odoo import api, models
 
 
 class IrAttachment(models.Model):
@@ -35,6 +35,7 @@ class IrAttachment(models.Model):
                             'res_id': order.id,
                         })
 
+    @api.model_create_multi
     def create(self, vals_list):
         attachments = super().create(vals_list)
         attachments._sync_to_maintenance_requests()

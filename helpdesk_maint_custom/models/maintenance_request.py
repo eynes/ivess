@@ -12,6 +12,11 @@ class MaintenanceRequest(models.Model):
         string='Helpdesk Ticket',
         index=True,
     )
+    team_type = fields.Selection(related='ticket_id.team_type')
+    dispatch_id = fields.Many2one(related='ticket_id.dispatch_id', string='Reparto', store=True)
+    equipment_id = fields.Many2one(
+        related='ticket_id.equipment_id', string='Equipment', store=True, readonly=False
+    )
     request_origin = fields.Char(string='Origen')
     material_ids = fields.One2many(
         'maintenance.request.material',

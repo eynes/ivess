@@ -20,12 +20,20 @@ class IvessHelpdeskIntake(models.Model):
             return {"error": f"Equipo '{patente}' no encontrado"}
 
         payload = self._format_payload(kwargs)
-        ticket = self._create_helpdesk_ticket(team, equipment, patente, items, intake_user, payload)
+        ticket = self._create_helpdesk_ticket(
+            team, equipment, patente, items, intake_user, payload, dispatch_route, dispatch
+        )
         return {"ticket_id": ticket.id, "ticket_name": ticket.name}
 
     def _get_workshop_team(self):
         return self.env["helpdesk.team"].search(
             [("team_type", "=", "workshop")],
+            limit=1,
+        )
+
+    def _get_workshop_maintenance_team(self):
+        return self.env["maintenance.team"].search(
+            [("is_workshop", "=", True)],
             limit=1,
         )
 
@@ -46,10 +54,25 @@ class IvessHelpdeskIntake(models.Model):
             for k, v in item.items()
         ]
 
-    def _create_helpdesk_ticket(self, team, equipment, patente, items, intake_user="", payload=None):
-        sequence = self.env["ir.sequence"].next_by_code("ivess.helpdesk.intake.cs")
-        return self.env["helpdesk.ticket"].create({
-            "name": sequence,
+    def _build_ticket_name(self, items, patente, dispatch_route=None):
+        descriptions = [
+            str(v) if k.strip().casefold() == "observaciones" else k
+            for item in items
+            for k, v in item.items()
+        ]
+        parts = descriptions + [patente] if descriptions else [patente]
+        if dispatch_route:
+            parts = [dispatch_route.display_name] + parts
+        return " - ".join(parts)
+
+    def _create_helpdesk_ticket(self, team, equipment, patente, items, intake_user="", payload=None,
+                                 dispatch_route=None, dispatch=""):
+        workshop_maintenance_team = self._get_workshop_maintenance_team()
+        create_ctx = {}
+        if workshop_maintenance_team:
+            create_ctx["maintenance_team_id_ctx"] = workshop_maintenance_team.id
+        return self.env["helpdesk.ticket"].with_context(**create_ctx).create({
+            "name": self._build_ticket_name(items, patente, dispatch_route),
             "user_id": self.env.user.id,
             "equipment_id": equipment.id,
             "ticket_source": "other",
@@ -57,4 +80,6 @@ class IvessHelpdeskIntake(models.Model):
             "item_ids": self._build_item_lines(items),
             "intake_user": intake_user,
             "intake_payload": payload,
+            "dispatch_id": dispatch_route.id if dispatch_route else False,
+            "dispatch": dispatch,
         })

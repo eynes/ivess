@@ -44,7 +44,7 @@ class DeliveryRouteNumber(models.Model):
     allow_previous_price = fields.Boolean(string='Allow Previous Price')
     allow_sale_without_stock = fields.Boolean(string='Allow sale without stock')
     allow_closing_with_rake = fields.Boolean(string='Allow closing with rake')
-    is_cold_hot_delivery = fields.Boolean(string="Is cold hot delivery", default=False)
+    is_technical_delivery = fields.Boolean(string="Is Technical Delivery", default=False)
     allow_cash_sale = fields.Boolean(
         string='Allow Cash Sale',
         required=True,
@@ -57,11 +57,8 @@ class DeliveryRouteNumber(models.Model):
         default=True,
         help="If checked, customers can enter a manual address for this delivery."
     )
-    remittance_sequence_ids = fields.Many2many(
+    remittance_sequence_id = fields.Many2one(
         'ir.sequence',
-        relation='delivery_route_number_ir_sequence_rel',
-        column1='route_number_id',
-        column2='sequence_id',
         string='Remittance Booklet',
     )
     collection_journal_id = fields.Many2one(
@@ -118,5 +115,51 @@ class DeliveryRouteNumber(models.Model):
                 raise ValidationError(
                     "Debe completar 'Fecha Desde' y 'Fecha Hasta' cuando 'Permitir precio anterior' está habilitado."
                 )
+
+    def _get_target_route(self):
+        self.ensure_one()
+        number_id = self._origin.id
+        today = fields.Date.today()
+        route = self.env['delivery.route'].search([
+            ('delivery_number_id', '=', number_id),
+            ('state', '=', 'in_progress'),
+        ], order='delivery_date desc', limit=1)
+        if route:
+            return route
+        return self.env['delivery.route'].search([
+            ('delivery_number_id', '=', number_id),
+            ('state', 'in', ('draft', 'sincronizado')),
+            ('delivery_date', '>=', today),
+        ], order='delivery_date asc', limit=1)
+
+
+class DeliveryRouteNumberMessage(models.Model):
+    _name = 'delivery.route.number.message'
+    _description = 'Mensaje General por Reparto'
+
+    delivery_route_number_ids = fields.Many2many(
+        'delivery.route.number',
+        string='Reparto',
+    )
+    route_ids = fields.Many2many(
+        'delivery.route',
+        string='Recorrido',
+        readonly=True,
+    )
+    message_text = fields.Text(
+        string='Mensaje',
+        required=True,
+    )
+    apply_to_all = fields.Boolean(
+        string='Todos / Aplicar a todos',
+    )
+
+    @api.constrains('apply_to_all', 'delivery_route_number_ids')
+    def _check_delivery_route_number_ids(self):
+        for record in self:
+            if not record.apply_to_all and not record.delivery_route_number_ids:
+                raise ValidationError(_(
+                    "Debe seleccionar al menos un reparto o marcar 'Todos / Aplicar a todos'."
+                ))
 
 

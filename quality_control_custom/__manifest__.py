@@ -19,6 +19,7 @@
         'quality_repair',
         'stock',
         'barcodes',
+        'logistic_custom_ivess',
     ],
     'data': [
         'security/ir.model.access.csv',
