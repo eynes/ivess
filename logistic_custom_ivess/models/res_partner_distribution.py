@@ -26,11 +26,10 @@ class PartnerDistributions(models.Model):
     _inherit = ['visit.schedule.mixin']
     _description = 'Distributions'
 
-    distribution = fields.Many2one('template.delivery.route', tracking=True)
+    distribution = fields.Many2one('template.delivery.route')
     visit_day = fields.Selection(
         related='distribution.day',
         string='Visit Day',
-        tracking=True,
     )
     frequency = fields.Selection(
         selection=[
@@ -40,7 +39,6 @@ class PartnerDistributions(models.Model):
         ],
         default=False,
         string='Frequency',
-        tracking=True,
     )
     partner_id = fields.Many2one('res.partner', string='Partner')
 
@@ -94,7 +92,6 @@ class PartnerDistributions(models.Model):
         string='Última Visita',
         copy=False,
         readonly=True,
-        tracking=True,
     )
 
     @api.constrains('partner_id', 'distribution')
@@ -225,3 +222,53 @@ class PartnerDistributions(models.Model):
             ('route_id.delivery_date', '>', today),
             ('route_id.template_delivery_route_id', '=', distribution_id),
         ]).unlink()
+
+
+class PartnerDistributionMessage(models.Model):
+    _name = 'partner.distribution.message'
+    _description = 'Mensaje de Distribución por Recorrido'
+
+    partner_distribution_id = fields.Many2one(
+        'partner.distribution',
+        string='Distribución',
+        required=True,
+        ondelete='cascade',
+        index=True,
+    )
+    route_id = fields.Many2one(
+        'delivery.route',
+        string='Recorrido',
+        required=True,
+        ondelete='cascade',
+        index=True,
+    )
+    route_line_id = fields.Many2one(
+        'delivery.route.line',
+        string='Línea de Recorrido',
+        compute='_compute_route_line_id',
+        store=True,
+        index=True,
+    )
+    message_text = fields.Text(
+        string='Mensaje',
+    )
+
+    _sql_constraints = [
+        (
+            'partner_distribution_route_uniq',
+            'unique(partner_distribution_id, route_id)',
+            'Ya existe un mensaje para este recorrido en esta distribución.',
+        ),
+    ]
+
+    @api.depends('route_id', 'partner_distribution_id.partner_id')
+    def _compute_route_line_id(self):
+        for message in self:
+            partner = message.partner_distribution_id.partner_id
+            if not message.route_id or not partner:
+                message.route_line_id = False
+                continue
+            message.route_line_id = self.env['delivery.route.line'].search([
+                ('route_id', '=', message.route_id.id),
+                ('client_id', '=', partner.id),
+            ], limit=1)
