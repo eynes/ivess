@@ -70,6 +70,21 @@ class HelpdeskTicket(models.Model):
             'res_id': order.id,
         }
 
+    def _get_maintenance_order_item_values(self):
+        self.ensure_one()
+        return [
+            (0, 0, {'name': item.name, 'value': item.value})
+            for item in self.item_ids
+        ]
+
+    def _sync_maintenance_order_items(self):
+        for ticket in self:
+            if not ticket.maintenance_order_ids:
+                continue
+            item_values = ticket._get_maintenance_order_item_values()
+            for order in ticket.maintenance_order_ids:
+                order.write({'item_ids': [(5, 0, 0)] + item_values})
+
     def action_view_maintenance_orders(self):
         self.ensure_one()
         action = {

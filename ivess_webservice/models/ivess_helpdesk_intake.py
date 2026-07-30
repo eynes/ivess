@@ -10,6 +10,7 @@ class IvessHelpdeskIntake(models.Model):
         patente = kwargs.get("patente", "")
         items = kwargs.get("items") or []
         intake_user = kwargs.get("user", "")
+        dispatch = kwargs.get("dispatch", "")
 
         team = self._get_workshop_team()
         if not team:
@@ -18,6 +19,8 @@ class IvessHelpdeskIntake(models.Model):
         equipment = self._get_equipment(patente)
         if not equipment:
             return {"error": f"Equipo '{patente}' no encontrado"}
+
+        dispatch_route = self._get_dispatch_route(dispatch)
 
         payload = self._format_payload(kwargs)
         ticket = self._create_helpdesk_ticket(
@@ -40,6 +43,18 @@ class IvessHelpdeskIntake(models.Model):
     def _get_equipment(self, patente):
         return self.env["maintenance.equipment"].with_context(lang="es_AR").search(
             [("name", "=", patente)],
+            limit=1,
+        )
+
+    def _get_dispatch_route(self, dispatch):
+        if not dispatch:
+            return self.env["delivery.route.number"]
+        try:
+            number = int(dispatch)
+        except (TypeError, ValueError):
+            return self.env["delivery.route.number"]
+        return self.env["delivery.route.number"].search(
+            [("number", "=", number)],
             limit=1,
         )
 

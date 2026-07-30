@@ -24,6 +24,12 @@ class MaintenanceRequest(models.Model):
         string='Materials',
         copy=True,
     )
+    item_ids = fields.One2many(
+        'maintenance.request.item',
+        'request_id',
+        string='Ítems',
+        copy=True,
+    )
 
     def write(self, vals):
         res = super().write(vals)

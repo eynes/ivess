@@ -16,7 +16,10 @@
                 <field name="authorize_for_technical_service" invisible="not sale_ok or type != 'service'"/>
                 <field name="litros_min_bonificacion" invisible="not is_frio_calor"/>
                 <field name="allows_replacement"/>
-                <field name="is_regular_app"/>
+                <field name="exclude_from_regular"/>
+            </field>
+            <field name="type" position="after">
+                <field name="is_promo"/>
             </field>
         </field>
     </record>
