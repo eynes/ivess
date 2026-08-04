@@ -412,6 +412,7 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         attachment = self.env['ir.attachment'].create(
             {
                 'name': filename,
+                'type': 'binary',
                 'datas': base64.b64encode(content.encode('latin-1')),
                 'res_model': self._name,
                 'res_id': self.id,
