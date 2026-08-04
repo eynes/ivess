@@ -1,0 +1,115 @@
+<odoo>
+    <record id="view_ivess_payment_import_wizard_form" model="ir.ui.view">
+        <field name="name">ivess.payment.import.wizard.form</field>
+        <field name="model">ivess.payment.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Importar cobros de clientes desde Excel">
+                <field name="state" invisible="1"/>
+
+                <!-- Paso 1: carga de archivo -->
+                <group invisible="state != 'upload'">
+                    <field name="filename" invisible="1"/>
+                    <field name="file" filename="filename"/>
+                    <field name="payment_journal_id"/>
+                </group>
+
+                <!-- Paso 2: previsualización -->
+                <group invisible="state != 'preview'" col="4">
+                    <field name="total_count"/>
+                    <field name="ok_count"/>
+                    <field name="error_count"/>
+                    <field name="skipped_count"/>
+                </group>
+                <field name="result_line_ids" invisible="state not in ('preview', 'done')">
+                    <list
+                        decoration-danger="has_error and resultado != 'ok'"
+                        decoration-success="resultado == 'ok'"
+                        decoration-muted="resultado == 'skipped'"
+                    >
+                        <field name="comprobante_display"/>
+                        <field name="partner_id"/>
+                        <field name="cliente_codigo" optional="show"/>
+                        <field name="fecha"/>
+                        <field name="importe_total" sum="Total"/>
+                        <field name="estado_proyectado" invisible="resultado != 'pending'"/>
+                        <field name="resultado" invisible="resultado == 'pending'" decoration-success="resultado == 'ok'" decoration-danger="resultado == 'error'"/>
+                        <field name="detail_count"/>
+                        <field name="has_error" invisible="1"/>
+                        <field name="error_message" optional="show"/>
+                        <field name="odoo_payment_id" optional="show"/>
+                    </list>
+                    <form string="Cobro">
+                        <group col="4">
+                            <field name="comprobante_display"/>
+                            <field name="partner_id"/>
+                            <field name="cliente_codigo"/>
+                            <field name="fecha"/>
+                            <field name="importe_total"/>
+                            <field name="estado_proyectado"/>
+                            <field name="odoo_payment_id"/>
+                        </group>
+                        <field name="error_message" invisible="not has_error"/>
+                        <field name="detail_line_ids">
+                            <list>
+                                <field name="tipo_compr_asoc"/>
+                                <field name="letra_asoc"/>
+                                <field name="pto_venta_asoc"/>
+                                <field name="numero_compr_asoc"/>
+                                <field name="invoice_id"/>
+                                <field name="importe"/>
+                                <field name="medio_pago" optional="show"/>
+                                <field name="caja" optional="show"/>
+                                <field name="moneda" optional="hide"/>
+                                <field name="tipo_cambio" optional="hide"/>
+                                <field name="cod_bco" optional="hide"/>
+                                <field name="sucursal_bco" optional="hide"/>
+                                <field name="has_error" invisible="1"/>
+                                <field name="error_message" decoration-danger="has_error"/>
+                            </list>
+                        </field>
+                    </form>
+                </field>
+
+                <footer>
+                    <button
+                        name="action_preview"
+                        type="object"
+                        string="Previsualizar"
+                        class="btn-primary"
+                        invisible="state != 'upload'"
+                    />
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirmar importación"
+                        class="btn-primary"
+                        invisible="state != 'preview'"
+                        confirm="Se van a crear los cobros sin errores (los anulados en origen no se importan). ¿Confirmar?"
+                    />
+                    <button
+                        name="action_back_to_upload"
+                        type="object"
+                        string="Volver"
+                        invisible="state != 'preview'"
+                    />
+                    <button string="Cerrar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ivess_payment_import_wizard" model="ir.actions.act_window">
+        <field name="name">Importar cobros de clientes (Excel)</field>
+        <field name="res_model">ivess.payment.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_ivess_payment_import"
+        name="Importar cobros de clientes (Excel)"
+        parent="account.menu_finance_entries"
+        action="action_ivess_payment_import_wizard"
+        sequence="101"
+    />
+</odoo>
