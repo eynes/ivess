@@ -205,3 +205,8 @@ msgstr "Usuario"
 #: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__is_promo
 msgid "Is Promo"
 msgstr "Es Promo"
+
+#. module: custom_ivess_product
+#: model:ir.model.fields,field_description:custom_ivess_product.field_product_template__authorize_for_technical_service
+msgid "Authorize for Technical Service"
+msgstr "Habilitar para servicio técnico"

@@ -39,7 +39,7 @@
                     <group col="2" invisible="team_type != 'workshop'">
                         <group string="Datos del Vehículo">
                             <field name="intake_user"/>
-                            <field name="dispatch"/>
+                            <field name="dispatch_id"/>
                             <field name="driver_name"/>
                             <field name="vehicle_model"/>
                             <field name="equipment_id"/>

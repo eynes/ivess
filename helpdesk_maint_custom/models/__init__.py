@@ -5,6 +5,7 @@ from . import helpdesk_ticket
 from . import ir_attachment
 from . import helpdesk_ticket_item
 from . import maintenance_request_material
+from . import maintenance_request_item
 from . import maintenance_request
 from . import maintenance_equipment
 from . import maintenance_stage

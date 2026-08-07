@@ -2,6 +2,7 @@
 import logging
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.fields import Domain
 
 _logger = logging.getLogger(__name__)
 
@@ -109,6 +110,33 @@ class RepairOrder(models.Model):
                 continue
             open_log = order.stage_log_ids.filtered(lambda l: not l.date_end)
             order.stage_started = bool(open_log and open_log[0].date_start)
+
+    @api.depends(
+        'product_id', 'company_id', 'picking_id', 'picking_id.move_ids',
+        'picking_id.move_ids.lot_ids', 'partner_id',
+    )
+    def _compute_allowed_lot_ids(self):
+        # El compute original de 'repair' no acota por compañía ni por cliente:
+        # en productos con miles de números de serie (p.ej. equipos Frío/Calor)
+        # esto generaba un onchange de varios MB que colgaba el formulario al
+        # elegir el producto a reparar.
+        for order in self:
+            if not order.product_id:
+                order.allowed_lot_ids = False
+                continue
+            domain = Domain('product_id', '=', order.product_id.id)
+            domain &= Domain('company_id', 'in', [order.company_id.id, False])
+            if order.picking_id:
+                domain &= Domain('id', 'in', order.picking_id.move_ids.lot_ids.ids)
+            elif order.partner_id:
+                containers = self.env['water.container'].search([
+                    ('partner_id', '=', order.partner_id.id),
+                    ('lot_id', '!=', False),
+                ])
+                domain &= Domain('id', 'in', containers.lot_id.ids)
+            else:
+                domain = Domain.FALSE
+            order.allowed_lot_ids = self.env['stock.lot'].search(domain)
 
     def action_start_current_stage(self):
         self.ensure_one()

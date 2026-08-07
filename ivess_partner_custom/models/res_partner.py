@@ -8,7 +8,7 @@ class ResPartner(models.Model):
     _inherit = "res.partner"
 
     requiere_comprobante = fields.Boolean(
-        string="Requiere Comprobante",
+        string="Requiere Factura",
     )
     unbilled_balance = fields.Monetary(
         string="Unbilled Balance",

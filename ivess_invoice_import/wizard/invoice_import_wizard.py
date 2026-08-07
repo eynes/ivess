@@ -1,0 +1,585 @@
+import base64
+import io
+from datetime import datetime
+
+from odoo import _, fields, models
+from odoo.exceptions import UserError
+
+try:
+    import openpyxl
+except ImportError:  # pragma: no cover
+    openpyxl = None
+
+EXPECTED_HEADERS = [
+    "tipo de comprobante",
+    "letra",
+    "pto vta",
+    "numero comprob",
+    "fecha",
+    "cod cliente",
+    "razon social",
+    "documento",
+    "fecha vto",
+    "importe total",
+    "comprobante anulado",
+    "cae",
+    "tipo de item",
+    "cod art",
+    "cantidad",
+    "precio unitario",
+    "tasa de iva",
+    "tasa de iva no inscripto",
+    "importe iva inscripto",
+    "importe iva no inscripto",
+    "importe total neto del item",
+    "importe del renglon",
+    "cod impuesto especial",
+    "monto imp",
+]
+
+# Columnas que identifican la cabecera de la factura agrupada. Se toman del
+# PRIMER renglón visto de cada grupo (decisión confirmada: si difieren entre
+# renglones del mismo comprobante -como puede pasar con fecha vto/importe
+# total en archivos reales- se ignora la diferencia y se usa el primero).
+GROUP_KEY_FIELDS = ("tipo_comprobante", "letra", "pto_vta", "numero_comprob")
+HEADER_ONLY_FIELDS = (
+    "fecha",
+    "cod_cliente",
+    "razon_social",
+    "documento",
+    "fecha_vto",
+    "importe_total",
+    "comprobante_anulado",
+)
+DETAIL_FIELDS = (
+    "tipo_item",
+    "cod_art",
+    "cantidad",
+    "precio_unitario",
+    "tasa_iva",
+    "tasa_iva_no_inscripto",
+    "importe_iva_inscripto",
+    "importe_iva_no_inscripto",
+    "importe_total_neto_item",
+    "importe_del_renglon",
+    "cod_impuesto_especial",
+    "monto_imp",
+)
+
+
+def group_invoice_rows(rows):
+    """Agrupa renglones desnormalizados de factura (una fila por ítem) en
+    facturas (cabecera + líneas de detalle), por (tipo_comprobante, letra,
+    pto_vta, numero_comprob).
+
+    :param rows: lista de dicts, cada uno con al menos las claves de
+        GROUP_KEY_FIELDS + HEADER_ONLY_FIELDS + DETAIL_FIELDS (además puede
+        traer "_row_number" para trazabilidad de errores).
+    :return: lista de dicts, cada uno con las claves de GROUP_KEY_FIELDS +
+        HEADER_ONLY_FIELDS + "lines" (lista de dicts con DETAIL_FIELDS) +
+        "row_numbers" (números de fila origen) + "error" (str u None, para
+        renglones que no se pudieron agrupar por faltarles la clave).
+    """
+    groups_by_key = {}
+    ordered_groups = []
+
+    for row in rows:
+        missing = [f for f in GROUP_KEY_FIELDS if not row.get(f)]
+        if missing:
+            ordered_groups.append(
+                {
+                    "tipo_comprobante": row.get("tipo_comprobante") or "",
+                    "letra": row.get("letra") or "",
+                    "pto_vta": row.get("pto_vta") or "",
+                    "numero_comprob": row.get("numero_comprob") or "",
+                    "lines": [],
+                    "row_numbers": [row.get("_row_number")],
+                    "error": _(
+                        "Fila %s: faltan datos de comprobante (%s)."
+                    )
+                    % (row.get("_row_number"), ", ".join(missing)),
+                }
+            )
+            continue
+
+        key = tuple(row[f] for f in GROUP_KEY_FIELDS)
+        group = groups_by_key.get(key)
+        if group is None:
+            group = {f: row[f] for f in GROUP_KEY_FIELDS}
+            for f in HEADER_ONLY_FIELDS:
+                group[f] = row.get(f)
+            group["lines"] = []
+            group["row_numbers"] = []
+            group["error"] = None
+            groups_by_key[key] = group
+            ordered_groups.append(group)
+
+        group["row_numbers"].append(row.get("_row_number"))
+        group["lines"].append({f: row.get(f) for f in DETAIL_FIELDS})
+
+    return ordered_groups
+
+
+class IvessInvoiceImportWizard(models.TransientModel):
+    _name = "ivess.invoice.import.wizard"
+    _description = "Importador de facturas de clientes desde archivo Excel"
+
+    file = fields.Binary(string="Archivo (.xlsx)", required=True)
+    filename = fields.Char(string="Nombre de archivo")
+    sale_journal_id = fields.Many2one(
+        "account.journal",
+        string="Diario de ventas",
+        domain=[("type", "=", "sale")],
+        help="Diario a usar para las facturas de cliente importadas.",
+    )
+    state = fields.Selection(
+        [
+            ("upload", "Subir archivo"),
+            ("preview", "Previsualización"),
+            ("done", "Resultado"),
+        ],
+        default="upload",
+    )
+    result_line_ids = fields.One2many(
+        "ivess.invoice.import.result.line",
+        "wizard_id",
+        string="Facturas",
+    )
+    total_count = fields.Integer(string="Total", readonly=True)
+    ok_count = fields.Integer(string="OK", readonly=True)
+    error_count = fields.Integer(string="Errores", readonly=True)
+
+    # ------------------------------------------------------------------
+    # Paso 1 -> 2: leer archivo, agrupar y validar (no escribe account.move)
+    # ------------------------------------------------------------------
+
+    def action_preview(self):
+        self.ensure_one()
+        if not self.file:
+            raise UserError(_("Adjuntá un archivo para importar."))
+        if openpyxl is None:
+            raise UserError(
+                _("Falta la librería 'openpyxl' en el servidor para leer archivos .xlsx.")
+            )
+        if not self.sale_journal_id:
+            raise UserError(_("Seleccioná el diario de ventas antes de previsualizar."))
+
+        rows = self._read_excel_rows(base64.b64decode(self.file))
+        groups = group_invoice_rows(rows)
+
+        self.result_line_ids.unlink()
+        for group in groups:
+            self._create_preview_line(group)
+
+        self.total_count = len(self.result_line_ids)
+        self.error_count = len(self.result_line_ids.filtered("has_error"))
+        self.ok_count = self.total_count - self.error_count
+        self.state = "preview"
+        return self._reopen()
+
+    def action_back_to_upload(self):
+        self.ensure_one()
+        self.result_line_ids.unlink()
+        self.state = "upload"
+        return self._reopen()
+
+    def _reopen(self):
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": self._name,
+            "res_id": self.id,
+            "view_mode": "form",
+            "target": "new",
+        }
+
+    # ------------------------------------------------------------------
+    # Lectura y parseo del Excel
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _normalize_header(value):
+        return (value or "").strip().lower()
+
+    @staticmethod
+    def _to_str(value):
+        if value is None:
+            return ""
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value).strip()
+
+    @staticmethod
+    def _to_float(value):
+        return float(str(value).strip())
+
+    @staticmethod
+    def _to_date(value):
+        text = str(int(value)) if isinstance(value, float) else str(value).strip()
+        return datetime.strptime(text, "%Y%m%d").date()
+
+    def _read_excel_rows(self, content):
+        try:
+            workbook = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+        except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001
+            raise UserError(_("No se pudo leer el archivo como Excel: %s") % exc) from exc
+
+        sheet = workbook.worksheets[0]
+        header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
+        if not header_row:
+            raise UserError(_("La primera hoja del archivo está vacía."))
+
+        headers = [self._normalize_header(h) for h in header_row]
+        missing_headers = [h for h in EXPECTED_HEADERS if h not in headers]
+        if missing_headers:
+            raise UserError(
+                _("Faltan columnas en el archivo: %s") % ", ".join(missing_headers)
+            )
+        col_index = {h: i for i, h in enumerate(headers)}
+
+        rows = []
+        for row_number, raw_row in enumerate(
+            sheet.iter_rows(min_row=2, values_only=True), start=2
+        ):
+            if all(cell is None for cell in raw_row):
+                continue
+            rows.append(self._row_to_dict(raw_row, col_index, row_number))
+        return rows
+
+    def _row_to_dict(self, raw_row, col_index, row_number):
+        def cell(header):
+            idx = col_index[header]
+            return raw_row[idx] if idx < len(raw_row) else None
+
+        return {
+            "_row_number": row_number,
+            "tipo_comprobante": self._to_str(cell("tipo de comprobante")).upper(),
+            "letra": self._to_str(cell("letra")).upper(),
+            "pto_vta": self._to_str(cell("pto vta")),
+            "numero_comprob": self._to_str(cell("numero comprob")),
+            "fecha": cell("fecha"),
+            "cod_cliente": self._to_str(cell("cod cliente")),
+            "razon_social": self._to_str(cell("razon social")),
+            "documento": self._to_str(cell("documento")),
+            "fecha_vto": cell("fecha vto"),
+            "importe_total": cell("importe total"),
+            "comprobante_anulado": self._to_str(cell("comprobante anulado")).upper() == "S",
+            "tipo_item": self._to_str(cell("tipo de item")),
+            "cod_art": self._to_str(cell("cod art")),
+            "cantidad": cell("cantidad"),
+            "precio_unitario": cell("precio unitario"),
+            "tasa_iva": cell("tasa de iva"),
+            "tasa_iva_no_inscripto": cell("tasa de iva no inscripto"),
+            "importe_iva_inscripto": cell("importe iva inscripto"),
+            "importe_iva_no_inscripto": cell("importe iva no inscripto"),
+            "importe_total_neto_item": cell("importe total neto del item"),
+            "importe_del_renglon": cell("importe del renglon"),
+            "cod_impuesto_especial": self._to_str(cell("cod impuesto especial")),
+            "monto_imp": cell("monto imp"),
+        }
+
+    # ------------------------------------------------------------------
+    # Resolución de cada grupo contra Odoo (partner, tipo de comprobante,
+    # productos, impuestos) y creación de las líneas de previsualización.
+    # ------------------------------------------------------------------
+
+    def _create_preview_line(self, group):
+        if group.get("error"):
+            self.env["ivess.invoice.import.result.line"].create(
+                {
+                    "wizard_id": self.id,
+                    "tipo_comprobante": group["tipo_comprobante"],
+                    "letra": group["letra"],
+                    "pto_vta": group["pto_vta"],
+                    "numero_comprobante": group["numero_comprob"],
+                    "has_error": True,
+                    "error_message": group["error"],
+                }
+            )
+            return
+
+        errors = []
+        if group["tipo_comprobante"] != "FC":
+            errors.append(
+                _(
+                    "tipo de comprobante '%s' no soportado (esta versión solo"
+                    " importa 'FC')."
+                )
+                % group["tipo_comprobante"]
+            )
+
+        voucher_type = self._find_voucher_type(group["letra"])
+        if not voucher_type:
+            errors.append(
+                _("No se encontró un tipo de comprobante Odoo para la letra '%s'.")
+                % group["letra"]
+            )
+
+        partner = self._find_partner(group["documento"])
+        if not partner:
+            errors.append(
+                _("No se encontró un cliente con CUIT/documento '%s' (%s).")
+                % (group["documento"], group["razon_social"])
+            )
+
+        try:
+            fecha = self._to_date(group["fecha"]) if group["fecha"] else False
+        except ValueError:
+            fecha = False
+            errors.append(_("Fecha inválida: '%s'.") % group["fecha"])
+
+        fecha_vto = False
+        if group["fecha_vto"]:
+            try:
+                fecha_vto = self._to_date(group["fecha_vto"])
+            except ValueError:
+                errors.append(_("Fecha de vencimiento inválida: '%s'.") % group["fecha_vto"])
+
+        try:
+            importe_total = self._to_float(group["importe_total"])
+        except ValueError:
+            importe_total = 0.0
+            errors.append(_("Importe total inválido: '%s'.") % group["importe_total"])
+
+        comprobante_ref = self._comprobante_ref(
+            group["letra"], group["pto_vta"], group["numero_comprob"]
+        )
+        if partner:
+            existing = self.env["account.move"].search(
+                [
+                    ("move_type", "=", "out_invoice"),
+                    ("ref", "=", comprobante_ref),
+                    ("partner_id", "=", partner.id),
+                ],
+                limit=1,
+            )
+            if existing:
+                errors.append(
+                    _("Ya existe una factura importada con esta clave (account.move #%s).")
+                    % existing.id
+                )
+
+        detail_vals, detail_errors = self._resolve_detail_lines(group["lines"])
+        errors.extend(detail_errors)
+
+        result_line = self.env["ivess.invoice.import.result.line"].create(
+            {
+                "wizard_id": self.id,
+                "tipo_comprobante": group["tipo_comprobante"],
+                "letra": group["letra"],
+                "pto_vta": group["pto_vta"],
+                "numero_comprobante": group["numero_comprob"],
+                "comprobante_ref": comprobante_ref,
+                "fecha": fecha,
+                "fecha_vto": fecha_vto,
+                "importe_total": importe_total,
+                "comprobante_anulado": bool(group["comprobante_anulado"]),
+                "cliente_codigo": group["cod_cliente"],
+                "cliente_razon_social": group["razon_social"],
+                "cliente_documento": group["documento"],
+                "partner_id": partner.id if partner else False,
+                "voucher_type_id": voucher_type.id if voucher_type else False,
+                "has_error": bool(errors),
+                "error_message": "\n".join(errors) if errors else False,
+                "detail_line_ids": detail_vals,
+            }
+        )
+        return result_line
+
+    @staticmethod
+    def _comprobante_ref(letra, pto_vta, numero_comprob):
+        """Clave de deduplicación/referencia externa del comprobante, en el
+        mismo formato compuesto que usa el propio sistema origen (aguas) para
+        identificar un comprobante (ver hoja "items" de sus exportes: letra +
+        punto de venta + número). Se guarda en el campo nativo
+        account.move.ref."""
+        return "%s%s%s" % (letra, (pto_vta or "").zfill(4), (numero_comprob or "").zfill(8))
+
+    def _find_voucher_type(self, letra):
+        if not letra:
+            return None
+        candidates = self.env["res.voucher.type"].search(
+            [("doc_type", "=", "b"), ("denomination", "=", letra.lower())]
+        )
+        if not candidates:
+            return None
+        # Puede haber más de un tipo para la misma letra (ej: "FACTURAS A",
+        # "... CON LEYENDA RETENCIÓN", "... MiPyMEs FCE"). Sin una columna en
+        # el Excel que distinga el caso especial, se asume el comprobante
+        # "plano" (menor afip_code) como default razonable para una
+        # importación masiva estándar.
+        return candidates.sorted(key=lambda v: v.afip_code)[0]
+
+    @staticmethod
+    def _only_digits(value):
+        return "".join(ch for ch in (value or "") if ch.isdigit())
+
+    def _find_partner(self, documento):
+        digits = self._only_digits(documento)
+        if not digits:
+            return None
+        candidates = self.env["res.partner"].search([("vat", "=", digits)])
+        return candidates[0] if len(candidates) == 1 else None
+
+    def _find_tax(self, tasa_iva, company):
+        candidates = self.env["account.tax"].search(
+            [("type_tax_use", "=", "sale"), ("company_id", "=", company.id)]
+        )
+        candidates = candidates.filtered(lambda t: round(t.amount, 2) == round(tasa_iva, 2))
+        return candidates[0] if len(candidates) == 1 else None, len(candidates)
+
+    def _resolve_detail_lines(self, lines):
+        detail_vals = []
+        errors = []
+        company = self.sale_journal_id.company_id
+
+        if not lines:
+            errors.append(_("La factura no tiene líneas de detalle."))
+            return detail_vals, errors
+
+        for line in lines:
+            line_errors = []
+
+            try:
+                cantidad = self._to_float(line["cantidad"])
+            except (TypeError, ValueError):
+                cantidad = 0.0
+                line_errors.append(_("Cantidad inválida: '%s'.") % line["cantidad"])
+
+            try:
+                precio_unitario = self._to_float(line["precio_unitario"])
+            except (TypeError, ValueError):
+                precio_unitario = 0.0
+                line_errors.append(_("Precio unitario inválido: '%s'.") % line["precio_unitario"])
+
+            try:
+                tasa_iva = self._to_float(line["tasa_iva"])
+            except (TypeError, ValueError):
+                tasa_iva = 0.0
+                line_errors.append(_("Tasa de IVA inválida: '%s'.") % line["tasa_iva"])
+
+            try:
+                tasa_iva_no_inscripto = self._to_float(line["tasa_iva_no_inscripto"])
+            except (TypeError, ValueError):
+                tasa_iva_no_inscripto = 0.0
+            if tasa_iva_no_inscripto:
+                line_errors.append(
+                    _("Tasa de IVA no inscripto (%.2f) no soportada en esta versión.")
+                    % tasa_iva_no_inscripto
+                )
+
+            product = self._find_product(line["cod_art"])
+            if not product:
+                line_errors.append(
+                    _("No se encontró un producto con código de artículo '%s'.")
+                    % line["cod_art"]
+                )
+
+            tax = None
+            if not line_errors:
+                tax, tax_candidates = self._find_tax(tasa_iva, company)
+                if not tax:
+                    line_errors.append(
+                        _("No se encontró (o es ambigua, %s candidatos) la tasa de IVA %.2f%%.")
+                        % (tax_candidates, tasa_iva)
+                    )
+
+            try:
+                importe_total_neto_item = self._to_float(line["importe_total_neto_item"])
+            except (TypeError, ValueError):
+                importe_total_neto_item = 0.0
+
+            try:
+                monto_imp = self._to_float(line["monto_imp"])
+            except (TypeError, ValueError):
+                monto_imp = 0.0
+
+            importe_del_renglon = self._to_str(line["importe_del_renglon"])
+
+            detail_vals.append(
+                (
+                    0,
+                    0,
+                    {
+                        "tipo_item": line["tipo_item"],
+                        "cod_art": line["cod_art"],
+                        "product_id": product.id if product else False,
+                        "cantidad": cantidad,
+                        "precio_unitario": precio_unitario,
+                        "tasa_iva": tasa_iva,
+                        "tax_id": tax.id if tax else False,
+                        "importe_total_neto_item": importe_total_neto_item,
+                        "importe_del_renglon": importe_del_renglon,
+                        "cod_impuesto_especial": line["cod_impuesto_especial"],
+                        "monto_imp": monto_imp,
+                        "has_error": bool(line_errors),
+                        "error_message": "; ".join(line_errors) if line_errors else False,
+                    },
+                )
+            )
+            errors.extend(line_errors)
+
+        return detail_vals, errors
+
+    def _find_product(self, cod_art):
+        if not cod_art:
+            return None
+        candidates = self.env["product.product"].search([("default_code", "=", cod_art)])
+        return candidates[0] if len(candidates) == 1 else None
+
+    # ------------------------------------------------------------------
+    # Paso 2 -> 3: crear las facturas que no tengan error
+    # ------------------------------------------------------------------
+
+    def action_confirm(self):
+        self.ensure_one()
+        for result_line in self.result_line_ids:
+            if result_line.has_error:
+                result_line.resultado = "error"
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    move = self._create_move(result_line)
+                    if result_line.comprobante_anulado:
+                        move.button_cancel()
+                result_line.write({"resultado": "ok", "odoo_move_id": move.id})
+            except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001
+                result_line.write(
+                    {
+                        "resultado": "error",
+                        "has_error": True,
+                        "error_message": _("Error al crear la factura: %s") % exc,
+                    }
+                )
+
+        self.ok_count = len(self.result_line_ids.filtered(lambda r: r.resultado == "ok"))
+        self.error_count = len(self.result_line_ids.filtered(lambda r: r.resultado == "error"))
+        self.state = "done"
+        return self._reopen()
+
+    def _create_move(self, result_line):
+        line_vals = [
+            (
+                0,
+                0,
+                {
+                    "product_id": detail.product_id.id,
+                    "name": detail.product_id.display_name,
+                    "quantity": detail.cantidad,
+                    "price_unit": detail.precio_unitario,
+                    "tax_ids": [(6, 0, [detail.tax_id.id])],
+                },
+            )
+            for detail in result_line.detail_line_ids
+        ]
+        move_vals = {
+            "move_type": "out_invoice",
+            "journal_id": self.sale_journal_id.id,
+            "partner_id": result_line.partner_id.id,
+            "voucher_type_id": result_line.voucher_type_id.id,
+            "invoice_date": result_line.fecha,
+            "invoice_line_ids": line_vals,
+            "ref": result_line.comprobante_ref,
+        }
+        if result_line.fecha_vto:
+            move_vals["invoice_date_due"] = result_line.fecha_vto
+        return self.env["account.move"].create(move_vals)

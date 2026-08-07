@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <!--
+        Customizaciones IVESS al subdiario de IVA prorrateable:
+        - Se agrega un bloque "EXENTO" en el resumen ("TOTAL DE
+          OPERACIONES QUE GENERAN CREDITO/DEBITO FISCAL"), con la misma
+          estructura (Tasa IVA, Subtotal) que Directo Gravado/
+          Prorrateable/Directo Exento; se inserta a la misma altura que
+          esas categorias (antes de "NI, NR, Exento, Monot., NCat"), y se
+          quita la linea plana "Exento" que traia el reporte original mas
+          abajo para no duplicar el total.
+        - El resumen ("TOTAL DE OPERACIONES QUE GENERAN CREDITO FISCAL"
+          en adelante) empieza en una hoja nueva en vez de pegarse
+          justo debajo de los totales del detalle de facturas.
+        - En el resumen por alicuota (Directo Gravado/Prorrateable/
+          Directo Exento, credito y debito fiscal) se ocultan las filas
+          "Tasa IVA X%" cuando Neto Gravado e IVA dan ambos 0, para no
+          mostrar filas vacias. El nombre de la categoria (que el
+          reporte original ponia en la primera fila de alicuota) se
+          mueve a una fila propia siempre visible, para que no
+          desaparezca si esa primera fila queda oculta por dar 0.
+    -->
+    <template
+        id="subjournal_apportionable_vat_qweb_ivess"
+        inherit_id="l10n_ar_eynes.subjournal_apportionable_vat_qweb"
+    >
+        <!-- Salto de pagina antes del resumen de totales -->
+        <xpath
+            expr="//table[.//th[normalize-space(text())='No Grav/Ex/No Alcanz.']]"
+            position="attributes"
+        >
+            <attribute
+                name="style"
+            >width: 100%; margin: 10px auto; page-break-before: always;</attribute>
+        </xpath>
+
+        <!-- Vaciar el nombre de categoria de la primera fila de alicuota -->
+        <xpath expr="(//td[normalize-space(text())='DIRECTO GRAVADO'])[1]" position="replace">
+            <td />
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='DIRECTO GRAVADO'])[1]" position="replace">
+            <td />
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='PRORRATEABLE'])[1]" position="replace">
+            <td />
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='PRORRATEABLE'])[1]" position="replace">
+            <td />
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='DIRECTO EXENTO'])[1]" position="replace">
+            <td />
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='DIRECTO EXENTO'])[1]" position="replace">
+            <td />
+        </xpath>
+
+        <!-- Agregar una fila propia, siempre visible, con el nombre de la categoria -->
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[1]/.." position="before">
+            <tr class="no-border-row">
+                <td>DIRECTO GRAVADO</td>
+                <td /><td /><td /><td /><td /><td /><td />
+            </tr>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[2]/.." position="before">
+            <tr class="no-border-row">
+                <td>PRORRATEABLE</td>
+                <td /><td /><td /><td /><td /><td /><td />
+            </tr>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[3]/.." position="before">
+            <tr class="no-border-row">
+                <td>DIRECTO EXENTO</td>
+                <td /><td /><td /><td /><td /><td /><td />
+            </tr>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[4]/.." position="before">
+            <tr class="no-border-row">
+                <td>DIRECTO GRAVADO</td>
+                <td /><td /><td /><td /><td /><td /><td />
+            </tr>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[5]/.." position="before">
+            <tr class="no-border-row">
+                <td>PRORRATEABLE</td>
+                <td /><td /><td /><td /><td /><td /><td />
+            </tr>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[6]/.." position="before">
+            <tr class="no-border-row">
+                <td>DIRECTO EXENTO</td>
+                <td /><td /><td /><td /><td /><td /><td />
+            </tr>
+        </xpath>
+
+        <!-- Ocultar filas de alicuota en 0 (Credito Fiscal) -->
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[1]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_taxed[0][0] or direct_taxed[0][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 21.00%'])[1]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_taxed[1][0] or direct_taxed[1][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 27.00%'])[1]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_taxed[2][0] or direct_taxed[2][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[2]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (apport[0][0] or apport[0][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 21.00%'])[2]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (apport[1][0] or apport[1][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 27.00%'])[2]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (apport[2][0] or apport[2][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[3]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_exempt[0][0] or direct_exempt[0][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 21.00%'])[3]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_exempt[1][0] or direct_exempt[1][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 27.00%'])[3]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_exempt[2][0] or direct_exempt[2][1]) else 'table-row' }};</attribute>
+        </xpath>
+
+        <!-- Ocultar filas de alicuota en 0 (Debito Fiscal) -->
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[4]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_taxed_refund[0][0] or direct_taxed_refund[0][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 21.00%'])[4]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_taxed_refund[1][0] or direct_taxed_refund[1][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 27.00%'])[4]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_taxed_refund[2][0] or direct_taxed_refund[2][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[5]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (apport_refund[0][0] or apport_refund[0][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 21.00%'])[5]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (apport_refund[1][0] or apport_refund[1][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 27.00%'])[5]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (apport_refund[2][0] or apport_refund[2][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 10.50%'])[6]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_exempt_refund[0][0] or direct_exempt_refund[0][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 21.00%'])[6]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_exempt_refund[1][0] or direct_exempt_refund[1][1]) else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='Tasa IVA 27.00%'])[6]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not (direct_exempt_refund[2][0] or direct_exempt_refund[2][1]) else 'table-row' }};</attribute>
+        </xpath>
+
+        <!-- Ocultar filas de "NI, NR, Exento, Monot., NCat" / "No alcanzado" / -->
+        <!-- "0 0" / "III Tasas" / "IIV Imp. Int. Agua" cuando el valor da 0 -->
+        <xpath expr="(//td[normalize-space(text())='NI, NR, Exento, Monot., NCat'])[1]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not ni_nr_ex_mon else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='NI, NR, Exento, Monot., NCat'])[2]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not ni_nr_ex_mon_refund else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='No alcanzado'])[1]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not untaxed else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='No alcanzado'])[2]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not untaxed_refund else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='0 0'])[1]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not cero else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='0 0'])[2]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not cero_refund else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='III Tasas'])[1]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not fees else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='III Tasas'])[2]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not fees_refund else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='IIV Imp. Int. Agua'])[1]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not internal_taxes else 'table-row' }};</attribute>
+        </xpath>
+        <xpath expr="(//td[normalize-space(text())='IIV Imp. Int. Agua'])[2]/.." position="attributes">
+            <attribute name="t-attf-style">display: {{ 'none' if not internal_taxes_refund else 'table-row' }};</attribute>
+        </xpath>
+
+        <!-- Bloque EXENTO - primer bloque (Credito Fiscal), a la misma altura que -->
+        <!-- DIRECTO GRAVADO / PRORRATEABLE / DIRECTO EXENTO -->
+        <xpath
+            expr="(//td[normalize-space(text())='NI, NR, Exento, Monot., NCat'])[1]/.."
+            position="before"
+        >
+            <tr class="no-border-row">
+                <td>EXENTO</td>
+                <td>Tasa IVA 0.00%</td>
+                <td />
+                <td />
+                <td>
+                    <t t-set="exento_ivess_net" t-value="float(exempt)" />
+                    <t
+                        t-set="exento_ivess_netformatted"
+                        t-value="'{:,.2f}'.format(exento_ivess_net).replace(',', 'X').replace('.', ',').replace('X', '.')"
+                    />
+                    <t t-out="exento_ivess_netformatted" />
+                </td>
+                <td>0,00</td>
+                <td />
+                <td><t t-out="exento_ivess_netformatted" /></td>
+            </tr>
+            <tr class="no-border-row subtotal-row">
+                <td />
+                <td>Subtotal</td>
+                <td />
+                <td />
+                <td><t t-out="exento_ivess_netformatted" /></td>
+                <td>0,00</td>
+                <td />
+                <td><t t-out="exento_ivess_netformatted" /></td>
+            </tr>
+        </xpath>
+
+        <!-- Bloque EXENTO - segundo bloque (Debito Fiscal), misma altura -->
+        <xpath
+            expr="(//td[normalize-space(text())='NI, NR, Exento, Monot., NCat'])[2]/.."
+            position="before"
+        >
+            <tr class="no-border-row">
+                <td>EXENTO</td>
+                <td>Tasa IVA 0.00%</td>
+                <td />
+                <td />
+                <td>
+                    <t
+                        t-set="exento_ivess_refund_net"
+                        t-value="float(exempt_refund)"
+                    />
+                    <t
+                        t-set="exento_ivess_refund_netformatted"
+                        t-value="'{:,.2f}'.format(exento_ivess_refund_net).replace(',', 'X').replace('.', ',').replace('X', '.')"
+                    />
+                    <t t-out="exento_ivess_refund_netformatted" />
+                </td>
+                <td>0,00</td>
+                <td />
+                <td><t t-out="exento_ivess_refund_netformatted" /></td>
+            </tr>
+            <tr class="no-border-row subtotal-row">
+                <td />
+                <td>Subtotal</td>
+                <td />
+                <td />
+                <td><t t-out="exento_ivess_refund_netformatted" /></td>
+                <td>0,00</td>
+                <td />
+                <td><t t-out="exento_ivess_refund_netformatted" /></td>
+            </tr>
+        </xpath>
+
+        <!-- Se quita la linea plana "Exento" original (mas abajo) para no duplicar el total -->
+        <xpath expr="//tr[td[text()='Exento']][1]" position="replace" />
+        <xpath expr="//tr[td[text()='Exento']][1]" position="replace" />
+    </template>
+
+</odoo>

@@ -1,0 +1,14 @@
+<odoo>
+
+    <record id="view_repair_order_form_inherit_turno" model="ir.ui.view">
+        <field name="name">view.repair.order.form.inherit.turno</field>
+        <field name="model">repair.order</field>
+        <field name="inherit_id" ref="repair.view_repair_order_form"/>
+        <field name="arch" type="xml">
+            <field name="schedule_date" position="after">
+                <field name="turno"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

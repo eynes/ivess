@@ -3,6 +3,7 @@
     <record id="view_water_container_tree" model="ir.ui.view">
         <field name="name">water.container.tree</field>
         <field name="model">water.container</field>
+        <field name="priority">1</field>
         <field name="arch" type="xml">
             <list>
                 <field name="partner_id"/>
@@ -20,6 +21,7 @@
     <record id="view_water_container_form" model="ir.ui.view">
         <field name="name">water.container.form</field>
         <field name="model">water.container</field>
+        <field name="priority">1</field>
         <field name="arch" type="xml">
             <form string="Water Container">
                 <sheet>
@@ -56,6 +58,10 @@
         <field name="name">Water Containers</field>
         <field name="res_model">water.container</field>
         <field name="view_mode">list,form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_water_container_tree')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_water_container_form')}),
+        ]"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create a new water container

@@ -13,6 +13,7 @@
                 <field name="order"/>
                 <field name="is_returnable"/>
                 <field name="is_frio_calor"/>
+                <field name="authorize_for_technical_service" invisible="not sale_ok or type != 'service'"/>
                 <field name="litros_min_bonificacion" invisible="not is_frio_calor"/>
                 <field name="allows_replacement"/>
                 <field name="exclude_from_regular"/>

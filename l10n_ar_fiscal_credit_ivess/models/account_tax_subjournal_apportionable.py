@@ -234,7 +234,15 @@ class AccountTaxSubjournalApportionableWizard(models.TransientModel):
                             float(vat_aliquot_name.replace('%', '')) == 0
                         )
                     except ValueError:
-                        is_zero_rate = False
+                        # FIX: algunos impuestos exentos no tienen un
+                        # nombre numerico (p.ej. "Exento" en vez de
+                        # "0.00%"), asi que se los detecta tambien por
+                        # nombre limpio en vez de depender solo de
+                        # is_exempt/porcentaje.
+                        is_zero_rate = vat_aliquot_name.strip() in (
+                            'Exento',
+                            'Exento_refund',
+                        )
 
                 for raw_fiscal_credit in vat_split:
                     if not first_vat:
@@ -260,15 +268,23 @@ class AccountTaxSubjournalApportionableWizard(models.TransientModel):
                     if not fiscal_credit and is_zero_rate:
                         fiscal_credit = 'direct_exempt'
 
+                    # FIX: al 0% (Exento o alicuota 0%) no corresponde
+                    # ninguna asignacion de credito fiscal (no hay
+                    # credito que prorratear), asi que la columna
+                    # "Asig.CF" queda vacia (el importe ya se ve en
+                    # "Neto Grav." y en el total "Exento" del pie).
+                    fiscal_credit_label = (
+                        ''
+                        if is_zero_rate
+                        else fiscal_credit_name.get(
+                            fiscal_credit, unassigned_fiscal_credit_name
+                        )
+                    )
+
                     new_line.insert(5, base_vat_amount)
                     new_line.insert(6, vat_aliquot)
                     new_line.insert(7, vat_amount)
-                    new_line.insert(
-                        8,
-                        fiscal_credit_name.get(
-                            fiscal_credit, unassigned_fiscal_credit_name
-                        ),
-                    )
+                    new_line.insert(8, fiscal_credit_label)
                     new_lines.append(new_line)
                     first_vat = False
 

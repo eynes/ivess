@@ -12,6 +12,7 @@
     "category": "Tools",
     "depends": [
         "base",
+        "mrp",
         "l10n_ar_eynes",
         "helpdesk_maint_custom",
         "logistic_custom_ivess",
