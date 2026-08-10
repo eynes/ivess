@@ -11,13 +11,10 @@ from odoo.exceptions import ValidationError
 from .bbva_fixed_width_dicts import (
     REGISTRO_010,
     REGISTRO_020,
+    REGISTRO_025,
     REGISTRO_090,
     REGISTRO_095,
 )
-
-# El registro 025 (multi-Echeq) todavía no está implementado: toda orden de
-# pago seleccionada debe tener exactamente un cheque/Echeq asociado (ver
-# docs/ANALISIS_Y_DISENO.md).
 
 # l10n_latam.identification.type.name -> código BBVA (Apéndice B.6).
 IDENTIFICATION_TYPE_BBVA = {
@@ -141,13 +138,32 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
                 % payment_order.number
             )
         elif len(checks) > 1:
-            errors.append(
-                _(
-                    '%s: tiene más de un cheque/Echeq asociado; el registro '
-                    '025 (multi-instrumento) todavía no está implementado.'
+            amount_diff = sum(checks.mapped('amount')) - payment_order.amount
+            if abs(amount_diff) > 0.01:
+                errors.append(
+                    _(
+                        '%s: la suma de los importes de sus cheques/Echeqs '
+                        '(%.2f) no coincide con el importe de la orden (%.2f).'
+                    )
+                    % (
+                        payment_order.number,
+                        sum(checks.mapped('amount')),
+                        payment_order.amount,
+                    )
                 )
-                % payment_order.number
+            not_to_order = checks.filtered(
+                lambda check: check.checkbook_format != 'physical'
+                and check.not_order
             )
+            if not_to_order:
+                errors.append(
+                    _(
+                        '%s: tiene Echeqs "no a la orden" (%s); BBVA solo '
+                        'admite Echeqs "a la orden" en el registro 025 '
+                        '(multi-instrumento).'
+                    )
+                    % (payment_order.number, ', '.join(not_to_order.mapped('number')))
+                )
         partner = payment_order.partner_id
         if not partner:
             errors.append(
@@ -287,8 +303,26 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         fixed_width.update(**vals)
         return fixed_width.line
 
-    def _build_020_line(self, payment_order, check, row_number, pro_nro_ord):
+    def _build_020_line(self, payment_order, checks, row_number, pro_nro_ord):
         partner = payment_order.partner_id
+        multi_instrument = len(checks) > 1
+        if multi_instrument:
+            # Orden cancelada con más de un cheque/Echeq: el 020 no informa
+            # el instrumento real (eso queda en cada 025), usa FORMA_PAGO=MP
+            # / DISPON_P=9 / FECHA_PAGO=99999999 (ver Apéndice A.2/B.0.1 de
+            # docs/ANALISIS_Y_DISENO.md, validado contra IMPA/LUFRAN).
+            forma_pago = 'MP'
+            dispon_p = '9'
+            fecha_pago = '99999999'
+            nro_cheque = '0'
+        else:
+            check = checks
+            forma_pago = self._forma_pago_bbva(check)
+            dispon_p = self._dispon_pago_bbva(check)
+            fecha_pago = (payment_order.date_due or self.fecha_proceso).strftime(
+                '%Y%m%d'
+            )
+            nro_cheque = self._nro_cheque_bbva(check)
         vals = {
             'ident_registro': '0306',
             'tipo_reg': '020',
@@ -307,16 +341,35 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
             'fecha_entrega': (
                 payment_order.date_effective or self.fecha_proceso
             ).strftime('%Y%m%d'),
-            'fecha_pago': (
-                payment_order.date_due or self.fecha_proceso
-            ).strftime('%Y%m%d'),
-            'forma_pago': self._forma_pago_bbva(check),
+            'fecha_pago': fecha_pago,
+            'forma_pago': forma_pago,
             'forma_cobro': '0',
-            'dispon_p': self._dispon_pago_bbva(check),
+            'dispon_p': dispon_p,
             'deposito': '0',
-            'nro_cheque': self._nro_cheque_bbva(check),
+            'nro_cheque': nro_cheque,
         }
         fixed_width = FixedWidth(REGISTRO_020)
+        fixed_width.update(**vals)
+        return fixed_width.line
+
+    def _build_025_line(self, payment_order, check, row_number):
+        vals = {
+            'ident_registro': '0306',
+            'tipo_reg': '025',
+            'tipo_doc_empresa': 'CUIT',
+            'cuit_empresa': _only_digits(self.company_id.vat),
+            'secuencia': str(row_number - 1),
+            'nro_minuta': _only_digits(payment_order.number),
+            'importe': self._moneyfmt(check.amount),
+            'ipermfin': 'N',
+            'fecha_pago': (check.payment_date or self.fecha_proceso).strftime(
+                '%Y%m%d'
+            ),
+            'forma_pago': self._forma_pago_bbva(check),
+            'dispon_p': self._dispon_pago_bbva(check),
+            'nro_cheque': self._nro_cheque_bbva(check),
+        }
+        fixed_width = FixedWidth(REGISTRO_025)
         fixed_width.update(**vals)
         return fixed_width.line
 
@@ -366,9 +419,9 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
     def _build_lines(self):
         """Arma las líneas del archivo BBVA.
 
-        El registro 025 (multi-Echeq) todavía no está implementado: cada
-        orden de pago aporta exactamente un 020 + su 090, ver
-        docs/ANALISIS_Y_DISENO.md.
+        Cada orden de pago aporta un 020 seguido, si tiene más de un
+        cheque/Echeq asociado, de un 025 por cada instrumento adicional, y
+        finalmente su 090 (ver docs/ANALISIS_Y_DISENO.md, Apéndice A.3/B.3).
         """
         self._check_payment_orders()
         province_codes = self._province_code_map()
@@ -376,11 +429,17 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         lines = [self._build_header_line()]
         row_number = 1
         for payment_order in self.payment_order_ids:
-            check = payment_order.issued_check_ids
+            checks = payment_order.issued_check_ids
             row_number += 1
             lines.append(
-                self._build_020_line(payment_order, check, row_number, pro_nro_ord)
+                self._build_020_line(payment_order, checks, row_number, pro_nro_ord)
             )
+            if len(checks) > 1:
+                for check in checks:
+                    row_number += 1
+                    lines.append(
+                        self._build_025_line(payment_order, check, row_number)
+                    )
             row_number += 1
             lines.append(
                 self._build_090_line(

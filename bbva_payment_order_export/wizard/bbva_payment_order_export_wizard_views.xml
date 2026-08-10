@@ -8,10 +8,9 @@
             <form string="Exportar Pago a Proveedores BBVA">
                 <span>
                     Genera el archivo TXT posicional para el servicio "Pago a
-                    Proveedores" de BBVA. Etapa actual: cada orden de pago
-                    debe tener exactamente un cheque/Echeq asociado; el
-                    registro 025 (una orden pagada con más de un instrumento)
-                    todavía no está implementado.
+                    Proveedores" de BBVA. Cada orden de pago debe tener al
+                    menos un cheque/Echeq asociado; si tiene más de uno, se
+                    incluye un registro 025 por cada instrumento adicional.
                 </span>
                 <group>
                     <group string="Selección">
