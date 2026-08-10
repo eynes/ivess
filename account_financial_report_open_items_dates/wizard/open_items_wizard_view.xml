@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="open_items_wizard_document_date" model="ir.ui.view">
+        <field name="name">open.items.report.wizard.form.document.date</field>
+        <field name="model">open.items.report.wizard</field>
+        <field
+            name="inherit_id"
+            ref="account_financial_report.open_items_wizard"
+        />
+        <field name="arch" type="xml">
+            <group name="date_range" position="inside">
+                <label for="document_date_from" string="Document Date" />
+                <div class="o_row">
+                    <field name="document_date_from" class="oe_inline" />
+                    <span class="oe_inline">to</span>
+                    <field name="document_date_to" class="oe_inline" />
+                </div>
+            </group>
+        </field>
+    </record>
+</odoo>
