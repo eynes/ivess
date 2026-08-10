@@ -1,14 +1,15 @@
 # Copyright 2026 Eynes
 # License LGPL-3.0 or later (https://www.gnu.org/licenses/lgpl.html).
 """Layout posicional de los registros 010 (cabecera), 020 (orden de pago),
-090 (proveedor beneficiario) y 095 (pie) del archivo BBVA "Pago a
-Proveedores".
+025 (instrumento adicional, multi-Echeq), 090 (proveedor beneficiario) y 095
+(pie) del archivo BBVA "Pago a Proveedores".
 
 Posiciones/longitudes validadas carácter por carácter contra
-``docs/JUMI_OP_ECHEQS_2026-06-23.txt`` (registros reales) y contra
-``docs/matriz_campos_bbva.csv`` / el Apéndice A de
-``docs/ANALISIS_Y_DISENO.md``. El registro 025 (multi-Echeq, una orden
-pagada con más de un instrumento) todavía no está implementado.
+``docs/JUMI_OP_ECHEQS_2026-06-23.txt`` (registros simples) y
+``docs/IMPA_OP_ECHEQS_2026-06-23 copy.txt`` (una orden con 4 Echeqs, incluye
+registro 025) y contra ``docs/matriz_campos_bbva.csv`` /
+``docs/Analisis_registro_025_BBVA_IMPA.xlsx`` / el Apéndice A de
+``docs/ANALISIS_Y_DISENO.md``.
 """
 
 REGISTRO_010 = {
@@ -478,6 +479,177 @@ REGISTRO_020 = {
         'alignment': 'right',
         'padding': '0',
         'required': True,
+    },
+    'nro_cheque': {
+        'start_pos': 286,
+        'length': 13,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': True,
+    },
+    'cod_devolucion': {
+        'start_pos': 299,
+        'length': 6,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': False,
+    },
+    'desc_devolucion': {
+        'start_pos': 305,
+        'length': 40,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': False,
+    },
+    'filler_final': {
+        'start_pos': 345,
+        'length': 506,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': False,
+    },
+}
+
+REGISTRO_025 = {
+    'ident_registro': {
+        'start_pos': 1,
+        'length': 4,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': True,
+    },
+    'tipo_reg': {
+        'start_pos': 5,
+        'length': 3,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': True,
+    },
+    'tipo_doc_empresa': {
+        'start_pos': 8,
+        'length': 4,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': True,
+    },
+    'cuit_empresa': {
+        'start_pos': 12,
+        'length': 13,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': True,
+    },
+    'secuencia': {
+        'start_pos': 25,
+        'length': 6,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': True,
+    },
+    'filler_1': {
+        'start_pos': 31,
+        'length': 15,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': False,
+    },
+    'nro_minuta': {
+        'start_pos': 46,
+        'length': 8,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': True,
+    },
+    'importe': {
+        'start_pos': 54,
+        'length': 13,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': True,
+    },
+    'filler_2': {
+        'start_pos': 67,
+        'length': 125,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': False,
+    },
+    'ipermfin': {
+        'start_pos': 192,
+        'length': 1,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': False,
+    },
+    'filler_3': {
+        'start_pos': 193,
+        'length': 58,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': False,
+    },
+    'pro_cbu_nro': {
+        'start_pos': 251,
+        'length': 22,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': False,
+    },
+    'fecha_pago': {
+        'start_pos': 273,
+        'length': 8,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': True,
+    },
+    'forma_pago': {
+        'start_pos': 281,
+        'length': 2,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': True,
+    },
+    'filler_4': {
+        'start_pos': 283,
+        'length': 1,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': False,
+    },
+    'dispon_p': {
+        'start_pos': 284,
+        'length': 1,
+        'type': 'string',
+        'alignment': 'right',
+        'padding': '0',
+        'required': True,
+    },
+    'filler_5': {
+        'start_pos': 285,
+        'length': 1,
+        'type': 'string',
+        'alignment': 'left',
+        'padding': ' ',
+        'required': False,
     },
     'nro_cheque': {
         'start_pos': 286,
