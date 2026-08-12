@@ -74,12 +74,9 @@ factura), `060`/`070` (retención IIBB) y `080` (retenciones especiales). Ver
 2. **Validación** (botón *Previsualizar* o *Descargar TXT*, `_check_payment_orders`):
    - Todas las órdenes deben ser de la compañía elegida, tipo `payment` y
      estado `posted`.
-   - Cada orden debe tener al menos un cheque/Echeq asociado
-     (`issued_check_ids`).
-   - Si tiene más de uno: la suma de los importes de los cheques/Echeqs debe
-     coincidir con el importe de la orden (tolerancia 0,01), y los Echeqs
-     usados en un `025` deben ser **"a la orden"** (restricción real del
-     banco: en el registro `025`, un Echeq (`EC`) solo admite código
+   - Si la orden tiene más de un cheque/Echeq asociado (`issued_check_ids`),
+     los Echeqs usados en un `025` deben ser **"a la orden"** (restricción
+     real del banco: en el registro `025`, un Echeq (`EC`) solo admite código
      `DISPON_P` 1, 2, 5 o 6 — ver tabla A.15 del análisis).
    - El proveedor de la orden debe ser argentino y tener completos: CUIT/CUIL,
      tipo de documento soportado, calle, localidad, código postal, provincia
@@ -112,12 +109,12 @@ se informa en cada `020`). `FECHA_ENTREGA`/`FECHA_PAGO` van fijos en
 |---|---|
 | `PRO_NRO_BENEFICIARIO` | `partner_id.id`, rellenado a 15 posiciones (identificador estable del proveedor — punto abierto de diseño, ver sección 7) |
 | `NRO_MINUTA` | `payment_order.number` (solo dígitos) |
-| `IMPORTE` | `payment_order.amount` |
+| `IMPORTE` | suma de `amount` de los `issued_check_ids` de la orden; si no tiene ningún cheque/Echeq asociado, `payment_order.amount` |
 | `PRO_NRO_ORD` | constante por archivo: `fecha_proceso + id del wizard` (no identifica la orden individual, identifica el lote — así lo espera el banco) |
 | `TIPO_DOCUMENTO` / `NRO_DOCUMENTO` | tipo de documento del proveedor (traducido con diccionario `IDENTIFICATION_TYPE_BBVA`) / `partner_id.vat` |
 | `FECHA_ENTREGA` | `payment_order.date_effective` |
 | **Si la orden tiene un solo cheque/Echeq**: `FECHA_PAGO`, `FORMA_PAGO`, `DISPON_P`, `NRO_CHEQUE` | del único `account.check` asociado (ver reglas de abajo) |
-| **Si la orden tiene 2+ cheques/Echeqs**: `FORMA_PAGO="MP"`, `DISPON_P="9"`, `FECHA_PAGO="99999999"`, `NRO_CHEQUE=0` | el detalle real de cada instrumento se informa en su propio `025` (regla del banco, validada contra archivos reales) |
+| **Si la orden no tiene cheques/Echeqs, o tiene 2+**: `FORMA_PAGO="MP"`, `DISPON_P="9"`, `FECHA_PAGO="99999999"`, `NRO_CHEQUE=0` | sin instrumento no hay nada más que informar; con 2+, el detalle real de cada instrumento se informa en su propio `025` (regla del banco, validada contra archivos reales) |
 
 ### 025 — Instrumento adicional (una línea por cada `account.check` de la orden, solo si hay más de uno)
 
