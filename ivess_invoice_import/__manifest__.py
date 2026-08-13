@@ -8,11 +8,18 @@
         - Facturas: importa facturas de cliente a account.move a partir de
           un archivo Excel desnormalizado (una fila por ítem facturado),
           agrupando por tipo de comprobante + letra + punto de venta +
-          número. Son facturas de tipo fiscal interna: no generan CAE ni se
-          envían a ARCA. Matchea cliente por res.partner.vat (contra la
-          columna "documento" del Excel) y producto por
-          product.product.default_code (contra "cod art"), y deduplica
-          contra account.move.ref.
+          número. Son comprobantes que ya tienen CAE en el sistema origen
+          (se importa tal cual, columna "cae", sin pedirlo a ARCA); Odoo las
+          postea (action_post) y les asigna su propia numeración según el
+          diario de ventas elegido en el wizard. Matchea cliente por
+          res.partner.vat (contra la columna "documento" del Excel) y
+          producto por product.product.default_code (contra "cod art"), y
+          deduplica contra account.move.ref. Los impuestos especiales
+          (percepciones de IIBB/IVA, impuestos internos, columna "cod
+          impuesto especial") se resuelven contra el mapeo configurable en
+          Contabilidad > Configuración > Códigos de impuesto especial
+          (importación) y se cargan tal cual (base/monto del Excel) en
+          account.move.perception_ids / internal_taxes_ids.
 
         - Cobros: importa cobros de cliente a account.payment (conciliados
           contra las facturas que cancelan) a partir de un archivo Excel
@@ -30,6 +37,7 @@
     "external_dependencies": {"python": ["openpyxl"]},
     "data": [
         "security/ir.model.access.csv",
+        "views/invoice_import_tax_code_views.xml",
         "wizard/invoice_import_wizard_views.xml",
         "wizard/payment_import_wizard_views.xml",
     ],
