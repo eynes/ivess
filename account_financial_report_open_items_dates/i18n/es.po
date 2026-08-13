@@ -15,19 +15,21 @@ msgstr ""
 #. module: account_financial_report_open_items_dates
 #: model:ir.model.fields,field_description:account_financial_report_open_items_dates.field_open_items_report_wizard__document_date_from
 msgid "Document Date from"
-msgstr "Fecha comprobante desde"
+msgstr "Fecha de factura desde"
 
 #. module: account_financial_report_open_items_dates
 #: model:ir.model.fields,field_description:account_financial_report_open_items_dates.field_open_items_report_wizard__document_date_to
 msgid "Document Date to"
-msgstr "Fecha comprobante hasta"
+msgstr "Fecha de factura hasta"
 
 #. module: account_financial_report_open_items_dates
 #: model_terms:ir.ui.view,arch_db:account_financial_report_open_items_dates.open_items_wizard_document_date
+#: model_terms:ir.ui.view,arch_db:account_financial_report_open_items_dates.report_open_items_lines_header_document_date
 msgid "Document Date"
-msgstr "Fecha comprobante"
+msgstr "Fecha de factura"
 
 #. module: account_financial_report_open_items_dates
+#: model_terms:ir.ui.view,arch_db:account_financial_report_open_items_dates.open_items_wizard_document_date
 #: model_terms:ir.ui.view,arch_db:account_financial_report_open_items_dates.report_open_items_lines_header_document_date
 msgid "Accounting Date"
 msgstr "Fecha contable"
@@ -36,7 +38,7 @@ msgstr "Fecha contable"
 #: code:addons/account_financial_report_open_items_dates/report/open_items_xlsx.py:0
 #: model_terms:ir.ui.view,arch_db:account_financial_report_open_items_dates.report_open_items_filters_document_date
 msgid "Document date filter"
-msgstr "Filtro fecha comprobante"
+msgstr "Filtro fecha de factura"
 
 #. module: account_financial_report_open_items_dates
 #: model:ir.model.fields,help:account_financial_report_open_items_dates.field_open_items_report_wizard__document_date_from
@@ -46,6 +48,22 @@ msgid ""
 "invoices (e.g. vendor bills), where the document date can differ from the "
 "accounting date."
 msgstr ""
-"Filtra las partidas abiertas por fecha comprobante (fecha de factura). "
-"Sólo es relevante para facturas (por ejemplo, facturas de proveedores), "
-"donde la fecha comprobante puede diferir de la fecha contable."
+"Filtra las partidas abiertas por fecha de factura. Sólo es relevante para "
+"facturas (por ejemplo, facturas de proveedores), donde la fecha de "
+"factura puede diferir de la fecha contable."
+
+#. module: account_financial_report_open_items_dates
+#: model:ir.model.fields,field_description:account_financial_report_open_items_dates.field_open_items_report_wizard__filter_by_document_date
+msgid "Filter by document date"
+msgstr "Filtrar por fecha de factura"
+
+#. module: account_financial_report_open_items_dates
+#: model:ir.model.fields,help:account_financial_report_open_items_dates.field_open_items_report_wizard__filter_by_document_date
+msgid ""
+"If disabled, open items are filtered only by the accounting date (native "
+"behavior). If enabled, open items are also filtered by their document "
+"date (invoice date) using the range below."
+msgstr ""
+"Si está desactivado, las partidas abiertas se filtran solo por la fecha "
+"contable (comportamiento nativo). Si está activado, también se filtran "
+"por su fecha de factura usando el rango de abajo."

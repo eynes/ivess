@@ -8,23 +8,25 @@
 
 {
     "name": "Account Financial Report - Open Items Document Date",
-    "version": "19.0.0.0.1",
+    "version": "19.0.0.0.4",
     "author": "Eynes SRL",
     "website": "http://www.eynes.com.ar",
     "category": "Accounting/Accounting",
-    "summary": "Agrega la fecha comprobante junto a la fecha contable "
+    "summary": "Agrega la fecha de factura junto a la fecha contable "
     "en el reporte de Partidas Abiertas",
     "description": """
         Extiende el reporte "Partidas Abiertas" (Open Items) de
         account_financial_report para distinguir, en los casos en que
         existan (facturas de proveedores, facturas de clientes), la
-        fecha comprobante (invoice_date) de la fecha contable (date):
+        fecha de factura (invoice_date) de la fecha contable (date):
 
-        - Wizard: agrega un filtro opcional por rango de fecha comprobante
-          (desde / hasta).
-        - Vista Odoo y PDF: agregan la columna "Fecha comprobante" junto a
+        - Wizard: agrega un filtro opcional por rango de fecha de factura
+          (desde / hasta), activable con un booleano ("Filtrar por fecha de
+          factura"). Desactivado, el reporte filtra solo por fecha
+          contable (comportamiento nativo).
+        - Vista Odoo y PDF: agregan la columna "Fecha de factura" junto a
           la columna "Fecha contable".
-        - Excel: agrega la columna "Fecha comprobante" junto a la columna
+        - Excel: agrega la columna "Fecha de factura" junto a la columna
           "Fecha contable" y el filtro aplicado.
     """,
     "depends": [

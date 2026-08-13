@@ -8,9 +8,26 @@
             ref="account_financial_report.open_items_wizard"
         />
         <field name="arch" type="xml">
+            <field name="date_at" position="replace" />
+            <field name="date_from" position="replace" />
             <group name="date_range" position="inside">
-                <label for="document_date_from" string="Document Date" />
-                <div class="o_row">
+                <label
+                    for="date_from"
+                    string="Accounting Date"
+                    invisible="filter_by_document_date"
+                />
+                <div class="o_row" invisible="filter_by_document_date">
+                    <field name="date_from" class="oe_inline" />
+                    <span class="oe_inline">to</span>
+                    <field name="date_at" class="oe_inline" />
+                </div>
+                <field name="filter_by_document_date" />
+                <label
+                    for="document_date_from"
+                    string="Document Date"
+                    invisible="not filter_by_document_date"
+                />
+                <div class="o_row" invisible="not filter_by_document_date">
                     <field name="document_date_from" class="oe_inline" />
                     <span class="oe_inline">to</span>
                     <field name="document_date_to" class="oe_inline" />
