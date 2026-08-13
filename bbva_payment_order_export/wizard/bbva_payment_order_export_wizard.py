@@ -132,25 +132,7 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
     def _payment_order_errors(self, payment_order, province_codes):
         errors = []
         checks = payment_order.issued_check_ids
-        if not checks:
-            errors.append(
-                _('%s: no tiene ningún cheque/Echeq asociado.')
-                % payment_order.number
-            )
-        elif len(checks) > 1:
-            amount_diff = sum(checks.mapped('amount')) - payment_order.amount
-            if abs(amount_diff) > 0.01:
-                errors.append(
-                    _(
-                        '%s: la suma de los importes de sus cheques/Echeqs '
-                        '(%.2f) no coincide con el importe de la orden (%.2f).'
-                    )
-                    % (
-                        payment_order.number,
-                        sum(checks.mapped('amount')),
-                        payment_order.amount,
-                    )
-                )
+        if len(checks) > 1:
             not_to_order = checks.filtered(
                 lambda check: check.checkbook_format != 'physical'
                 and check.not_order
@@ -303,13 +285,22 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         fixed_width.update(**vals)
         return fixed_width.line
 
+    def _importe_020(self, payment_order, checks):
+        # El importe del 020 es la suma de los cheques/Echeqs asociados
+        # (los mismos que se detallan en cada 025); si la orden no tiene
+        # ninguno, se usa el monto de la orden de pago.
+        if checks:
+            return sum(checks.mapped('amount'))
+        return payment_order.amount
+
     def _build_020_line(self, payment_order, checks, row_number, pro_nro_ord):
         partner = payment_order.partner_id
-        multi_instrument = len(checks) > 1
-        if multi_instrument:
-            # Orden cancelada con más de un cheque/Echeq: el 020 no informa
-            # el instrumento real (eso queda en cada 025), usa FORMA_PAGO=MP
-            # / DISPON_P=9 / FECHA_PAGO=99999999 (ver Apéndice A.2/B.0.1 de
+        single_instrument = len(checks) == 1
+        if not single_instrument:
+            # Orden sin cheque asociado, o cancelada con más de uno: el 020
+            # no informa un instrumento real (en el caso multi-instrumento
+            # eso queda en cada 025), usa FORMA_PAGO=MP / DISPON_P=9 /
+            # FECHA_PAGO=99999999 (ver Apéndice A.2/B.0.1 de
             # docs/ANALISIS_Y_DISENO.md, validado contra IMPA/LUFRAN).
             forma_pago = 'MP'
             dispon_p = '9'
@@ -331,7 +322,7 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
             'secuencia': str(row_number - 1),
             'pro_nro_beneficiario': self._pro_nro_beneficiario(partner),
             'nro_minuta': _only_digits(payment_order.number),
-            'importe': self._moneyfmt(payment_order.amount),
+            'importe': self._moneyfmt(self._importe_020(payment_order, checks)),
             'pro_nro_ord': pro_nro_ord,
             'ipermfin': 'N',
             'cli_aje': ' ',
