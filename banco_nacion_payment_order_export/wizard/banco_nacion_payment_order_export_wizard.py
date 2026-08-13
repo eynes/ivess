@@ -3,7 +3,7 @@
 import base64
 import re
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
 CONCEPTO_BNA_LABELS = {
@@ -54,12 +54,39 @@ class BancoNacionPaymentOrderExportWizard(models.TransientModel):
         string='Diario/Cuenta Banco Nación',
         domain="[('company_id', '=', company_id), ('type', '=', 'bank')]",
         required=True,
+        default=lambda self: self._default_bank_journal_id(),
         help='Diario cuyas líneas de método de pago se exportan como '
         'transferencia a Banco Nación. El importe exportado de cada orden '
         'es la suma de sus líneas de pago que usan este diario, no el '
         'total de la orden.',
     )
     preview_csv = fields.Text(string='Vista previa', readonly=True)
+
+    def _default_bank_journal_id(self):
+        return self._find_default_bank_journal(self.env.company)
+
+    def _find_default_bank_journal(self, company):
+        return self.env['account.journal'].search(
+            [
+                ('company_id', '=', company.id),
+                ('type', '=', 'bank'),
+                ('banco_nacion_is_default_account', '=', True),
+            ],
+            limit=1,
+        )
+
+    @api.onchange('company_id')
+    def _onchange_company_id(self):
+        self.bank_journal_id = self._find_default_bank_journal(self.company_id)
+
+    @api.onchange('payment_order_ids')
+    def _onchange_payment_order_ids(self):
+        # El concepto debe mostrarse siempre como "Varios" al traer una
+        # orden al wizard, sin importar qué tenga guardado la orden (p.ej.
+        # órdenes creadas antes de que este default cambiara). El usuario
+        # puede modificarlo a mano después por orden, línea por línea.
+        for payment_order in self.payment_order_ids:
+            payment_order.concepto_bna = 'VAR'
 
     def _check_payment_orders(self):
         self.ensure_one()
