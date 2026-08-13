@@ -22,6 +22,7 @@
                         <field name="fecha_proceso" />
                     </group>
                     <group string="Cuenta de débito BBVA">
+                        <field name="bank_journal_id" />
                         <field name="suc_cta_debito" />
                         <field name="dv_cta_debito" />
                         <field name="nro_cta_debito" />

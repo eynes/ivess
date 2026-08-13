@@ -18,7 +18,7 @@ class AccountPaymentOrder(models.Model):
             ('HON', 'Honorarios'),
         ],
         string='Concepto Banco Nación',
-        default='FAC',
+        default='VAR',
         help='Código de concepto exigido por Banco Nación para el '
         'archivo de transferencias masivas a proveedores.',
     )

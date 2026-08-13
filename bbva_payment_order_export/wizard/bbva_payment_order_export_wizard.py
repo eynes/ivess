@@ -4,7 +4,7 @@ import base64
 import re
 from decimal import Decimal
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.addons.l10n_ar_eynes.utils.sicore_fixed_width import FixedWidth, moneyfmt
 from odoo.exceptions import ValidationError
 
@@ -82,9 +82,19 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         default=fields.Date.context_today,
         help='Fecha hábil de proceso/envío del archivo (AAAAMMDD en el TXT).',
     )
-    # Datos de la contratación de la cuenta de débito con BBVA. Por ahora
-    # se piden en el wizard; a futuro deberían vivir en una configuración
-    # persistente ligada al journal (ver sección 7.1 del análisis).
+    bank_journal_id = fields.Many2one(
+        comodel_name='account.journal',
+        string='Diario/Cuenta débito BBVA',
+        domain="[('company_id', '=', company_id), ('type', '=', 'bank')]",
+        default=lambda self: self._default_bank_journal_id(),
+        help='Al elegir un diario configurado con datos BBVA (pestaña '
+        '"BBVA Pago a Proveedores" del diario), se autocompletan los '
+        'campos de la cuenta de débito. Se puede cambiar sin afectar los '
+        'valores ya cargados abajo.',
+    )
+    # Datos de la contratación de la cuenta de débito con BBVA. Se
+    # autocompletan desde bank_journal_id (ver sección 7.1 del análisis)
+    # pero quedan editables por si hace falta un valor puntual distinto.
     suc_cta_debito = fields.Char(string='Sucursal cuenta débito', required=True)
     dv_cta_debito = fields.Char(
         string='Dígito verificador cuenta débito', required=True
@@ -94,6 +104,31 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         string='Contrato BBVA Pago a Proveedores', required=True
     )
     preview_txt = fields.Text(string='Vista previa', readonly=True)
+
+    def _default_bank_journal_id(self):
+        return self._find_default_bank_journal(self.env.company)
+
+    def _find_default_bank_journal(self, company):
+        return self.env['account.journal'].search(
+            [
+                ('company_id', '=', company.id),
+                ('type', '=', 'bank'),
+                ('bbva_is_default_debit_account', '=', True),
+            ],
+            limit=1,
+        )
+
+    @api.onchange('company_id')
+    def _onchange_company_id(self):
+        self.bank_journal_id = self._find_default_bank_journal(self.company_id)
+
+    @api.onchange('bank_journal_id')
+    def _onchange_bank_journal_id(self):
+        journal = self.bank_journal_id
+        self.suc_cta_debito = journal.bbva_suc_cta_debito
+        self.dv_cta_debito = journal.bbva_dv_cta_debito
+        self.nro_cta_debito = journal.bbva_nro_cta_debito
+        self.contrato_prov = journal.bbva_contrato_prov
 
     def _check_payment_orders(self):
         self.ensure_one()
@@ -185,6 +220,19 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
                     'partner': partner.name,
                     'fields': ', '.join(missing),
                 }
+            )
+        if not partner.cbu:
+            errors.append(
+                _('%s: el proveedor %s no tiene CBU informado.')
+                % (payment_order.number, partner.name)
+            )
+        elif not re.fullmatch(r'\d{22}', partner.cbu):
+            errors.append(
+                _(
+                    '%s: el CBU del proveedor %s no tiene 22 dígitos '
+                    'numéricos ("%s").'
+                )
+                % (payment_order.number, partner.name, partner.cbu)
             )
         return errors
 
