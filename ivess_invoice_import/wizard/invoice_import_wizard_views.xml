@@ -28,6 +28,7 @@
                         <field name="cliente_codigo" optional="show"/>
                         <field name="fecha"/>
                         <field name="importe_total" sum="Total"/>
+                        <field name="cae" optional="show"/>
                         <field name="estado_proyectado" invisible="resultado != 'pending'"/>
                         <field name="resultado" invisible="resultado == 'pending'" decoration-success="resultado == 'ok'" decoration-danger="resultado == 'error'"/>
                         <field name="detail_count"/>
@@ -44,6 +45,7 @@
                             <field name="fecha"/>
                             <field name="fecha_vto"/>
                             <field name="importe_total"/>
+                            <field name="cae"/>
                             <field name="estado_proyectado"/>
                             <field name="odoo_move_id"/>
                         </group>
@@ -59,6 +61,7 @@
                                 <field name="tax_id"/>
                                 <field name="importe_total_neto_item"/>
                                 <field name="cod_impuesto_especial" optional="show"/>
+                                <field name="special_tax_id" optional="show"/>
                                 <field name="monto_imp" optional="show"/>
                                 <field name="has_error" invisible="1"/>
                                 <field name="error_message" decoration-danger="has_error"/>
@@ -105,8 +108,8 @@
     <menuitem
         id="menu_ivess_invoice_import"
         name="Importar facturas de clientes (Excel)"
-        parent="account.menu_finance_entries"
+        parent="account.menu_finance_receivables"
         action="action_ivess_invoice_import_wizard"
-        sequence="100"
+        sequence="120"
     />
 </odoo>

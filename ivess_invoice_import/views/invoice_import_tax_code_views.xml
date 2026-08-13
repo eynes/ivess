@@ -1,0 +1,35 @@
+<odoo>
+    <record id="view_ivess_invoice_import_tax_code_list" model="ir.ui.view">
+        <field name="name">ivess.invoice.import.tax.code.list</field>
+        <field name="model">ivess.invoice.import.tax.code</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="code"/>
+                <field name="tax_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_ivess_invoice_import_tax_code" model="ir.actions.act_window">
+        <field name="name">Códigos de impuesto especial (importación Excel)</field>
+        <field name="res_model">ivess.invoice.import.tax.code</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Mapeá cada código de la columna "cod impuesto especial" del
+                Excel de importación (percepción IIBB, percepción de IVA,
+                impuestos internos, etc.) con el impuesto de Odoo
+                correspondiente.
+            </p>
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_ivess_invoice_import_tax_code"
+        name="Códigos de impuesto especial (importación)"
+        parent="account.menu_finance_configuration"
+        action="action_ivess_invoice_import_tax_code"
+        sequence="200"
+    />
+</odoo>

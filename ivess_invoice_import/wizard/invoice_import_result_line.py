@@ -28,12 +28,13 @@ class IvessInvoiceImportResultLine(models.TransientModel):
     comprobante_anulado = fields.Boolean(string="Anulado en origen")
     estado_proyectado = fields.Selection(
         [
-            ("draft", "A crear en Borrador"),
+            ("draft", "A crear y Registrar"),
             ("cancel", "A crear y Cancelar"),
         ],
         string="Estado proyectado",
         compute="_compute_estado_proyectado",
     )
+    cae = fields.Char(string="CAE")
     cliente_codigo = fields.Char(string="Código de cliente (origen)")
     cliente_razon_social = fields.Char(string="Razón social (origen)")
     cliente_documento = fields.Char(string="CUIT/documento (origen)")

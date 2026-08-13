@@ -50,6 +50,7 @@ HEADER_ONLY_FIELDS = (
     "fecha_vto",
     "importe_total",
     "comprobante_anulado",
+    "cae",
 )
 DETAIL_FIELDS = (
     "tipo_item",
@@ -212,6 +213,11 @@ class IvessInvoiceImportWizard(models.TransientModel):
     def _to_float(value):
         return float(str(value).strip())
 
+    @classmethod
+    def _to_cae(cls, value):
+        text = cls._to_str(value)
+        return text if text and text != "0" else ""
+
     @staticmethod
     def _to_date(value):
         text = str(int(value)) if isinstance(value, float) else str(value).strip()
@@ -263,6 +269,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
             "fecha_vto": cell("fecha vto"),
             "importe_total": cell("importe total"),
             "comprobante_anulado": self._to_str(cell("comprobante anulado")).upper() == "S",
+            "cae": self._to_cae(cell("cae")),
             "tipo_item": self._to_str(cell("tipo de item")),
             "cod_art": self._to_str(cell("cod art")),
             "cantidad": cell("cantidad"),
@@ -373,6 +380,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
                 "fecha_vto": fecha_vto,
                 "importe_total": importe_total,
                 "comprobante_anulado": bool(group["comprobante_anulado"]),
+                "cae": group["cae"],
                 "cliente_codigo": group["cod_cliente"],
                 "cliente_razon_social": group["razon_social"],
                 "cliente_documento": group["documento"],
@@ -493,6 +501,30 @@ class IvessInvoiceImportWizard(models.TransientModel):
             except (TypeError, ValueError):
                 monto_imp = 0.0
 
+            special_tax = None
+            cod_impuesto_especial = line["cod_impuesto_especial"]
+            if cod_impuesto_especial:
+                special_tax = self._find_special_tax(cod_impuesto_especial)
+                if not special_tax:
+                    line_errors.append(
+                        _(
+                            "No se encontró un mapeo para el código de impuesto"
+                            " especial '%s' (configuralo en Contabilidad >"
+                            " Configuración > Códigos de impuesto especial"
+                            " (importación))."
+                        )
+                        % cod_impuesto_especial
+                    )
+                elif not monto_imp or not importe_total_neto_item:
+                    line_errors.append(
+                        _(
+                            "El código de impuesto especial '%s' está mapeado a"
+                            " '%s' pero el monto o la base informados son 0."
+                        )
+                        % (cod_impuesto_especial, special_tax.name)
+                    )
+                    special_tax = None
+
             importe_del_renglon = self._to_str(line["importe_del_renglon"])
 
             detail_vals.append(
@@ -509,7 +541,8 @@ class IvessInvoiceImportWizard(models.TransientModel):
                         "tax_id": tax.id if tax else False,
                         "importe_total_neto_item": importe_total_neto_item,
                         "importe_del_renglon": importe_del_renglon,
-                        "cod_impuesto_especial": line["cod_impuesto_especial"],
+                        "cod_impuesto_especial": cod_impuesto_especial,
+                        "special_tax_id": special_tax.id if special_tax else False,
                         "monto_imp": monto_imp,
                         "has_error": bool(line_errors),
                         "error_message": "; ".join(line_errors) if line_errors else False,
@@ -519,6 +552,16 @@ class IvessInvoiceImportWizard(models.TransientModel):
             errors.extend(line_errors)
 
         return detail_vals, errors
+
+    def _find_special_tax(self, cod_impuesto_especial):
+        mapping = self.env["ivess.invoice.import.tax.code"].search(
+            [
+                ("code", "=", cod_impuesto_especial),
+                ("company_id", "=", self.sale_journal_id.company_id.id),
+            ],
+            limit=1,
+        )
+        return mapping.tax_id if mapping else None
 
     def _find_product(self, cod_art):
         if not cod_art:
@@ -539,6 +582,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
             try:
                 with self.env.cr.savepoint():
                     move = self._create_move(result_line)
+                    move.action_post()
                     if result_line.comprobante_anulado:
                         move.button_cancel()
                 result_line.write({"resultado": "ok", "odoo_move_id": move.id})
@@ -579,7 +623,44 @@ class IvessInvoiceImportWizard(models.TransientModel):
             "invoice_date": result_line.fecha,
             "invoice_line_ids": line_vals,
             "ref": result_line.comprobante_ref,
+            "cae": result_line.cae or False,
         }
         if result_line.fecha_vto:
             move_vals["invoice_date_due"] = result_line.fecha_vto
+        perception_vals, internal_tax_vals = self._special_tax_vals(result_line)
+        if perception_vals:
+            move_vals["perception_ids"] = perception_vals
+        if internal_tax_vals:
+            move_vals["internal_taxes_ids"] = internal_tax_vals
         return self.env["account.move"].create(move_vals)
+
+    @staticmethod
+    def _special_tax_vals(result_line):
+        """Agrega, por impuesto especial resuelto (percepción IIBB/IVA,
+        impuesto interno), una línea a perception_ids o internal_taxes_ids
+        con base y monto sumados de todas las líneas de detalle que
+        comparten ese impuesto (no se recalculan: se toman tal cual del
+        archivo origen)."""
+        perception_vals = []
+        internal_tax_vals = []
+        special_lines = result_line.detail_line_ids.filtered("special_tax_id")
+        for tax in special_lines.mapped("special_tax_id"):
+            lines = special_lines.filtered(lambda d, tax=tax: d.special_tax_id == tax)
+            base = sum(lines.mapped("importe_total_neto_item"))
+            amount = sum(lines.mapped("monto_imp"))
+            if tax.tax_group_id.group_type == "internals":
+                internal_tax_vals.append((0, 0, {"tax_id": tax.id, "base": base, "amount": amount}))
+            else:
+                perception_vals.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "perception_id": tax.id,
+                            "partner_id": result_line.partner_id.id,
+                            "base": base,
+                            "amount": amount,
+                        },
+                    )
+                )
+        return perception_vals, internal_tax_vals
