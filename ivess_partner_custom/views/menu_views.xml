@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Ocultar el menú "Pagos" (Proveedores > Pagos) -->
+    <record id="account.menu_action_account_payments_payable" model="ir.ui.menu">
+        <field name="active" eval="False"/>
+    </record>
+
+</odoo>
