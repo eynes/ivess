@@ -1,6 +1,6 @@
 import logging
 
-from odoo import fields, models
+from odoo import _, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -24,13 +24,20 @@ class ResPartner(models.Model):
             _logger.exception(
                 "Error fetching Padron values for partners %s", partner_ids
             )
-            self.env["res.partner"].browse(partner_ids).write(
-                {"padron_update_error": str(error)}
-            )
+            partners = self.env["res.partner"].browse(partner_ids)
+            partners.write({"padron_update_error": str(error)})
+            for partner in partners:
+                partner.message_post(
+                    body=_("Error al actualizar el Padrón de Perc/Ret: %s")
+                    % error,
+                )
             return False
 
         if partner_ids:
-            self.env["res.partner"].browse(partner_ids).write(
-                {"padron_update_error": False}
-            )
+            partners = self.env["res.partner"].browse(partner_ids)
+            partners.write({"padron_update_error": False})
+            for partner in partners:
+                partner.message_post(
+                    body=_("Padrón de Perc/Ret actualizado correctamente. %s", result.get('params').get('message')),
+                )
         return result
