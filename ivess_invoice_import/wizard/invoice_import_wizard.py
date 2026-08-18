@@ -127,12 +127,6 @@ class IvessInvoiceImportWizard(models.TransientModel):
 
     file = fields.Binary(string="Archivo (.xlsx)", required=True)
     filename = fields.Char(string="Nombre de archivo")
-    sale_journal_id = fields.Many2one(
-        "account.journal",
-        string="Diario de ventas",
-        domain=[("type", "=", "sale")],
-        help="Diario a usar para las facturas de cliente importadas.",
-    )
     state = fields.Selection(
         [
             ("upload", "Subir archivo"),
@@ -162,8 +156,6 @@ class IvessInvoiceImportWizard(models.TransientModel):
             raise UserError(
                 _("Falta la librería 'openpyxl' en el servidor para leer archivos .xlsx.")
             )
-        if not self.sale_journal_id:
-            raise UserError(_("Seleccioná el diario de ventas antes de previsualizar."))
 
         rows = self._read_excel_rows(base64.b64decode(self.file))
         groups = group_invoice_rows(rows)
@@ -213,6 +205,22 @@ class IvessInvoiceImportWizard(models.TransientModel):
     def _to_float(value):
         return float(str(value).strip())
 
+    @staticmethod
+    def _digits_to_int(value):
+        digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+        return int(digits) if digits else None
+
+    @classmethod
+    def _to_numeric_str(cls, value):
+        """Normaliza a una representación canónica sin ceros a la izquierda,
+        sea que la celda venga como texto, número o número con formato
+        distinto entre renglones (ej. "0004" vs 4 vs 4.0). Se usa para
+        pto_vta/numero_comprob: son parte de la clave de agrupación de la
+        factura y también se comparan contra el diario, así que deben
+        comparar igual sin importar cómo vino la celda."""
+        digits = cls._digits_to_int(cls._to_str(value))
+        return str(digits) if digits is not None else ""
+
     @classmethod
     def _to_cae(cls, value):
         text = cls._to_str(value)
@@ -260,8 +268,8 @@ class IvessInvoiceImportWizard(models.TransientModel):
             "_row_number": row_number,
             "tipo_comprobante": self._to_str(cell("tipo de comprobante")).upper(),
             "letra": self._to_str(cell("letra")).upper(),
-            "pto_vta": self._to_str(cell("pto vta")),
-            "numero_comprob": self._to_str(cell("numero comprob")),
+            "pto_vta": self._to_numeric_str(cell("pto vta")),
+            "numero_comprob": self._to_numeric_str(cell("numero comprob")),
             "fecha": cell("fecha"),
             "cod_cliente": self._to_str(cell("cod cliente")),
             "razon_social": self._to_str(cell("razon social")),
@@ -320,6 +328,22 @@ class IvessInvoiceImportWizard(models.TransientModel):
                 _("No se encontró un tipo de comprobante Odoo para la letra '%s'.")
                 % group["letra"]
             )
+
+        journal, journal_candidates = self._find_journal(group["pto_vta"])
+        if not journal:
+            if journal_candidates:
+                errors.append(
+                    _(
+                        "El punto de venta '%s' coincide con %s diarios de"
+                        " venta distintos; debe coincidir con uno solo."
+                    )
+                    % (group["pto_vta"], journal_candidates)
+                )
+            else:
+                errors.append(
+                    _("No se encontró un diario de venta para el punto de venta '%s'.")
+                    % group["pto_vta"]
+                )
 
         partner = self._find_partner(group["documento"])
         if not partner:
@@ -386,6 +410,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
                 "cliente_documento": group["documento"],
                 "partner_id": partner.id if partner else False,
                 "voucher_type_id": voucher_type.id if voucher_type else False,
+                "journal_id": journal.id if journal else False,
                 "has_error": bool(errors),
                 "error_message": "\n".join(errors) if errors else False,
                 "detail_line_ids": detail_vals,
@@ -417,6 +442,29 @@ class IvessInvoiceImportWizard(models.TransientModel):
         # importación masiva estándar.
         return candidates.sorted(key=lambda v: v.afip_code)[0]
 
+    def _find_journal(self, pto_vta):
+        """Resuelve el diario de ventas a partir del punto de venta del
+        Excel: el archivo mezcla comprobantes de más de un diario, así que
+        el diario ya no se elige a mano en el wizard. Matchea contra el
+        código AFIP del diario (account.journal.code, ver
+        get_pos_number() en l10n_ar_eynes) o, si no coincide con ninguno,
+        contra los dígitos del nombre del diario (algunos diarios están
+        identificados solo por su nombre).
+
+        :return: tupla (diario o None, cantidad de diarios candidatos).
+        """
+        pos_number = self._digits_to_int(pto_vta)
+        if pos_number is None:
+            return None, 0
+        journals = self.env["account.journal"].search(
+            [("type", "=", "sale"), ("company_id", "=", self.env.company.id)]
+        )
+        matches = journals.filtered(
+            lambda j: j.get_pos_number() == pos_number
+            or self._digits_to_int(j.name) == pos_number
+        )
+        return (matches[0] if len(matches) == 1 else None), len(matches)
+
     @staticmethod
     def _only_digits(value):
         return "".join(ch for ch in (value or "") if ch.isdigit())
@@ -438,7 +486,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
     def _resolve_detail_lines(self, lines):
         detail_vals = []
         errors = []
-        company = self.sale_journal_id.company_id
+        company = self.env.company
 
         if not lines:
             errors.append(_("La factura no tiene líneas de detalle."))
@@ -557,7 +605,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
         mapping = self.env["ivess.invoice.import.tax.code"].search(
             [
                 ("code", "=", cod_impuesto_especial),
-                ("company_id", "=", self.sale_journal_id.company_id.id),
+                ("company_id", "=", self.env.company.id),
             ],
             limit=1,
         )
@@ -617,13 +665,24 @@ class IvessInvoiceImportWizard(models.TransientModel):
         ]
         move_vals = {
             "move_type": "out_invoice",
-            "journal_id": self.sale_journal_id.id,
+            "journal_id": result_line.journal_id.id,
             "partner_id": result_line.partner_id.id,
             "voucher_type_id": result_line.voucher_type_id.id,
             "invoice_date": result_line.fecha,
             "invoice_line_ids": line_vals,
             "ref": result_line.comprobante_ref,
             "cae": result_line.cae or False,
+            # Esta es una factura histórica, ya emitida y numerada en el
+            # sistema origen (con CAE propio): se fija el número real acá en
+            # vez de dejar que se autonumere con la secuencia del diario.
+            # posted_before=True es lo que l10n_ar_eynes chequea en
+            # account.move._post() para no pisar internal_number con el
+            # próximo valor de la secuencia (ver l10n_ar_eynes/models/
+            # account_move.py).
+            "internal_number": self._internal_number(
+                result_line.journal_id, result_line.numero_comprobante
+            ),
+            "posted_before": True,
         }
         if result_line.fecha_vto:
             move_vals["invoice_date_due"] = result_line.fecha_vto
@@ -633,6 +692,10 @@ class IvessInvoiceImportWizard(models.TransientModel):
         if internal_tax_vals:
             move_vals["internal_taxes_ids"] = internal_tax_vals
         return self.env["account.move"].create(move_vals)
+
+    @staticmethod
+    def _internal_number(journal, numero_comprobante):
+        return "%s-%s" % (journal.get_pos_number(), (numero_comprobante or "").zfill(8))
 
     @staticmethod
     def _special_tax_vals(result_line):

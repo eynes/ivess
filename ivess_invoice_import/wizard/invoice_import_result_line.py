@@ -40,6 +40,12 @@ class IvessInvoiceImportResultLine(models.TransientModel):
     cliente_documento = fields.Char(string="CUIT/documento (origen)")
     partner_id = fields.Many2one("res.partner", string="Cliente")
     voucher_type_id = fields.Many2one("res.voucher.type", string="Tipo de comprobante Odoo")
+    journal_id = fields.Many2one(
+        "account.journal",
+        string="Diario",
+        help="Diario de ventas resuelto automáticamente a partir de la"
+        " columna 'pto vta' del Excel.",
+    )
     detail_line_ids = fields.One2many(
         "ivess.invoice.import.detail.line",
         "result_line_id",
