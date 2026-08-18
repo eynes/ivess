@@ -10,6 +10,12 @@ class ResPartner(models.Model):
     requiere_comprobante = fields.Boolean(
         string="Requiere Factura",
     )
+    state_id = fields.Many2one(
+        required=True,
+    )
+    property_supplier_payment_term_id = fields.Many2one(
+        required=True,
+    )
     unbilled_balance = fields.Monetary(
         string="Unbilled Balance",
         compute="_compute_balances",
