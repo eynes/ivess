@@ -7,15 +7,13 @@
         <field name="inherit_id" ref="base.view_partner_form" />
         <field name="arch" type="xml">
 
-            <xpath expr="//div[@name='button_box']" position="after">
-                <div
-                    class="alert alert-warning"
-                    role="alert"
+            <xpath expr="//page[@name='internal_notes']/field[@name='comment']" position="after">
+                <field
+                    name="padron_update_error"
+                    string="Error al actualizar el Padrón de Perc/Ret"
+                    readonly="1"
                     invisible="not padron_update_error"
-                >
-                    <strong>Error al actualizar el Padrón de Perc/Ret:</strong>
-                    <field name="padron_update_error" nolabel="1" readonly="1" />
-                </div>
+                />
             </xpath>
 
         </field>
