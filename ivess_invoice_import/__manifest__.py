@@ -3,7 +3,7 @@
     "version": "19.0.0.0.0",
     "summary": "Importador de facturas y cobros de clientes desde archivo Excel (formato 'aguas')",
     "description": """
-        Dos wizards de 3 pasos (subir archivo / previsualizar / confirmar):
+        Wizards de 3 pasos (subir archivo / previsualizar / confirmar):
 
         - Facturas: importa facturas de cliente a account.move a partir de
           un archivo Excel desnormalizado (una fila por ítem facturado),
