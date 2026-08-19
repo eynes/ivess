@@ -37,6 +37,7 @@
     "external_dependencies": {"python": ["openpyxl"]},
     "data": [
         "security/ir.model.access.csv",
+        "views/account_tax_views.xml",
         "views/invoice_import_tax_code_views.xml",
         "wizard/invoice_import_wizard_views.xml",
         "wizard/payment_import_wizard_views.xml",
