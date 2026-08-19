@@ -37,6 +37,15 @@ EXPECTED_HEADERS = [
     "monto imp",
 ]
 
+# Mapeo tipo de comprobante (columna del Excel) -> res.voucher.type.doc_type,
+# para resolver el comprobante Odoo (FC=Factura, ND=Nota de Débito, NC=Nota
+# de Crédito) y derivar el move_type/is_debit_note correspondiente.
+TIPO_COMPROBANTE_DOC_TYPES = {
+    "FC": "b",
+    "ND": "dn",
+    "NC": "cn",
+}
+
 # Columnas que identifican la cabecera de la factura agrupada. Se toman del
 # PRIMER renglón visto de cada grupo (decisión confirmada: si difieren entre
 # renglones del mismo comprobante -como puede pasar con fecha vto/importe
@@ -313,16 +322,20 @@ class IvessInvoiceImportWizard(models.TransientModel):
             return
 
         errors = []
-        if group["tipo_comprobante"] != "FC":
+        doc_type = TIPO_COMPROBANTE_DOC_TYPES.get(group["tipo_comprobante"])
+        if not doc_type:
             errors.append(
                 _(
                     "tipo de comprobante '%s' no soportado (esta versión solo"
-                    " importa 'FC')."
+                    " importa %s)."
                 )
-                % group["tipo_comprobante"]
+                % (
+                    group["tipo_comprobante"],
+                    ", ".join(sorted(TIPO_COMPROBANTE_DOC_TYPES)),
+                )
             )
 
-        voucher_type = self._find_voucher_type(group["letra"])
+        voucher_type = self._find_voucher_type(group["letra"], doc_type)
         if not voucher_type:
             errors.append(
                 _("No se encontró un tipo de comprobante Odoo para la letra '%s'.")
@@ -375,14 +388,19 @@ class IvessInvoiceImportWizard(models.TransientModel):
             group["letra"], group["pto_vta"], group["numero_comprob"]
         )
         if partner:
-            existing = self.env["account.move"].search(
-                [
-                    ("move_type", "=", "out_invoice"),
-                    ("ref", "=", comprobante_ref),
-                    ("partner_id", "=", partner.id),
-                ],
-                limit=1,
-            )
+            move_type = "out_refund" if group["tipo_comprobante"] == "NC" else "out_invoice"
+            dedup_domain = [
+                ("move_type", "=", move_type),
+                ("ref", "=", comprobante_ref),
+                ("partner_id", "=", partner.id),
+            ]
+            if move_type == "out_invoice":
+                # FC y ND comparten move_type "out_invoice": distinguirlos por
+                # is_debit_note para no confundir una con la otra en el dedup.
+                dedup_domain.append(
+                    ("is_debit_note", "=", group["tipo_comprobante"] == "ND")
+                )
+            existing = self.env["account.move"].search(dedup_domain, limit=1)
             if existing:
                 errors.append(
                     _("Ya existe una factura importada con esta clave (account.move #%s).")
@@ -427,11 +445,11 @@ class IvessInvoiceImportWizard(models.TransientModel):
         account.move.ref."""
         return "%s%s%s" % (letra, (pto_vta or "").zfill(4), (numero_comprob or "").zfill(8))
 
-    def _find_voucher_type(self, letra):
-        if not letra:
+    def _find_voucher_type(self, letra, doc_type):
+        if not letra or not doc_type:
             return None
         candidates = self.env["res.voucher.type"].search(
-            [("doc_type", "=", "b"), ("denomination", "=", letra.lower())]
+            [("doc_type", "=", doc_type), ("denomination", "=", letra.lower())]
         )
         if not candidates:
             return None
@@ -602,10 +620,26 @@ class IvessInvoiceImportWizard(models.TransientModel):
         return detail_vals, errors
 
     def _find_special_tax(self, cod_impuesto_especial):
+        company = self.env.company
+        # 1) Percepciones: se matchean directo contra el código Bejerman
+        # cargado en el propio impuesto (Contabilidad > Impuestos > pestaña
+        # "Perceptions").
+        perception = self.env["account.tax"].search(
+            [
+                ("bejerman_code", "=", cod_impuesto_especial),
+                ("tax_group_id.group_type", "=", "perception"),
+                ("company_id", "=", company.id),
+            ],
+            limit=1,
+        )
+        if perception:
+            return perception
+        # 2) Impuestos internos (u otras percepciones sin código Bejerman
+        # cargado todavía): mapeo manual configurable.
         mapping = self.env["ivess.invoice.import.tax.code"].search(
             [
                 ("code", "=", cod_impuesto_especial),
-                ("company_id", "=", self.env.company.id),
+                ("company_id", "=", company.id),
             ],
             limit=1,
         )
@@ -664,7 +698,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
             for detail in result_line.detail_line_ids
         ]
         move_vals = {
-            "move_type": "out_invoice",
+            "move_type": "out_refund" if result_line.tipo_comprobante == "NC" else "out_invoice",
             "journal_id": result_line.journal_id.id,
             "partner_id": result_line.partner_id.id,
             "voucher_type_id": result_line.voucher_type_id.id,
@@ -683,7 +717,14 @@ class IvessInvoiceImportWizard(models.TransientModel):
                 result_line.journal_id, result_line.numero_comprobante
             ),
             "posted_before": True,
+            # Las percepciones/impuestos internos de esta factura ya vienen
+            # calculados del sistema origen (columna "monto imp"): no
+            # queremos que l10n_ar_eynes intente recalcularlos solo con la
+            # posición fiscal del cliente.
+            "disable_perceptions": True,
         }
+        if result_line.tipo_comprobante == "ND":
+            move_vals["is_debit_note"] = True
         if result_line.fecha_vto:
             move_vals["invoice_date_due"] = result_line.fecha_vto
         perception_vals, internal_tax_vals = self._special_tax_vals(result_line)
@@ -691,7 +732,24 @@ class IvessInvoiceImportWizard(models.TransientModel):
             move_vals["perception_ids"] = perception_vals
         if internal_tax_vals:
             move_vals["internal_taxes_ids"] = internal_tax_vals
-        return self.env["account.move"].create(move_vals)
+
+        move = self.env["account.move"].create(move_vals)
+        # perception_ids/internal_taxes_ids por sí solos solo alimentan las
+        # pestañas "Percepciones"/"Internal taxes": para que el importe
+        # también aparezca como impuesto en la línea de factura y en el
+        # asiento hay que agregar el impuesto a las líneas (esto es lo que
+        # hace el onchange de l10n_ar_eynes en la UI, acá se replica a mano
+        # porque un create() por wizard no dispara onchanges) y ajustar el
+        # monto de la línea de impuesto generada al importe real importado.
+        if perception_vals:
+            move.invoice_line_ids.link_perception_to_move_lines()
+            move._update_perception_move_line_amount()
+        if internal_tax_vals:
+            move.invoice_line_ids.link_internal_taxes_to_move_lines(
+                move.internal_taxes_ids.mapped("tax_id")
+            )
+            move._update_internal_taxes_move_line_amount()
+        return move
 
     @staticmethod
     def _internal_number(journal, numero_comprobante):
@@ -712,13 +770,29 @@ class IvessInvoiceImportWizard(models.TransientModel):
             base = sum(lines.mapped("importe_total_neto_item"))
             amount = sum(lines.mapped("monto_imp"))
             if tax.tax_group_id.group_type == "internals":
-                internal_tax_vals.append((0, 0, {"tax_id": tax.id, "base": base, "amount": amount}))
+                internal_tax_vals.append(
+                    (
+                        0,
+                        0,
+                        {
+                            # "name" es un campo compute/store, pero el compute no
+                            # se dispara de forma confiable al crear vía comandos
+                            # (0,0,{...}) anidados en account.move.create(): se
+                            # informa explícito, igual que hace l10n_ar_eynes.
+                            "name": tax.name,
+                            "tax_id": tax.id,
+                            "base": base,
+                            "amount": amount,
+                        },
+                    )
+                )
             else:
                 perception_vals.append(
                     (
                         0,
                         0,
                         {
+                            "name": tax.name,
                             "perception_id": tax.id,
                             "partner_id": result_line.partner_id.id,
                             "base": base,
