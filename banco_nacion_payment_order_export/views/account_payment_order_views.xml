@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="account_payment_order_view_form_concepto_bna" model="ir.ui.view">
+        <field name="name">account.payment.order.view.form.concepto.bna</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.account_supplier_payment_order_view_form" />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='receipt_number']" position="after">
+                <field name="concepto_bna" />
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

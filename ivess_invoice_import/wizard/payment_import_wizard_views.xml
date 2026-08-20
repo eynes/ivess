@@ -108,8 +108,8 @@
     <menuitem
         id="menu_ivess_payment_import"
         name="Importar cobros de clientes (Excel)"
-        parent="account.menu_finance_entries"
+        parent="account.menu_finance_receivables"
         action="action_ivess_payment_import_wizard"
-        sequence="101"
+        sequence="121"
     />
 </odoo>

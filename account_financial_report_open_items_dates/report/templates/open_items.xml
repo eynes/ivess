@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- Filters block: show the document date range filter when set -->
+    <template
+        id="report_open_items_filters_document_date"
+        inherit_id="account_financial_report.report_open_items_filters"
+    >
+        <xpath expr="//div[hasclass('act_as_row', 'labels')]" position="inside">
+            <div class="act_as_cell">Document date filter</div>
+        </xpath>
+        <xpath
+            expr="//div[hasclass('act_as_row')][not(hasclass('labels'))]"
+            position="inside"
+        >
+            <div class="act_as_cell">
+                <span t-if="document_date_from or document_date_to">
+                    <t t-out="document_date_from" />
+                    -
+                    <t t-out="document_date_to" />
+                </span>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- Header line: rename Date to Accounting Date and add Document Date -->
+    <template
+        id="report_open_items_lines_header_document_date"
+        inherit_id="account_financial_report.report_open_items_lines_header"
+    >
+        <xpath expr="//div[hasclass('first_column')]" position="replace">
+            <div class="act_as_cell first_column" style="width: 5.51%;">
+                Accounting Date
+            </div>
+        </xpath>
+        <xpath expr="//div[hasclass('first_column')]" position="after">
+            <div class="act_as_cell" style="width: 5.51%;">Document Date</div>
+        </xpath>
+        <xpath expr="//div[@style='width: 24.5%;']" position="attributes">
+            <attribute name="style">width: 18.99%;</attribute>
+        </xpath>
+    </template>
+
+    <!-- Move lines: add the document date (invoice date) cell -->
+    <template
+        id="report_open_items_lines_document_date"
+        inherit_id="account_financial_report.report_open_items_lines"
+    >
+        <xpath expr="//div[hasclass('act_as_row', 'lines')]/div[1]" position="after">
+            <div class="act_as_cell left">
+                <span
+                    t-if="line['invoice_date']"
+                    t-out="line['invoice_date'].strftime('%d/%m/%Y')"
+                />
+            </div>
+        </xpath>
+    </template>
+</odoo>

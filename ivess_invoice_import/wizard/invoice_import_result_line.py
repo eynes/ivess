@@ -28,17 +28,24 @@ class IvessInvoiceImportResultLine(models.TransientModel):
     comprobante_anulado = fields.Boolean(string="Anulado en origen")
     estado_proyectado = fields.Selection(
         [
-            ("draft", "A crear en Borrador"),
+            ("draft", "A crear y Registrar"),
             ("cancel", "A crear y Cancelar"),
         ],
         string="Estado proyectado",
         compute="_compute_estado_proyectado",
     )
+    cae = fields.Char(string="CAE")
     cliente_codigo = fields.Char(string="Código de cliente (origen)")
     cliente_razon_social = fields.Char(string="Razón social (origen)")
     cliente_documento = fields.Char(string="CUIT/documento (origen)")
     partner_id = fields.Many2one("res.partner", string="Cliente")
     voucher_type_id = fields.Many2one("res.voucher.type", string="Tipo de comprobante Odoo")
+    journal_id = fields.Many2one(
+        "account.journal",
+        string="Diario",
+        help="Diario de ventas resuelto automáticamente a partir de la"
+        " columna 'pto vta' del Excel.",
+    )
     detail_line_ids = fields.One2many(
         "ivess.invoice.import.detail.line",
         "result_line_id",

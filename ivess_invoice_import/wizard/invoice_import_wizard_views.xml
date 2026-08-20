@@ -10,7 +10,6 @@
                 <group invisible="state != 'upload'">
                     <field name="filename" invisible="1"/>
                     <field name="file" filename="filename"/>
-                    <field name="sale_journal_id"/>
                 </group>
 
                 <!-- Paso 2: previsualización -->
@@ -22,12 +21,14 @@
                 <field name="result_line_ids" invisible="state not in ('preview', 'done')">
                     <list decoration-danger="has_error and resultado != 'ok'" decoration-success="resultado == 'ok'">
                         <field name="comprobante_display"/>
+                        <field name="journal_id" optional="show"/>
                         <field name="partner_id"/>
                         <field name="cliente_razon_social" invisible="partner_id"/>
                         <field name="cliente_documento" invisible="partner_id"/>
                         <field name="cliente_codigo" optional="show"/>
                         <field name="fecha"/>
                         <field name="importe_total" sum="Total"/>
+                        <field name="cae" optional="show"/>
                         <field name="estado_proyectado" invisible="resultado != 'pending'"/>
                         <field name="resultado" invisible="resultado == 'pending'" decoration-success="resultado == 'ok'" decoration-danger="resultado == 'error'"/>
                         <field name="detail_count"/>
@@ -38,12 +39,14 @@
                     <form string="Factura">
                         <group col="4">
                             <field name="comprobante_display"/>
+                            <field name="journal_id"/>
                             <field name="partner_id"/>
                             <field name="cliente_razon_social" invisible="partner_id"/>
                             <field name="cliente_documento" invisible="partner_id"/>
                             <field name="fecha"/>
                             <field name="fecha_vto"/>
                             <field name="importe_total"/>
+                            <field name="cae"/>
                             <field name="estado_proyectado"/>
                             <field name="odoo_move_id"/>
                         </group>
@@ -59,6 +62,7 @@
                                 <field name="tax_id"/>
                                 <field name="importe_total_neto_item"/>
                                 <field name="cod_impuesto_especial" optional="show"/>
+                                <field name="special_tax_id" optional="show"/>
                                 <field name="monto_imp" optional="show"/>
                                 <field name="has_error" invisible="1"/>
                                 <field name="error_message" decoration-danger="has_error"/>
@@ -105,8 +109,8 @@
     <menuitem
         id="menu_ivess_invoice_import"
         name="Importar facturas de clientes (Excel)"
-        parent="account.menu_finance_entries"
+        parent="account.menu_finance_receivables"
         action="action_ivess_invoice_import_wizard"
-        sequence="100"
+        sequence="120"
     />
 </odoo>

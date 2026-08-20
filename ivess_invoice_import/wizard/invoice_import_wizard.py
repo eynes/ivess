@@ -37,6 +37,15 @@ EXPECTED_HEADERS = [
     "monto imp",
 ]
 
+# Mapeo tipo de comprobante (columna del Excel) -> res.voucher.type.doc_type,
+# para resolver el comprobante Odoo (FC=Factura, ND=Nota de Débito, NC=Nota
+# de Crédito) y derivar el move_type/is_debit_note correspondiente.
+TIPO_COMPROBANTE_DOC_TYPES = {
+    "FC": "b",
+    "ND": "dn",
+    "NC": "cn",
+}
+
 # Columnas que identifican la cabecera de la factura agrupada. Se toman del
 # PRIMER renglón visto de cada grupo (decisión confirmada: si difieren entre
 # renglones del mismo comprobante -como puede pasar con fecha vto/importe
@@ -50,6 +59,7 @@ HEADER_ONLY_FIELDS = (
     "fecha_vto",
     "importe_total",
     "comprobante_anulado",
+    "cae",
 )
 DETAIL_FIELDS = (
     "tipo_item",
@@ -126,12 +136,6 @@ class IvessInvoiceImportWizard(models.TransientModel):
 
     file = fields.Binary(string="Archivo (.xlsx)", required=True)
     filename = fields.Char(string="Nombre de archivo")
-    sale_journal_id = fields.Many2one(
-        "account.journal",
-        string="Diario de ventas",
-        domain=[("type", "=", "sale")],
-        help="Diario a usar para las facturas de cliente importadas.",
-    )
     state = fields.Selection(
         [
             ("upload", "Subir archivo"),
@@ -161,8 +165,6 @@ class IvessInvoiceImportWizard(models.TransientModel):
             raise UserError(
                 _("Falta la librería 'openpyxl' en el servidor para leer archivos .xlsx.")
             )
-        if not self.sale_journal_id:
-            raise UserError(_("Seleccioná el diario de ventas antes de previsualizar."))
 
         rows = self._read_excel_rows(base64.b64decode(self.file))
         groups = group_invoice_rows(rows)
@@ -213,6 +215,27 @@ class IvessInvoiceImportWizard(models.TransientModel):
         return float(str(value).strip())
 
     @staticmethod
+    def _digits_to_int(value):
+        digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+        return int(digits) if digits else None
+
+    @classmethod
+    def _to_numeric_str(cls, value):
+        """Normaliza a una representación canónica sin ceros a la izquierda,
+        sea que la celda venga como texto, número o número con formato
+        distinto entre renglones (ej. "0004" vs 4 vs 4.0). Se usa para
+        pto_vta/numero_comprob: son parte de la clave de agrupación de la
+        factura y también se comparan contra el diario, así que deben
+        comparar igual sin importar cómo vino la celda."""
+        digits = cls._digits_to_int(cls._to_str(value))
+        return str(digits) if digits is not None else ""
+
+    @classmethod
+    def _to_cae(cls, value):
+        text = cls._to_str(value)
+        return text if text and text != "0" else ""
+
+    @staticmethod
     def _to_date(value):
         text = str(int(value)) if isinstance(value, float) else str(value).strip()
         return datetime.strptime(text, "%Y%m%d").date()
@@ -254,8 +277,8 @@ class IvessInvoiceImportWizard(models.TransientModel):
             "_row_number": row_number,
             "tipo_comprobante": self._to_str(cell("tipo de comprobante")).upper(),
             "letra": self._to_str(cell("letra")).upper(),
-            "pto_vta": self._to_str(cell("pto vta")),
-            "numero_comprob": self._to_str(cell("numero comprob")),
+            "pto_vta": self._to_numeric_str(cell("pto vta")),
+            "numero_comprob": self._to_numeric_str(cell("numero comprob")),
             "fecha": cell("fecha"),
             "cod_cliente": self._to_str(cell("cod cliente")),
             "razon_social": self._to_str(cell("razon social")),
@@ -263,6 +286,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
             "fecha_vto": cell("fecha vto"),
             "importe_total": cell("importe total"),
             "comprobante_anulado": self._to_str(cell("comprobante anulado")).upper() == "S",
+            "cae": self._to_cae(cell("cae")),
             "tipo_item": self._to_str(cell("tipo de item")),
             "cod_art": self._to_str(cell("cod art")),
             "cantidad": cell("cantidad"),
@@ -298,21 +322,41 @@ class IvessInvoiceImportWizard(models.TransientModel):
             return
 
         errors = []
-        if group["tipo_comprobante"] != "FC":
+        doc_type = TIPO_COMPROBANTE_DOC_TYPES.get(group["tipo_comprobante"])
+        if not doc_type:
             errors.append(
                 _(
                     "tipo de comprobante '%s' no soportado (esta versión solo"
-                    " importa 'FC')."
+                    " importa %s)."
                 )
-                % group["tipo_comprobante"]
+                % (
+                    group["tipo_comprobante"],
+                    ", ".join(sorted(TIPO_COMPROBANTE_DOC_TYPES)),
+                )
             )
 
-        voucher_type = self._find_voucher_type(group["letra"])
+        voucher_type = self._find_voucher_type(group["letra"], doc_type)
         if not voucher_type:
             errors.append(
                 _("No se encontró un tipo de comprobante Odoo para la letra '%s'.")
                 % group["letra"]
             )
+
+        journal, journal_candidates = self._find_journal(group["pto_vta"])
+        if not journal:
+            if journal_candidates:
+                errors.append(
+                    _(
+                        "El punto de venta '%s' coincide con %s diarios de"
+                        " venta distintos; debe coincidir con uno solo."
+                    )
+                    % (group["pto_vta"], journal_candidates)
+                )
+            else:
+                errors.append(
+                    _("No se encontró un diario de venta para el punto de venta '%s'.")
+                    % group["pto_vta"]
+                )
 
         partner = self._find_partner(group["documento"])
         if not partner:
@@ -344,14 +388,19 @@ class IvessInvoiceImportWizard(models.TransientModel):
             group["letra"], group["pto_vta"], group["numero_comprob"]
         )
         if partner:
-            existing = self.env["account.move"].search(
-                [
-                    ("move_type", "=", "out_invoice"),
-                    ("ref", "=", comprobante_ref),
-                    ("partner_id", "=", partner.id),
-                ],
-                limit=1,
-            )
+            move_type = "out_refund" if group["tipo_comprobante"] == "NC" else "out_invoice"
+            dedup_domain = [
+                ("move_type", "=", move_type),
+                ("ref", "=", comprobante_ref),
+                ("partner_id", "=", partner.id),
+            ]
+            if move_type == "out_invoice":
+                # FC y ND comparten move_type "out_invoice": distinguirlos por
+                # is_debit_note para no confundir una con la otra en el dedup.
+                dedup_domain.append(
+                    ("is_debit_note", "=", group["tipo_comprobante"] == "ND")
+                )
+            existing = self.env["account.move"].search(dedup_domain, limit=1)
             if existing:
                 errors.append(
                     _("Ya existe una factura importada con esta clave (account.move #%s).")
@@ -373,11 +422,13 @@ class IvessInvoiceImportWizard(models.TransientModel):
                 "fecha_vto": fecha_vto,
                 "importe_total": importe_total,
                 "comprobante_anulado": bool(group["comprobante_anulado"]),
+                "cae": group["cae"],
                 "cliente_codigo": group["cod_cliente"],
                 "cliente_razon_social": group["razon_social"],
                 "cliente_documento": group["documento"],
                 "partner_id": partner.id if partner else False,
                 "voucher_type_id": voucher_type.id if voucher_type else False,
+                "journal_id": journal.id if journal else False,
                 "has_error": bool(errors),
                 "error_message": "\n".join(errors) if errors else False,
                 "detail_line_ids": detail_vals,
@@ -394,11 +445,11 @@ class IvessInvoiceImportWizard(models.TransientModel):
         account.move.ref."""
         return "%s%s%s" % (letra, (pto_vta or "").zfill(4), (numero_comprob or "").zfill(8))
 
-    def _find_voucher_type(self, letra):
-        if not letra:
+    def _find_voucher_type(self, letra, doc_type):
+        if not letra or not doc_type:
             return None
         candidates = self.env["res.voucher.type"].search(
-            [("doc_type", "=", "b"), ("denomination", "=", letra.lower())]
+            [("doc_type", "=", doc_type), ("denomination", "=", letra.lower())]
         )
         if not candidates:
             return None
@@ -408,6 +459,29 @@ class IvessInvoiceImportWizard(models.TransientModel):
         # "plano" (menor afip_code) como default razonable para una
         # importación masiva estándar.
         return candidates.sorted(key=lambda v: v.afip_code)[0]
+
+    def _find_journal(self, pto_vta):
+        """Resuelve el diario de ventas a partir del punto de venta del
+        Excel: el archivo mezcla comprobantes de más de un diario, así que
+        el diario ya no se elige a mano en el wizard. Matchea contra el
+        código AFIP del diario (account.journal.code, ver
+        get_pos_number() en l10n_ar_eynes) o, si no coincide con ninguno,
+        contra los dígitos del nombre del diario (algunos diarios están
+        identificados solo por su nombre).
+
+        :return: tupla (diario o None, cantidad de diarios candidatos).
+        """
+        pos_number = self._digits_to_int(pto_vta)
+        if pos_number is None:
+            return None, 0
+        journals = self.env["account.journal"].search(
+            [("type", "=", "sale"), ("company_id", "=", self.env.company.id)]
+        )
+        matches = journals.filtered(
+            lambda j: j.get_pos_number() == pos_number
+            or self._digits_to_int(j.name) == pos_number
+        )
+        return (matches[0] if len(matches) == 1 else None), len(matches)
 
     @staticmethod
     def _only_digits(value):
@@ -430,7 +504,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
     def _resolve_detail_lines(self, lines):
         detail_vals = []
         errors = []
-        company = self.sale_journal_id.company_id
+        company = self.env.company
 
         if not lines:
             errors.append(_("La factura no tiene líneas de detalle."))
@@ -493,6 +567,30 @@ class IvessInvoiceImportWizard(models.TransientModel):
             except (TypeError, ValueError):
                 monto_imp = 0.0
 
+            special_tax = None
+            cod_impuesto_especial = line["cod_impuesto_especial"]
+            if cod_impuesto_especial:
+                special_tax = self._find_special_tax(cod_impuesto_especial)
+                if not special_tax:
+                    line_errors.append(
+                        _(
+                            "No se encontró un mapeo para el código de impuesto"
+                            " especial '%s' (configuralo en Contabilidad >"
+                            " Configuración > Códigos de impuesto especial"
+                            " (importación))."
+                        )
+                        % cod_impuesto_especial
+                    )
+                elif not monto_imp or not importe_total_neto_item:
+                    line_errors.append(
+                        _(
+                            "El código de impuesto especial '%s' está mapeado a"
+                            " '%s' pero el monto o la base informados son 0."
+                        )
+                        % (cod_impuesto_especial, special_tax.name)
+                    )
+                    special_tax = None
+
             importe_del_renglon = self._to_str(line["importe_del_renglon"])
 
             detail_vals.append(
@@ -509,7 +607,8 @@ class IvessInvoiceImportWizard(models.TransientModel):
                         "tax_id": tax.id if tax else False,
                         "importe_total_neto_item": importe_total_neto_item,
                         "importe_del_renglon": importe_del_renglon,
-                        "cod_impuesto_especial": line["cod_impuesto_especial"],
+                        "cod_impuesto_especial": cod_impuesto_especial,
+                        "special_tax_id": special_tax.id if special_tax else False,
                         "monto_imp": monto_imp,
                         "has_error": bool(line_errors),
                         "error_message": "; ".join(line_errors) if line_errors else False,
@@ -519,6 +618,32 @@ class IvessInvoiceImportWizard(models.TransientModel):
             errors.extend(line_errors)
 
         return detail_vals, errors
+
+    def _find_special_tax(self, cod_impuesto_especial):
+        company = self.env.company
+        # 1) Percepciones: se matchean directo contra el código Bejerman
+        # cargado en el propio impuesto (Contabilidad > Impuestos > pestaña
+        # "Perceptions").
+        perception = self.env["account.tax"].search(
+            [
+                ("bejerman_code", "=", cod_impuesto_especial),
+                ("tax_group_id.group_type", "=", "perception"),
+                ("company_id", "=", company.id),
+            ],
+            limit=1,
+        )
+        if perception:
+            return perception
+        # 2) Impuestos internos (u otras percepciones sin código Bejerman
+        # cargado todavía): mapeo manual configurable.
+        mapping = self.env["ivess.invoice.import.tax.code"].search(
+            [
+                ("code", "=", cod_impuesto_especial),
+                ("company_id", "=", company.id),
+            ],
+            limit=1,
+        )
+        return mapping.tax_id if mapping else None
 
     def _find_product(self, cod_art):
         if not cod_art:
@@ -539,6 +664,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
             try:
                 with self.env.cr.savepoint():
                     move = self._create_move(result_line)
+                    move.action_post()
                     if result_line.comprobante_anulado:
                         move.button_cancel()
                 result_line.write({"resultado": "ok", "odoo_move_id": move.id})
@@ -572,14 +698,106 @@ class IvessInvoiceImportWizard(models.TransientModel):
             for detail in result_line.detail_line_ids
         ]
         move_vals = {
-            "move_type": "out_invoice",
-            "journal_id": self.sale_journal_id.id,
+            "move_type": "out_refund" if result_line.tipo_comprobante == "NC" else "out_invoice",
+            "journal_id": result_line.journal_id.id,
             "partner_id": result_line.partner_id.id,
             "voucher_type_id": result_line.voucher_type_id.id,
             "invoice_date": result_line.fecha,
             "invoice_line_ids": line_vals,
             "ref": result_line.comprobante_ref,
+            "cae": result_line.cae or False,
+            # Esta es una factura histórica, ya emitida y numerada en el
+            # sistema origen (con CAE propio): se fija el número real acá en
+            # vez de dejar que se autonumere con la secuencia del diario.
+            # posted_before=True es lo que l10n_ar_eynes chequea en
+            # account.move._post() para no pisar internal_number con el
+            # próximo valor de la secuencia (ver l10n_ar_eynes/models/
+            # account_move.py).
+            "internal_number": self._internal_number(
+                result_line.journal_id, result_line.numero_comprobante
+            ),
+            "posted_before": True,
+            # Las percepciones/impuestos internos de esta factura ya vienen
+            # calculados del sistema origen (columna "monto imp"): no
+            # queremos que l10n_ar_eynes intente recalcularlos solo con la
+            # posición fiscal del cliente.
+            "disable_perceptions": True,
         }
+        if result_line.tipo_comprobante == "ND":
+            move_vals["is_debit_note"] = True
         if result_line.fecha_vto:
             move_vals["invoice_date_due"] = result_line.fecha_vto
-        return self.env["account.move"].create(move_vals)
+        perception_vals, internal_tax_vals = self._special_tax_vals(result_line)
+        if perception_vals:
+            move_vals["perception_ids"] = perception_vals
+        if internal_tax_vals:
+            move_vals["internal_taxes_ids"] = internal_tax_vals
+
+        move = self.env["account.move"].create(move_vals)
+        # perception_ids/internal_taxes_ids por sí solos solo alimentan las
+        # pestañas "Percepciones"/"Internal taxes": para que el importe
+        # también aparezca como impuesto en la línea de factura y en el
+        # asiento hay que agregar el impuesto a las líneas (esto es lo que
+        # hace el onchange de l10n_ar_eynes en la UI, acá se replica a mano
+        # porque un create() por wizard no dispara onchanges) y ajustar el
+        # monto de la línea de impuesto generada al importe real importado.
+        if perception_vals:
+            move.invoice_line_ids.link_perception_to_move_lines()
+            move._update_perception_move_line_amount()
+        if internal_tax_vals:
+            move.invoice_line_ids.link_internal_taxes_to_move_lines(
+                move.internal_taxes_ids.mapped("tax_id")
+            )
+            move._update_internal_taxes_move_line_amount()
+        return move
+
+    @staticmethod
+    def _internal_number(journal, numero_comprobante):
+        return "%s-%s" % (journal.get_pos_number(), (numero_comprobante or "").zfill(8))
+
+    @staticmethod
+    def _special_tax_vals(result_line):
+        """Agrega, por impuesto especial resuelto (percepción IIBB/IVA,
+        impuesto interno), una línea a perception_ids o internal_taxes_ids
+        con base y monto sumados de todas las líneas de detalle que
+        comparten ese impuesto (no se recalculan: se toman tal cual del
+        archivo origen)."""
+        perception_vals = []
+        internal_tax_vals = []
+        special_lines = result_line.detail_line_ids.filtered("special_tax_id")
+        for tax in special_lines.mapped("special_tax_id"):
+            lines = special_lines.filtered(lambda d, tax=tax: d.special_tax_id == tax)
+            base = sum(lines.mapped("importe_total_neto_item"))
+            amount = sum(lines.mapped("monto_imp"))
+            if tax.tax_group_id.group_type == "internals":
+                internal_tax_vals.append(
+                    (
+                        0,
+                        0,
+                        {
+                            # "name" es un campo compute/store, pero el compute no
+                            # se dispara de forma confiable al crear vía comandos
+                            # (0,0,{...}) anidados en account.move.create(): se
+                            # informa explícito, igual que hace l10n_ar_eynes.
+                            "name": tax.name,
+                            "tax_id": tax.id,
+                            "base": base,
+                            "amount": amount,
+                        },
+                    )
+                )
+            else:
+                perception_vals.append(
+                    (
+                        0,
+                        0,
+                        {
+                            "name": tax.name,
+                            "perception_id": tax.id,
+                            "partner_id": result_line.partner_id.id,
+                            "base": base,
+                            "amount": amount,
+                        },
+                    )
+                )
+        return perception_vals, internal_tax_vals

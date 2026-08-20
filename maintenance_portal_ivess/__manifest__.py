@@ -23,6 +23,11 @@
         'views/maintenance_views.xml',
         'views/maintenance_portal_templates.xml',
     ],
+    'assets': {
+        'web.assets_frontend': [
+            'maintenance_portal_ivess/static/src/js/portal_filter_bar.js',
+        ],
+    },
     'installable': True,
     'auto_install': False,
     'license': 'LGPL-3',

@@ -25,10 +25,19 @@ class IvessInvoiceImportDetailLine(models.TransientModel):
         " cantidad x precio unitario x impuesto).",
     )
     cod_impuesto_especial = fields.Char(string="Código impuesto especial")
+    special_tax_id = fields.Many2one(
+        "account.tax",
+        string="Impuesto especial (mapeado)",
+        help="Impuesto Odoo resuelto a partir de 'Código impuesto especial'"
+        " según el mapeo configurado en Contabilidad > Configuración >"
+        " Códigos de impuesto especial (importación).",
+    )
     monto_imp = fields.Float(
         string="Monto impuesto especial",
-        help="Informativo: este importe no se aplica a la factura, esta"
-        " versión del importador no soporta impuestos especiales.",
+        help="Importe informado en el origen para 'cod impuesto especial'."
+        " Si el código está mapeado a un impuesto Odoo, este importe se usa"
+        " tal cual como monto de la percepción/impuesto interno agregado a"
+        " la factura (no se recalcula a partir de una alícuota).",
     )
     has_error = fields.Boolean(string="Con error")
     error_message = fields.Char(string="Detalle del error")

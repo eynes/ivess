@@ -36,6 +36,20 @@ class AccountMove(models.Model):
         journal_due_date = self.journal_id.due_date
         document_name = "%s (ID: %s)" % (self.display_name or _("(no name)"), self.id)
 
+        if self.invoice_date and self.date and self.invoice_date > self.date:
+            return {
+                "invalid": True,
+                "message": _(
+                    "Document: %s\n"
+                    "The invoice date (%s) cannot be later than the accounting date (%s)."
+                )
+                % (
+                    document_name,
+                    self.invoice_date.strftime("%d-%m-%Y"),
+                    self.date.strftime("%d-%m-%Y"),
+                ),
+            }
+
         if not journal_due_date:
             return {
                 "invalid": True,
