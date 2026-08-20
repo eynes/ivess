@@ -35,6 +35,7 @@ class IvessInvoiceImportResultLine(models.TransientModel):
         compute="_compute_estado_proyectado",
     )
     cae = fields.Char(string="CAE")
+    vto_cae = fields.Date(string="Vto. CAE")
     cliente_codigo = fields.Char(string="Código de cliente (origen)")
     cliente_razon_social = fields.Char(string="Razón social (origen)")
     cliente_documento = fields.Char(string="CUIT/documento (origen)")

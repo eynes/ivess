@@ -47,6 +47,7 @@
                             <field name="fecha_vto"/>
                             <field name="importe_total"/>
                             <field name="cae"/>
+                            <field name="vto_cae"/>
                             <field name="estado_proyectado"/>
                             <field name="odoo_move_id"/>
                         </group>
@@ -61,12 +62,32 @@
                                 <field name="tasa_iva"/>
                                 <field name="tax_id"/>
                                 <field name="importe_total_neto_item"/>
-                                <field name="cod_impuesto_especial" optional="show"/>
-                                <field name="special_tax_id" optional="show"/>
-                                <field name="monto_imp" optional="show"/>
+                                <field name="special_tax_display" optional="show" string="Imp. especiales/internos"/>
                                 <field name="has_error" invisible="1"/>
                                 <field name="error_message" decoration-danger="has_error"/>
                             </list>
+                            <form string="Línea de detalle">
+                                <group col="4">
+                                    <field name="tipo_item"/>
+                                    <field name="cod_art"/>
+                                    <field name="product_id"/>
+                                    <field name="cantidad"/>
+                                    <field name="precio_unitario"/>
+                                    <field name="tasa_iva"/>
+                                    <field name="tax_id"/>
+                                    <field name="importe_total_neto_item"/>
+                                    <field name="importe_del_renglon"/>
+                                </group>
+                                <field name="error_message" invisible="not has_error"/>
+                                <field name="special_tax_ids">
+                                    <list editable="bottom">
+                                        <field name="cod"/>
+                                        <field name="tax_id"/>
+                                        <field name="base"/>
+                                        <field name="monto"/>
+                                    </list>
+                                </field>
+                            </form>
                         </field>
                     </form>
                 </field>

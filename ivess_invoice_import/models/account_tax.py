@@ -7,9 +7,9 @@ class AccountTax(models.Model):
     bejerman_code = fields.Char(
         string="Código Bejerman",
         help="Código con el que esta percepción está identificada en el"
-        " sistema Bejerman del cliente. Se usa para matchear la columna"
-        " 'cod impuesto especial' del Excel de importación de facturas con"
-        " la percepción correspondiente.",
+        " sistema Bejerman del cliente. Se usa para matchear las columnas"
+        " 'cod impuesto interno' / 'cod imp especiales*' del Excel de"
+        " importación de facturas con la percepción correspondiente.",
     )
 
     _sql_constraints = [
