@@ -17,10 +17,10 @@
         <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Mapeá cada código de la columna "cod impuesto especial" del
-                Excel de importación (percepción IIBB, percepción de IVA,
-                impuestos internos, etc.) con el impuesto de Odoo
-                correspondiente.
+                Mapeá cada código de las columnas "cod impuesto interno" /
+                "cod imp especiales*" del Excel de importación (percepción
+                IIBB, percepción de IVA, impuestos internos, etc.) con el
+                impuesto de Odoo correspondiente.
             </p>
         </field>
     </record>

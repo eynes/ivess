@@ -15,8 +15,9 @@
           res.partner.vat (contra la columna "documento" del Excel) y
           producto por product.product.default_code (contra "cod art"), y
           deduplica contra account.move.ref. Los impuestos especiales
-          (percepciones de IIBB/IVA, impuestos internos, columna "cod
-          impuesto especial") se resuelven contra el mapeo configurable en
+          (percepciones de IIBB/IVA, impuestos internos, columnas "cod
+          impuesto interno" / "cod imp especiales*") se resuelven, cada uno
+          por separado y por línea, contra el mapeo configurable en
           Contabilidad > Configuración > Códigos de impuesto especial
           (importación) y se cargan tal cual (base/monto del Excel) en
           account.move.perception_ids / internal_taxes_ids.
