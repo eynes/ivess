@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+import re
 from collections import defaultdict
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
+
+CODIGO_AGUAS_REGEX = re.compile(r"^[A-Za-z0-9]{6}$")
 
 
 class ResPartner(models.Model):
@@ -9,6 +12,11 @@ class ResPartner(models.Model):
 
     requiere_comprobante = fields.Boolean(
         string="Requiere Factura",
+    )
+    codigo_aguas = fields.Char(
+        string="Código Aguas",
+        size=6,
+        copy=False,
     )
     # state_id = fields.Many2one(
     #     required=True,
@@ -62,6 +70,27 @@ class ResPartner(models.Model):
 
             partner.unbilled_balance = unbilled
             partner.final_balance = total_orders - payment_totals.get(partner.id, 0.0)
+
+    @api.constrains("codigo_aguas")
+    def _check_codigo_aguas(self):
+        for partner in self:
+            if not partner.codigo_aguas:
+                continue
+            if not CODIGO_AGUAS_REGEX.match(partner.codigo_aguas):
+                raise ValidationError(
+                    _("El Código Aguas debe tener exactamente 6 caracteres alfanuméricos (letras y números).")
+                )
+            duplicate = self.with_context(active_test=False).search(
+                [
+                    ("codigo_aguas", "=", partner.codigo_aguas),
+                    ("id", "!=", partner.id),
+                ],
+                limit=1,
+            )
+            if duplicate:
+                raise ValidationError(
+                    _("Ya existe un contacto con el Código Aguas '%s'.") % partner.codigo_aguas
+                )
 
     def write(self, vals):
         self._check_pending_water_containers_before_archiving(vals)
