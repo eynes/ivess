@@ -394,11 +394,14 @@ class IvessInvoiceImportWizard(models.TransientModel):
                     % (group["letra"], group["pto_vta"])
                 )
 
-        partner = self._find_partner(group["documento"])
+        partner = self._find_partner(group["cod_cliente"], group["documento"])
         if not partner:
             errors.append(
-                _("No se encontró un cliente con CUIT/documento '%s' (%s).")
-                % (group["documento"], group["razon_social"])
+                _(
+                    "No se encontró un cliente con código Bejerman '%s' ni con"
+                    " CUIT/documento '%s' (%s)."
+                )
+                % (group["cod_cliente"], group["documento"], group["razon_social"])
             )
 
         try:
@@ -515,7 +518,12 @@ class IvessInvoiceImportWizard(models.TransientModel):
         recién ahí se matchea el número: contra el código AFIP del diario
         (account.journal.code, ver get_pos_number() en l10n_ar_eynes) o, si
         no coincide con ninguno, contra los dígitos del nombre del diario
-        (algunos diarios están identificados solo por su nombre).
+        (algunos diarios están identificados solo por su nombre: el campo
+        "code" puede no tener nada que ver con el punto de venta real, ej.
+        un diario "9999" con code="INV1"). NO existe account.journal.
+        l10n_ar_afip_pos_number en esta instalación: el módulo Odoo
+        oficial "l10n_ar" está desinstalado, solo corre "l10n_ar_eynes"
+        (fork propio), que no tiene ese campo.
 
         :return: tupla (diario o None, cantidad de diarios candidatos).
         """
@@ -539,7 +547,17 @@ class IvessInvoiceImportWizard(models.TransientModel):
     def _only_digits(value):
         return "".join(ch for ch in (value or "") if ch.isdigit())
 
-    def _find_partner(self, documento):
+    def _find_partner(self, cod_cliente, documento):
+        """Resuelve el cliente por su código Bejerman (columna "cod cliente"
+        del Excel, matcheado contra res.partner.codigo_bejerman) y, si no
+        matchea, por CUIT/documento (res.partner.vat) como respaldo."""
+        if cod_cliente:
+            candidates = self.env["res.partner"].search(
+                [("codigo_bejerman", "=", cod_cliente)]
+            )
+            if len(candidates) == 1:
+                return candidates[0]
+
         digits = self._only_digits(documento)
         if not digits:
             return None
@@ -764,6 +782,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
         return self._reopen()
 
     def _create_move(self, result_line):
+        invoice_wide_tax_ids = self._invoice_wide_special_tax_ids(result_line)
         line_vals = [
             (
                 0,
@@ -773,17 +792,8 @@ class IvessInvoiceImportWizard(models.TransientModel):
                     "name": detail.product_id.display_name,
                     "quantity": detail.cantidad,
                     "price_unit": detail.precio_unitario,
-                    # Cada línea lleva su propio IVA más, si corresponde, los
-                    # impuestos especiales/internos matcheados PARA ESA LÍNEA
-                    # (detail.special_tax_ids): así quedan asociados solo a
-                    # la línea que los trajo en el Excel, no a toda la
-                    # factura (ver _resolve_special_taxes).
                     "tax_ids": [
-                        (
-                            6,
-                            0,
-                            [detail.tax_id.id] + detail.special_tax_ids.tax_id.ids,
-                        )
+                        (6, 0, self._line_tax_ids(detail, invoice_wide_tax_ids))
                     ],
                 },
             )
@@ -807,7 +817,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
             # próximo valor de la secuencia (ver l10n_ar_eynes/models/
             # account_move.py).
             "internal_number": self._internal_number(
-                result_line.journal_id, result_line.numero_comprobante
+                result_line.pto_vta, result_line.numero_comprobante
             ),
             "posted_before": True,
             # Las percepciones/impuestos internos de esta factura ya vienen
@@ -841,16 +851,19 @@ class IvessInvoiceImportWizard(models.TransientModel):
             move.invoice_line_ids.filtered(lambda l: l.display_type == "product"),
             result_line.detail_line_ids,
         ):
-            line.tax_ids = [(6, 0, [detail.tax_id.id] + detail.special_tax_ids.tax_id.ids)]
+            line.tax_ids = [(6, 0, self._line_tax_ids(detail, invoice_wide_tax_ids))]
         # perception_ids/internal_taxes_ids por sí solos solo alimentan las
         # pestañas "Percepciones"/"Internal taxes": el importe informado ahí
         # también tiene que quedar como monto de la línea de impuesto real
         # del asiento (generada por Odoo a partir del tax_ids de cada línea,
         # reescrito arriba). NO se usan acá los helpers
         # link_perception_to_move_lines()/link_internal_taxes_to_move_lines()
-        # de l10n_ar_eynes: con disable_perceptions=True esos aplican TODAS
-        # las percepciones de la factura a TODAS las líneas de producto, sin
-        # respetar a qué línea vino asociada cada una en el Excel.
+        # de l10n_ar_eynes: con disable_perceptions=True esos recalculan la
+        # aplicabilidad de percepciones por posición fiscal/cuenta contable
+        # y las aplican a TODAS las líneas de producto sin distinguir
+        # percepción de IVA (por línea) de percepción IIBB (toda la
+        # factura); acá se arma explícito el tax_ids correcto por línea
+        # (ver _line_tax_ids) tal como matcheamos arriba.
         if perception_vals:
             move._update_perception_move_line_amount()
         if internal_tax_vals:
@@ -858,8 +871,48 @@ class IvessInvoiceImportWizard(models.TransientModel):
         return move
 
     @staticmethod
-    def _internal_number(journal, numero_comprobante):
-        return "%s-%s" % (journal.get_pos_number(), (numero_comprobante or "").zfill(8))
+    def _invoice_wide_special_tax_ids(result_line):
+        """IDs de los impuestos especiales que aplican a TODA la factura y
+        no solo a la línea del Excel donde se detectaron: las percepciones
+        de IIBB (ARBA/AGIP-CABA, account.tax.retention_type ==
+        "gross_income"). A diferencia del impuesto interno y la percepción
+        de IVA (que sí son por línea de producto), IIBB se calcula sobre el
+        neto de toda la factura, así que su tax_id debe quedar en el
+        tax_ids de todas las líneas de producto del asiento (ver
+        _line_tax_ids) para que Odoo calcule bien la base de esa línea de
+        impuesto (tax_base_amount / tax_totals)."""
+        special_taxes = result_line.detail_line_ids.mapped("special_tax_ids")
+        return special_taxes.filtered(
+            lambda s: s.tax_id.retention_type == "gross_income"
+        ).tax_id.ids
+
+    @staticmethod
+    def _line_tax_ids(detail, invoice_wide_tax_ids):
+        """IDs de impuesto a asignar a una línea de producto del asiento: su
+        IVA, sus impuestos especiales/internos propios que NO sean IIBB
+        (impuesto interno y percepción de IVA: van por línea, ver
+        _resolve_special_taxes) y las percepciones IIBB de toda la factura
+        (invoice_wide_tax_ids, ver _invoice_wide_special_tax_ids)."""
+        per_line_tax_ids = detail.special_tax_ids.filtered(
+            lambda s: s.tax_id.retention_type != "gross_income"
+        ).tax_id.ids
+        return list(
+            dict.fromkeys([detail.tax_id.id] + per_line_tax_ids + invoice_wide_tax_ids)
+        )
+
+    @staticmethod
+    def _internal_number(pto_vta, numero_comprobante):
+        # Se arma con el "pto vta" tal como vino del Excel (ya validado
+        # contra el diario en _find_journal), NO releyendo el diario: los
+        # campos de punto de venta del diario (account.journal.code) pueden
+        # no tener relación con el punto de venta real (ver comentario en
+        # _find_journal, ej. diario "9999" con code="INV1"). Mismo padding
+        # que _comprobante_ref/comprobante_display (zfill(4) en el punto de
+        # venta), ya que replica el formato compuesto del sistema origen.
+        return "%s-%s" % (
+            (pto_vta or "").zfill(4),
+            (numero_comprobante or "").zfill(8),
+        )
 
     @staticmethod
     def _special_tax_vals(result_line):
