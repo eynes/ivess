@@ -51,15 +51,11 @@ class ProductTemplate(models.Model):
 
     authorize_for_technical_service = fields.Boolean(string="Authorize for Technical Service")
 
-    @api.constrains('purchase_ok', 'categ_id', 'state')
+    @api.constrains('purchase_ok', 'state')
     def _check_purchase_required_fields(self):
         for rec in self:
             if not rec.purchase_ok:
                 continue
-            if not rec.categ_id:
-                raise ValidationError(
-                    _("Product Category is required for purchase products.")
-                )
             if not rec.state:
                 raise ValidationError(
                     _("Status is required for purchase products.")
