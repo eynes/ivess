@@ -5,6 +5,7 @@ Loop maneja el circuito y Odoo responde: Loop consulta qué equipos hay
 disponibles en expedición, valida las series que va escaneando y avisa qué
 subió al camión. El stock se mueve en el momento de la llamada.
 """
+import hashlib
 import logging
 
 from odoo import SUPERUSER_ID, api, models
@@ -39,6 +40,18 @@ class AguasFCOutbound(models.AbstractModel):
             raise UserError(f'No está configurada la ubicación Expedición FC en la empresa {company.name}.')
         if not company.aguas_fc_salida_picking_type_id:
             raise UserError(f'No está configurado el tipo de operación Salida FC en la empresa {company.name}.')
+
+    @api.model
+    def _referencia_derivada(self, idreparto, equipos, fecha):
+        """Referencia estable a partir del contenido del pedido.
+
+        Se usa cuando Loop no manda su propio identificador: mismo reparto,
+        misma fecha y mismas series dan siempre la misma referencia, de modo
+        que un reintento del pedido se reconoce como repetido igual.
+        """
+        series = sorted((s or '').strip() for s in equipos)
+        base = '%s|%s|%s' % (fecha, idreparto, ','.join(series))
+        return 'AUTO-%s' % hashlib.sha1(base.encode('utf-8')).hexdigest()[:16]
 
     @api.model
     def _buscar_lote(self, product, serial):
@@ -181,11 +194,15 @@ class AguasFCOutbound(models.AbstractModel):
         company = self._get_company(dest_location)
         self._check_config(company)
 
+        # referencia_externa es opcional: si Loop no manda la suya, se deriva del
+        # contenido del pedido para no perder la proteccion contra reintentos.
+        if not referencia_externa:
+            referencia_externa = self._referencia_derivada(idreparto, equipos, fecha)
+
         # Idempotencia: si Loop reintenta el mismo pedido no se duplica el stock.
-        # Sin referencia_externa no hay nada contra qué deduplicar.
         anterior = self.env['stock.picking'].search(
             [('aguas_fc_ref_externa', '=', referencia_externa)], limit=1
-        ) if referencia_externa else self.env['stock.picking']
+        )
         if anterior:
             _logger.info(
                 'Aguas FC: referencia %s ya registrada en %s, no se duplica',
@@ -198,6 +215,7 @@ class AguasFCOutbound(models.AbstractModel):
                 'picking_name': anterior.name,
                 'seriales_procesados': len(anterior.move_line_ids),
                 'origin': anterior.origin,
+                'referencia_externa': referencia_externa,
             }
 
         product = company.aguas_fc_product_id
@@ -283,6 +301,7 @@ class AguasFCOutbound(models.AbstractModel):
             'picking_name': picking.name,
             'seriales_procesados': len(lots),
             'origin': origin,
+            'referencia_externa': referencia_externa,
         }
 
     # ------------------------------------------------------------------
