@@ -1,0 +1,81 @@
+<odoo>
+    <record id="view_res_partner_import_wizard_form" model="ir.ui.view">
+        <field name="name">res.partner.import.wizard.form</field>
+        <field name="model">res.partner.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Importar clientes (maestro) desde Excel">
+                <field name="state" invisible="1" />
+
+                <!-- Paso 1: carga de archivo -->
+                <group invisible="state != 'upload'">
+                    <field name="filename" invisible="1" />
+                    <field name="file" filename="filename" />
+                    <field name="row_limit" />
+                </group>
+
+                <!-- Paso 2: análisis previo (matcheo de many2one, exclusiones) -->
+                <group invisible="state not in ('preview', 'done')" col="4">
+                    <field name="total_rows" />
+                    <field name="rows_to_insert" />
+                    <field name="rows_skipped" />
+                    <field name="geo_ok_count" />
+                    <field name="geo_blank_count" />
+                    <field name="inserted_count" invisible="state != 'done'" />
+                </group>
+                <field name="issue_ids" invisible="state not in ('preview', 'done')">
+                    <list
+            decoration-danger="blocking"
+            create="false"
+            edit="false"
+            delete="false"
+          >
+                        <field name="category" />
+                        <field name="value" />
+                        <field name="row_count" sum="Filas" />
+                        <field name="blocking" invisible="1" />
+                    </list>
+                </field>
+
+                <footer>
+                    <button
+            name="action_preview"
+            type="object"
+            string="Analizar"
+            class="btn-primary"
+            invisible="state != 'upload'"
+          />
+                    <button
+            name="action_confirm"
+            type="object"
+            string="Confirmar importación"
+            class="btn-primary"
+            invisible="state != 'preview'"
+            confirm="Se van a crear los clientes de las filas sin exclusión (ver 'Filas a importar'). ¿Confirmar?"
+          />
+                    <button
+            name="action_back_to_upload"
+            type="object"
+            string="Volver"
+            invisible="state != 'preview'"
+          />
+                    <button string="Cerrar" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_res_partner_import_wizard" model="ir.actions.act_window">
+        <field name="name">Importar clientes (maestro) desde Excel</field>
+        <field name="res_model">res.partner.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+    id="menu_res_partner_import_wizard"
+    name="Importar clientes (maestro) desde Excel"
+    parent="contacts.res_partner_menu_config"
+    action="action_res_partner_import_wizard"
+    sequence="100"
+  />
+</odoo>
