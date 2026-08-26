@@ -10,6 +10,7 @@
             <field name="categ_id" position="after">
                 <field name="state" required="purchase_ok"/>
                 <field name="abbreviation" invisible="product_variant_count &gt; 1"/>
+                <field name="codigo_bejerman"/>
                 <field name="order"/>
                 <field name="is_returnable"/>
                 <field name="is_frio_calor"/>
