@@ -95,18 +95,6 @@
                             </select>
                         </div>
                         <div class="col-6 col-md-2">
-                            <label class="form-label small fw-semibold mb-1" for="o_maint_f_team_id">Equipo de mantenimiento</label>
-                            <select name="f_team_id" id="o_maint_f_team_id" class="form-select form-select-sm">
-                                <option value="">— Todos —</option>
-                                <t t-foreach="filter_options['team_options']" t-as="team">
-                                    <option t-att-value="team.id"
-                                            t-att-selected="'selected' if active_filters.get('f_team_id') == team.id else None">
-                                        <t t-esc="team.name"/>
-                                    </option>
-                                </t>
-                            </select>
-                        </div>
-                        <div class="col-6 col-md-2">
                             <label class="form-label small fw-semibold mb-1" for="o_maint_f_date_from">Desde</label>
                             <input type="date" name="f_date_from" id="o_maint_f_date_from"
                                    class="form-control form-control-sm"
@@ -146,10 +134,6 @@
                                 <t t-esc="chip['label']"/> <i class="fa fa-times ms-1"/>
                             </a>
                             <a t-elif="chip['kind'] == 'equipment'" t-att-href="request.httprequest.path + '?' + keep_query('*', f_equipment_id=None)"
-                               class="badge rounded-pill text-bg-light border text-dark text-decoration-none">
-                                <t t-esc="chip['label']"/> <i class="fa fa-times ms-1"/>
-                            </a>
-                            <a t-elif="chip['kind'] == 'team'" t-att-href="request.httprequest.path + '?' + keep_query('*', f_team_id=None)"
                                class="badge rounded-pill text-bg-light border text-dark text-decoration-none">
                                 <t t-esc="chip['label']"/> <i class="fa fa-times ms-1"/>
                             </a>
