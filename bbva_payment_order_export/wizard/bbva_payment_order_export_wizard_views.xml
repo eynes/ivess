@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="bbva_payment_order_export_wizard_view_form" model="ir.ui.view">
+        <field name="name">bbva.payment.order.export.wizard.view.form</field>
+        <field name="model">bbva.payment.order.export.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Exportar Pago a Proveedores BBVA">
+                <span>
+                    Genera el archivo TXT posicional para el servicio "Pago a
+                    Proveedores" de BBVA. Cada orden de pago debe tener al
+                    menos un cheque/Echeq asociado; si tiene más de uno, se
+                    incluye un registro 025 por cada instrumento adicional.
+                </span>
+                <group>
+                    <group string="Selección">
+                        <field name="company_id" />
+                        <field
+                            name="payment_order_ids"
+                            widget="many2many_tags"
+                        />
+                        <field name="fecha_proceso" />
+                    </group>
+                    <group string="Cuenta de débito BBVA">
+                        <field name="bank_journal_id" />
+                        <field name="suc_cta_debito" />
+                        <field name="dv_cta_debito" />
+                        <field name="nro_cta_debito" />
+                        <field name="contrato_prov" />
+                    </group>
+                </group>
+                <field
+                    name="preview_txt"
+                    readonly="1"
+                    widget="text"
+                    invisible="not preview_txt"
+                    style="font-family: monospace; white-space: pre;"
+                />
+                <footer>
+                    <button
+                        name="action_preview"
+                        type="object"
+                        string="Previsualizar"
+                    />
+                    <button
+                        name="action_download"
+                        type="object"
+                        string="Descargar TXT"
+                        class="oe_highlight"
+                    />
+                    <button string="Cerrar" special="cancel" class="oe_link" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_bbva_payment_order_export_wizard" model="ir.actions.act_window">
+        <field name="name">Exportar Pago a Proveedores BBVA</field>
+        <field name="res_model">bbva.payment.order.export.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_bbva_payment_order_export"
+        name="Exportar a BBVA"
+        action="action_bbva_payment_order_export_wizard"
+        parent="account.menu_finance_payables"
+        sequence="5"
+    />
+
+    <record id="action_bbva_payment_order_export_wizard_from_list" model="ir.actions.act_window">
+        <field name="name">Exportar a BBVA</field>
+        <field name="res_model">bbva.payment.order.export.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_payment_order_ids': active_ids}</field>
+        <field name="binding_model_id" ref="l10n_ar_eynes.model_account_payment_order" />
+        <field name="binding_view_types">list</field>
+    </record>
+
+</odoo>

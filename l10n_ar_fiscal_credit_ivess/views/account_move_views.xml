@@ -18,6 +18,14 @@
                     not parent.show_fiscal_credit or parent.move_type in ('out_invoice', 'out_refund')
                 </attribute>
             </xpath>
+
+            <!-- En facturas de proveedor, CAE y su vencimiento son obligatorios -->
+            <xpath expr="//field[@name='cae']" position="attributes">
+                <attribute name="required">move_type in ('in_invoice', 'in_refund')</attribute>
+            </xpath>
+            <xpath expr="//field[@name='cae_due_date']" position="attributes">
+                <attribute name="required">move_type in ('in_invoice', 'in_refund')</attribute>
+            </xpath>
         </field>
     </record>
 

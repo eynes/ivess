@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': "Sale Custom Ivess",
-    'version': '19.0.0.0.15',
+    'version': '19.0.0.0.16',
     'description': """
     """,
     'author': "Eynes",

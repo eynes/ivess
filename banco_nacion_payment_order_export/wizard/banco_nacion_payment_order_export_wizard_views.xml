@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="banco_nacion_payment_order_export_wizard_view_form" model="ir.ui.view">
+        <field name="name">banco.nacion.payment.order.export.wizard.view.form</field>
+        <field name="model">banco.nacion.payment.order.export.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Exportar a Banco Nación">
+                <span>
+                    Genera el archivo CSV de transferencias masivas a
+                    proveedores de Banco Nación. El importe exportado de
+                    cada orden es la suma de sus líneas de pago que usan el
+                    diario/cuenta de Banco Nación seleccionado, no el total
+                    de la orden.
+                </span>
+                <group>
+                    <field name="company_id" />
+                    <field name="bank_journal_id" />
+                </group>
+                <label for="payment_order_ids" string="Órdenes de pago y concepto" />
+                <field name="payment_order_ids">
+                    <list editable="bottom">
+                        <field name="number" string="Orden de pago" readonly="1" />
+                        <field name="concepto_bna" string="Concepto Banco Nación" />
+                    </list>
+                </field>
+                <field
+                    name="preview_csv"
+                    readonly="1"
+                    widget="text"
+                    invisible="not preview_csv"
+                    style="font-family: monospace; white-space: pre;"
+                />
+                <footer>
+                    <button
+                        name="action_preview"
+                        type="object"
+                        string="Previsualizar"
+                    />
+                    <button
+                        name="action_download"
+                        type="object"
+                        string="Descargar CSV"
+                        class="oe_highlight"
+                    />
+                    <button string="Cerrar" special="cancel" class="oe_link" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_banco_nacion_payment_order_export_wizard" model="ir.actions.act_window">
+        <field name="name">Exportar a Banco Nación</field>
+        <field name="res_model">banco.nacion.payment.order.export.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_banco_nacion_payment_order_export"
+        name="Exportar a Banco Nación"
+        action="action_banco_nacion_payment_order_export_wizard"
+        parent="account.menu_finance_payables"
+        sequence="6"
+    />
+
+    <record id="action_banco_nacion_payment_order_export_wizard_from_list" model="ir.actions.act_window">
+        <field name="name">Exportar a Banco Nación</field>
+        <field name="res_model">banco.nacion.payment.order.export.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_payment_order_ids': active_ids}</field>
+        <field name="binding_model_id" ref="l10n_ar_eynes.model_account_payment_order" />
+        <field name="binding_view_types">list</field>
+    </record>
+
+</odoo>
