@@ -1,4 +1,4 @@
-from odoo import models, fields, _, api
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
 
@@ -29,13 +29,26 @@ class ProductTemplate(models.Model):
     exclude_from_regular = fields.Boolean(string="Exclude from Regular")
     show_in_app = fields.Boolean(string="Mostrar en App")
     is_promo = fields.Boolean(string="Is Promo")
+    codigo_bejerman = fields.Char(
+        string='Código Bejerman',
+        help=_(
+            'Código con el que este producto está identificado en el'
+            ' sistema Bejerman del cliente.'
+        ),
+        copy=False,
+    )
 
     _sql_constraints = [
         (
             'unique_abbreviation',
             'unique(abbreviation)',
             _('Duplicate abbreviation.')
-        )
+        ),
+        (
+            'unique_codigo_bejerman',
+            'unique(codigo_bejerman)',
+            _('Duplicate Código Bejerman.')
+        ),
     ]
 
     state = fields.Selection(
