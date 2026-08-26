@@ -83,9 +83,7 @@ def group_payment_rows(rows):
                     "num_compr": row.get("num_compr") or "",
                     "lines": [],
                     "row_numbers": [row.get("_row_number")],
-                    "error": _(
-                        "Fila %s: faltan datos de comprobante (%s)."
-                    )
+                    "error": _("Fila %s: faltan datos de comprobante (%s).")
                     % (row.get("_row_number"), ", ".join(missing)),
                 }
             )
@@ -115,14 +113,6 @@ class IvessPaymentImportWizard(models.TransientModel):
 
     file = fields.Binary(string="Archivo (.xlsx)", required=True)
     filename = fields.Char(string="Nombre de archivo")
-    payment_journal_id = fields.Many2one(
-        "account.journal",
-        string="Diario de cobros",
-        domain=[("type", "in", ("cash", "bank"))],
-        help="Diario a usar para los cobros de cliente importados. Las"
-        " columnas 'medio de pago' y 'caja' del archivo se muestran solo a"
-        " título informativo: no determinan el diario en esta versión.",
-    )
     state = fields.Selection(
         [
             ("upload", "Subir archivo"),
@@ -151,11 +141,11 @@ class IvessPaymentImportWizard(models.TransientModel):
             raise UserError(_("Adjuntá un archivo para importar."))
         if openpyxl is None:
             raise UserError(
-                _("Falta la librería 'openpyxl' en el servidor para leer archivos .xlsx.")
+                _(
+                    "Falta la librería 'openpyxl' en el servidor para leer"
+                    " archivos .xlsx."
+                )
             )
-        if not self.payment_journal_id:
-            raise UserError(_("Seleccioná el diario de cobros antes de previsualizar."))
-
         rows = self._read_excel_rows(base64.b64decode(self.file))
         groups = group_payment_rows(rows)
 
@@ -225,7 +215,9 @@ class IvessPaymentImportWizard(models.TransientModel):
         try:
             workbook = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
         except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001
-            raise UserError(_("No se pudo leer el archivo como Excel: %s") % exc) from exc
+            raise UserError(
+                _("No se pudo leer el archivo como Excel: %s") % exc
+            ) from exc
 
         sheet = self._get_sheet(workbook)
         header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
@@ -333,8 +325,28 @@ class IvessPaymentImportWizard(models.TransientModel):
             group["letra"], group["pto_vta"], group["num_compr"]
         )
 
-        detail_vals, detail_errors, matched_partners, applied_total = self._resolve_detail_lines(
-            group["lines"]
+        journal, journal_candidates = self._find_receipt_journal()
+        if not journal:
+            if journal_candidates:
+                errors.append(
+                    _(
+                        "Hay %s diarios de tipo 'Recibo de Cobranza' en la"
+                        " compañía; debe haber uno solo para poder"
+                        " determinarlo automáticamente."
+                    )
+                    % journal_candidates
+                )
+            else:
+                errors.append(
+                    _(
+                        "No se encontró ningún diario de tipo 'Recibo de"
+                        " Cobranza' (account.journal type='receipt') en la"
+                        " compañía."
+                    )
+                )
+
+        detail_vals, detail_errors, matched_partners, applied_total = (
+            self._resolve_detail_lines(group["lines"])
         )
         errors.extend(detail_errors)
 
@@ -367,16 +379,20 @@ class IvessPaymentImportWizard(models.TransientModel):
             )
 
         if partner and not group["comprobante_anulado"]:
-            existing = self.env["account.payment"].search(
+            existing = self.env["account.payment.order"].search(
                 [
-                    ("payment_reference", "=", comprobante_ref),
+                    ("type", "=", "receipt"),
+                    ("reference", "=", comprobante_ref),
                     ("partner_id", "=", partner.id),
                 ],
                 limit=1,
             )
             if existing:
                 errors.append(
-                    _("Ya existe un cobro importado con esta clave (account.payment #%s).")
+                    _(
+                        "Ya existe un cobro importado con esta clave"
+                        " (account.payment.order #%s)."
+                    )
                     % existing.id
                 )
 
@@ -393,11 +409,61 @@ class IvessPaymentImportWizard(models.TransientModel):
                 "comprobante_anulado": bool(group["comprobante_anulado"]),
                 "cliente_codigo": group["cod_cliente"],
                 "partner_id": partner.id if partner else False,
+                "journal_id": journal.id if journal else False,
                 "has_error": bool(errors),
                 "error_message": "\n".join(errors) if errors else False,
                 "detail_line_ids": detail_vals,
             }
         )
+
+    def _find_receipt_journal(self):
+        """Resuelve el diario de Recibo de Cobranza (account.journal con
+        type='receipt') de la compañía activa.
+
+        A diferencia del diario de ventas de facturas (que sí tiene un
+        diario Odoo distinto por letra + punto de venta AFIP, ver
+        IvessInvoiceImportWizard._find_journal), un recibo de cobranza no
+        es un comprobante autorizado por AFIP: no hay múltiples diarios
+        'receipt' por letra/punto de venta para desambiguar (de hecho
+        account.journal.denomination ni siquiera tiene un valor que
+        represente la letra "X" que usa "aguas" para sus recibos, y el
+        código del diario no tiene por qué tener dígitos de punto de
+        venta). En la práctica hay un único diario 'receipt' por compañía,
+        así que se usa ese directamente.
+
+        :return: tupla (diario o None, cantidad de diarios candidatos).
+        """
+        journals = self.env["account.journal"].search(
+            [
+                ("type", "=", "receipt"),
+                ("company_id", "=", self.env.company.id),
+            ]
+        )
+        return (journals[0] if len(journals) == 1 else None), len(journals)
+
+    def _find_payment_mode_journal(self, medio_pago, caja, cod_bco, sucursal_bco):
+        """Resuelve el diario de caja/banco (payment_mode_line_ids.payment_mode_id)
+        a partir de las columnas "medio de pago" + "caja" + "cod bco" +
+        "sucursal del bco" de la línea de detalle, contra el mapeo
+        configurable ivess.payment.import.payment.method.code (mismo
+        patrón que IvessInvoiceImportWizard._find_special_tax usa para
+        impuestos especiales). "caja" desambigua medios de pago en
+        efectivo (varias cajas físicas); "cod bco" + "sucursal del bco"
+        desambiguan medios de pago bancarios cuando hay más de una cuenta
+        posible bajo el mismo medio de pago (ej. HSBC vs Mercado Pago)."""
+        if not medio_pago:
+            return None
+        mapping = self.env["ivess.payment.import.payment.method.code"].search(
+            [
+                ("medio_pago", "=", medio_pago),
+                ("caja", "=", caja or ""),
+                ("cod_bco", "=", cod_bco or ""),
+                ("sucursal_bco", "=", sucursal_bco or ""),
+                ("company_id", "=", self.env.company.id),
+            ],
+            limit=1,
+        )
+        return mapping.journal_id if mapping else None
 
     def _resolve_detail_lines(self, lines):
         detail_vals = []
@@ -426,7 +492,9 @@ class IvessPaymentImportWizard(models.TransientModel):
                 )
             else:
                 invoice_ref = IvessInvoiceImportWizard._comprobante_ref(
-                    line["letra_asoc"], line["pto_venta_asoc"], line["numero_compr_asoc"]
+                    line["letra_asoc"],
+                    line["pto_venta_asoc"],
+                    line["numero_compr_asoc"],
                 )
                 invoice = self.env["account.move"].search(
                     [("move_type", "=", "out_invoice"), ("ref", "=", invoice_ref)],
@@ -434,16 +502,49 @@ class IvessPaymentImportWizard(models.TransientModel):
                 )
                 if not invoice:
                     line_errors.append(
-                        _("No se encontró la factura '%s' para conciliar.") % invoice_ref
+                        _("No se encontró la factura '%s' para conciliar.")
+                        % invoice_ref
                     )
                 elif invoice.state != "posted":
                     line_errors.append(
                         _("La factura '%s' no está confirmada (estado: %s).")
                         % (invoice_ref, invoice.state)
                     )
+                elif importe - invoice.amount_residual > 0.01:
+                    # account.payment.order.line._check_amount_over_original()
+                    # (l10n_ar_eynes) rechaza con un error genérico en inglés
+                    # si el importe supera el saldo pendiente: se valida acá
+                    # antes para dar un error claro en la previsualización en
+                    # vez de que reviente recién al confirmar.
+                    line_errors.append(
+                        _(
+                            "El importe aplicado (%.2f) supera el saldo"
+                            " pendiente de la factura '%s' (%.2f)."
+                        )
+                        % (importe, invoice_ref, invoice.amount_residual)
+                    )
                 else:
                     matched_partners.add(invoice.partner_id)
                     applied_total += importe
+
+            payment_mode = self._find_payment_mode_journal(
+                line["medio_pago"], line["caja"], line["cod_bco"], line["sucursal_bco"]
+            )
+            if not payment_mode:
+                line_errors.append(
+                    _(
+                        "No hay un diario mapeado para el medio de pago '%s'"
+                        " + caja '%s' + cod bco '%s' + sucursal '%s'"
+                        " (configurar en Contabilidad > Configuración >"
+                        " Medios de pago (importación de cobros))."
+                    )
+                    % (
+                        line["medio_pago"],
+                        line["caja"],
+                        line["cod_bco"],
+                        line["sucursal_bco"],
+                    )
+                )
 
             try:
                 importe_movimiento = self._to_float(line["importe_movimiento"])
@@ -468,6 +569,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                         "numero_compr_asoc": line["numero_compr_asoc"],
                         "invoice_id": invoice.id if invoice else False,
                         "importe": importe,
+                        "payment_mode_id": payment_mode.id if payment_mode else False,
                         "medio_pago": line["medio_pago"],
                         "moneda": line["moneda"],
                         "tipo_cambio": line["tipo_cambio"],
@@ -475,9 +577,13 @@ class IvessPaymentImportWizard(models.TransientModel):
                         "importe_movimiento": importe_movimiento,
                         "cod_bco": line["cod_bco"],
                         "sucursal_bco": line["sucursal_bco"],
-                        "importe_movimiento_moneda_local": importe_movimiento_moneda_local,
+                        "importe_movimiento_moneda_local": (
+                            importe_movimiento_moneda_local
+                        ),
                         "has_error": bool(line_errors),
-                        "error_message": "; ".join(line_errors) if line_errors else False,
+                        "error_message": "; ".join(line_errors)
+                        if line_errors
+                        else False,
                     },
                 )
             )
@@ -504,8 +610,10 @@ class IvessPaymentImportWizard(models.TransientModel):
                 continue
             try:
                 with self.env.cr.savepoint():
-                    payment = self._create_payment(result_line)
-                result_line.write({"resultado": "ok", "odoo_payment_id": payment.id})
+                    payment_order = self._create_payment_order(result_line)
+                result_line.write(
+                    {"resultado": "ok", "odoo_payment_order_id": payment_order.id}
+                )
             except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001
                 result_line.write(
                     {
@@ -515,55 +623,94 @@ class IvessPaymentImportWizard(models.TransientModel):
                     }
                 )
 
-        self.ok_count = len(self.result_line_ids.filtered(lambda r: r.resultado == "ok"))
-        self.error_count = len(self.result_line_ids.filtered(lambda r: r.resultado == "error"))
+        self.ok_count = len(
+            self.result_line_ids.filtered(lambda r: r.resultado == "ok")
+        )
+        self.error_count = len(
+            self.result_line_ids.filtered(lambda r: r.resultado == "error")
+        )
         self.skipped_count = len(
             self.result_line_ids.filtered(lambda r: r.resultado == "skipped")
         )
         self.state = "done"
         return self._reopen()
 
-    def _create_payment(self, result_line):
-        payment = self.env["account.payment"].create(
+    def _create_payment_order(self, result_line):
+        company = result_line.journal_id.company_id
+        order = self.env["account.payment.order"].create(
             {
-                "payment_type": "inbound",
-                "partner_type": "customer",
                 "partner_id": result_line.partner_id.id,
-                "amount": result_line.importe_total,
-                "journal_id": self.payment_journal_id.id,
+                "journal_id": result_line.journal_id.id,
+                "type": "receipt",
+                "company_id": company.id,
                 "date": result_line.fecha,
-                "memo": result_line.comprobante_ref,
-                "payment_reference": result_line.comprobante_ref,
+                "reference": result_line.comprobante_ref,
+                "name": result_line.comprobante_ref,
+                "disable_retentions": True,
             }
         )
-        payment.action_post()
-        if not payment.move_id:
-            # Odoo no generó el asiento del pago: pasa en silencio (sin
-            # excepción) cuando el método de pago usado no tiene configurada
-            # la cuenta puente (account.payment.method.line.payment_account_id).
-            # Sin asiento no hay nada que conciliar, así que se corta acá en
-            # vez de dejar el cobro marcado como "ok" sin haber conciliado
-            # nada.
-            raise UserError(
-                _(
-                    "Odoo no generó el asiento contable del pago: el método"
-                    " de pago del diario '%s' no tiene configurada la cuenta"
-                    " puente (payment_account_id). Hay que corregir esa"
-                    " configuración contable antes de poder importar cobros."
-                )
-                % self.payment_journal_id.display_name
-            )
-        self._reconcile_payment(payment, result_line.detail_line_ids.mapped("invoice_id"))
-        return payment
+        order.income_line_ids = [
+            (0, 0, vals) for vals in self._prepare_income_line_vals(order, result_line)
+        ]
+        order.payment_mode_line_ids = [
+            (0, 0, vals) for vals in self._prepare_payment_mode_line_vals(result_line)
+        ]
+        order.proforma_voucher()
+        return order
 
     @staticmethod
-    def _reconcile_payment(payment, invoices):
-        payment_lines = payment.move_id.line_ids.filtered(
-            lambda l: l.account_id.account_type == "asset_receivable" and not l.reconciled
-        )
-        invoice_lines = invoices.line_ids.filtered(
-            lambda l: l.account_id.account_type == "asset_receivable" and not l.reconciled
-        )
-        all_lines = payment_lines + invoice_lines
-        for account in all_lines.account_id:
-            all_lines.filtered(lambda l, account=account: l.account_id == account).reconcile()
+    def _prepare_payment_mode_line_vals(result_line):
+        """Agrupa las líneas de detalle por diario de medio de pago resuelto
+        (payment_mode_id, ver _find_payment_mode_journal) y arma una
+        payment_mode_line por cada diario distinto, con el importe sumado
+        de las facturas aplicadas con ese medio de pago: un mismo recibo
+        puede combinar más de un medio de pago (ej. parte efectivo, parte
+        cheque)."""
+        amounts_by_journal = {}
+        order_by_journal = []
+        for detail in result_line.detail_line_ids:
+            journal = detail.payment_mode_id
+            if journal.id not in amounts_by_journal:
+                amounts_by_journal[journal.id] = 0.0
+                order_by_journal.append(journal)
+            amounts_by_journal[journal.id] += detail.importe
+
+        return [
+            {
+                "payment_mode_id": journal.id,
+                "amount": amounts_by_journal[journal.id],
+                "name": result_line.comprobante_ref,
+                "date": result_line.fecha,
+            }
+            for journal in order_by_journal
+        ]
+
+    @staticmethod
+    def _prepare_income_line_vals(order, result_line):
+        income_vals = []
+        for detail in result_line.detail_line_ids:
+            invoice = detail.invoice_id
+            move_line = invoice.line_ids.filtered(
+                lambda aml: aml.account_id.account_type == "asset_receivable"
+                and not aml.reconciled
+            )[:1]
+            if not move_line:
+                raise UserError(
+                    _(
+                        "La factura '%s' no tiene un apunte a cobrar"
+                        " pendiente de conciliar."
+                    )
+                    % invoice.display_name
+                )
+            income_vals.append(
+                {
+                    "invoice_id": invoice.id,
+                    "move_line_id": move_line.id,
+                    "account_id": move_line.account_id.id,
+                    "amount": detail.importe,
+                    "type": "income",
+                    "currency_id": order.currency_id.id,
+                    "original_currency_id": order.company_id.currency_id.id,
+                }
+            )
+        return income_vals

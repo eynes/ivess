@@ -3,7 +3,9 @@ from odoo import fields, models
 
 class IvessPaymentImportResultLine(models.TransientModel):
     _name = "ivess.payment.import.result.line"
-    _description = "Línea de recibo de cobro agrupada (previsualización/resultado de importación)"
+    _description = (
+        "Línea de recibo de cobro agrupada (previsualización/resultado de importación)"
+    )
     _order = "id"
 
     wizard_id = fields.Many2one(
@@ -18,10 +20,12 @@ class IvessPaymentImportResultLine(models.TransientModel):
     comprobante_ref = fields.Char(
         string="Referencia (aguas)",
         help="Clave compuesta letra+pto_vta+numero del recibo, tal como la"
-        " usa el sistema origen. Se guarda en account.payment.payment_reference"
+        " usa el sistema origen. Se guarda en account.payment.order.reference"
         " para deduplicar reimportaciones.",
     )
-    comprobante_display = fields.Char(string="Comprobante", compute="_compute_comprobante_display")
+    comprobante_display = fields.Char(
+        string="Comprobante", compute="_compute_comprobante_display"
+    )
     fecha = fields.Date(string="Fecha")
     importe_total = fields.Float(string="Importe total")
     comprobante_anulado = fields.Boolean(string="Anulado en origen")
@@ -35,12 +39,20 @@ class IvessPaymentImportResultLine(models.TransientModel):
     )
     cliente_codigo = fields.Char(string="Código de cliente (origen)")
     partner_id = fields.Many2one("res.partner", string="Cliente")
+    journal_id = fields.Many2one(
+        "account.journal",
+        string="Diario",
+        help="Diario de Recibo de Cobranza (type='receipt') resuelto"
+        " automáticamente: el único diario de ese tipo de la compañía.",
+    )
     detail_line_ids = fields.One2many(
         "ivess.payment.import.detail.line",
         "result_line_id",
         string="Facturas aplicadas",
     )
-    detail_count = fields.Integer(string="Cant. facturas", compute="_compute_detail_count")
+    detail_count = fields.Integer(
+        string="Cant. facturas", compute="_compute_detail_count"
+    )
     has_error = fields.Boolean(string="Con error")
     error_message = fields.Text(string="Detalle del error")
     resultado = fields.Selection(
@@ -53,7 +65,9 @@ class IvessPaymentImportResultLine(models.TransientModel):
         string="Resultado",
         default="pending",
     )
-    odoo_payment_id = fields.Many2one("account.payment", string="Cobro Odoo")
+    odoo_payment_order_id = fields.Many2one(
+        "account.payment.order", string="Recibo de cobranza Odoo"
+    )
 
     def _compute_comprobante_display(self):
         for line in self:
