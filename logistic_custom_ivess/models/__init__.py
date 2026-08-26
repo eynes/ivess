@@ -9,6 +9,7 @@ from . import res_partner_distribution
 from . import delivery_route
 from . import no_purchase_reason
 from . import product_template
+from . import product_area
 from . import replacement_reason
 from . import res_partner_distribution
 from . import res_partner_water_consumption
