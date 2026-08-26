@@ -14,6 +14,7 @@
     ],
     "data": [
         "views/res_partner.xml",
+        "views/menu_views.xml",
     ],
     "installable": True,
     "application": False,

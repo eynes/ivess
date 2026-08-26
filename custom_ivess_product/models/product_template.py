@@ -1,4 +1,4 @@
-from odoo import models, fields, _, api
+from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
 
@@ -29,13 +29,26 @@ class ProductTemplate(models.Model):
     exclude_from_regular = fields.Boolean(string="Exclude from Regular")
     show_in_app = fields.Boolean(string="Mostrar en App")
     is_promo = fields.Boolean(string="Is Promo")
+    codigo_bejerman = fields.Char(
+        string='Código Bejerman',
+        help=_(
+            'Código con el que este producto está identificado en el'
+            ' sistema Bejerman del cliente.'
+        ),
+        copy=False,
+    )
 
     _sql_constraints = [
         (
             'unique_abbreviation',
             'unique(abbreviation)',
             _('Duplicate abbreviation.')
-        )
+        ),
+        (
+            'unique_codigo_bejerman',
+            'unique(codigo_bejerman)',
+            _('Duplicate Código Bejerman.')
+        ),
     ]
 
     state = fields.Selection(
@@ -51,15 +64,11 @@ class ProductTemplate(models.Model):
 
     authorize_for_technical_service = fields.Boolean(string="Authorize for Technical Service")
 
-    @api.constrains('purchase_ok', 'categ_id', 'state')
+    @api.constrains('purchase_ok', 'state')
     def _check_purchase_required_fields(self):
         for rec in self:
             if not rec.purchase_ok:
                 continue
-            if not rec.categ_id:
-                raise ValidationError(
-                    _("Product Category is required for purchase products.")
-                )
             if not rec.state:
                 raise ValidationError(
                     _("Status is required for purchase products.")
@@ -81,7 +90,7 @@ class ProductTemplate(models.Model):
     def create(self, vals):
         """
         Generates the internal reference (default_code) during product creation
-        based on the product's state and category.
+        based on the product's state and category, only for purchasable products.
         Args:
             vals (list): list of dict of field values for the new product.
         Returns:
@@ -90,18 +99,23 @@ class ProductTemplate(models.Model):
         if isinstance(vals, dict):
             vals = [vals]
         for val in vals:
-            state = val.get(
-                'state',
-                self._fields['state'].default(self)
+            purchase_ok = val.get(
+                'purchase_ok',
+                self._fields['purchase_ok'].default(self)
             )
-            categ_id = val.get('categ_id', False)
-            val.update({'default_code': self._generate_default_code(state, categ_id)})
+            if purchase_ok:
+                state = val.get(
+                    'state',
+                    self._fields['state'].default(self)
+                )
+                categ_id = val.get('categ_id', False)
+                val.update({'default_code': self._generate_default_code(state, categ_id)})
         return super(ProductTemplate, self).create(vals)
 
     def write(self, vals):
         """
-        Updates the internal reference (default_code) if the product's state
-        or category is changed.
+        Updates the internal reference (default_code) if the product's state,
+        category or purchase capability changes, only for purchasable products.
         Args:
             vals (dict): Dictionary of updated field values for the product.
         Returns:
@@ -109,13 +123,18 @@ class ProductTemplate(models.Model):
         """
         for rec in self:
             new_vals = dict(vals)
-            if rec.has_change_state(vals) or rec.has_change_categ(vals):
+            purchase_ok = vals.get('purchase_ok', rec.purchase_ok)
+            if purchase_ok and (
+                rec.has_change_state(vals)
+                or rec.has_change_categ(vals)
+                or rec.has_change_purchase_ok(vals)
+            ):
                 state = vals.get('state', rec.state)
                 categ_id = vals.get('categ_id', rec.categ_id.id)
                 default_code = self._generate_default_code(state, categ_id)
                 # Se actualiza aunque sea False / vacío
                 new_vals['default_code'] = default_code
-        super(ProductTemplate, rec).write(new_vals)
+            super(ProductTemplate, rec).write(new_vals)
         return True
 
     def has_change_state(self, vals):
@@ -123,6 +142,13 @@ class ProductTemplate(models.Model):
 
     def has_change_categ(self, vals):
         return 'categ_id' in vals and vals['categ_id'] != self.categ_id.id
+
+    def has_change_purchase_ok(self, vals):
+        return (
+            'purchase_ok' in vals
+            and vals['purchase_ok']
+            and vals['purchase_ok'] != self.purchase_ok
+        )
 
     def _generate_default_code(self, state, categ_id):
         """

@@ -106,6 +106,171 @@ class MaintenancePortalController(CustomerPortal):
             'maintenance_for_options': [('equipment', 'Equipo'), ('workcenter', 'Centro de trabajo')],
         }
 
+    def _maint_cast_int(self, raw):
+        """Cast seguro a int: '' / None / no-numérico / 0 -> None (se descarta el filtro, nunca 500)."""
+        raw = (raw or '').strip()
+        if not raw:
+            return None
+        try:
+            val = int(raw)
+        except ValueError:
+            return None
+        return val or None
+
+    def _maint_parse_date(self, raw):
+        """'YYYY-MM-DD' -> date, o None. Mismo estilo try/except que ya usa el archivo
+        con _dt.strptime para schedule_date/schedule_end."""
+        raw = (raw or '').strip()
+        if not raw:
+            return None
+        try:
+            return _dt.strptime(raw, '%Y-%m-%d').date()
+        except ValueError:
+            return None
+
+    def _maint_parse_filters(self, kw):
+        """Parsea y sanea los filtros combinables (query string) compartidos por
+        /my/maintenance y /my/workshop.
+
+        Devuelve (extra_domain, active_filters, url_args):
+          - extra_domain: lista de tuplas de dominio a sumar (AND) al dominio base de la sección.
+          - active_filters: dict {param: valor_saneado} para que la futura UI refleje el estado.
+          - url_args: dict para el pager, así la paginación conserva los filtros.
+        """
+        extra_domain = []
+        active_filters = {}
+        url_args = {}
+
+        name = (kw.get('f_name') or '').strip()
+        if name:
+            extra_domain.append(('name', 'ilike', name))
+            active_filters['f_name'] = name
+            url_args['f_name'] = name
+
+        priority = (kw.get('f_priority') or '').strip()
+        if priority in _PRIORITY_LABELS:
+            extra_domain.append(('priority', '=', priority))
+            active_filters['f_priority'] = priority
+            url_args['f_priority'] = priority
+
+        for field, param in (
+            ('user_id', 'f_user_id'),
+            ('department_id', 'f_department_id'),
+            ('equipment_id', 'f_equipment_id'),
+        ):
+            val = self._maint_cast_int(kw.get(param))
+            if val:
+                extra_domain.append((field, '=', val))
+                active_filters[param] = val
+                url_args[param] = val
+
+        date_from = self._maint_parse_date(kw.get('f_date_from'))
+        date_to = self._maint_parse_date(kw.get('f_date_to'))
+        if date_from and date_to and date_from > date_to:
+            # Rango invertido: no se agrega ningún bound al dominio (el resto de
+            # los filtros combinados sigue devolviendo resultados útiles en vez
+            # de forzar 0), pero se conservan ambos valores tipeados para
+            # repoblar los inputs y se marca el flag para el alert-danger del
+            # template.
+            active_filters['f_date_from'] = date_from.strftime('%Y-%m-%d')
+            active_filters['f_date_to'] = date_to.strftime('%Y-%m-%d')
+            url_args['f_date_from'] = active_filters['f_date_from']
+            url_args['f_date_to'] = active_filters['f_date_to']
+            active_filters['date_range_invalid'] = True
+        else:
+            if date_from:
+                extra_domain.append(('request_date', '>=', date_from))
+                active_filters['f_date_from'] = date_from.strftime('%Y-%m-%d')
+                url_args['f_date_from'] = active_filters['f_date_from']
+            if date_to:
+                extra_domain.append(('request_date', '<=', date_to))
+                active_filters['f_date_to'] = date_to.strftime('%Y-%m-%d')
+                url_args['f_date_to'] = active_filters['f_date_to']
+
+        return extra_domain, active_filters, url_args
+
+    def _maint_filter_options(self, base_domain):
+        """Opciones de cada desplegable, acotadas al dominio BASE de la sección
+        (_MAINTENANCE_DOMAIN o _WORKSHOP_DOMAIN), sin combinarlas con los demás
+        filtros ya activos (dropdowns no facetados). Usa _read_group sobre
+        maintenance.request.sudo() — nunca un search([]) suelto sobre
+        res.users / hr.department / maintenance.equipment / maintenance.team."""
+        MaintenanceRequest = request.env['maintenance.request'].sudo()
+
+        def _options_for(field_name):
+            groups = MaintenanceRequest._read_group(base_domain, [field_name])
+            comodel = MaintenanceRequest._fields[field_name].comodel_name
+            # Arrancar desde el env sudo'd (MaintenanceRequest.env), no request.env:
+            # una unión de recordsets conserva el env del lado izquierdo, así que
+            # partir de request.env[comodel] (no-sudo) tira AccessError al leer
+            # .name más abajo para un usuario portal sin ACL sobre ese comodelo.
+            records = MaintenanceRequest.env[comodel]
+            for (value,) in groups:
+                if value:
+                    records |= value
+            return records.sorted(key=lambda r: r.name or '')
+
+        return {
+            'priority_options': _PRIORITY_OPTIONS,
+            'user_options': _options_for('user_id'),
+            'department_options': _options_for('department_id'),
+            'equipment_options': _options_for('equipment_id'),
+        }
+
+    def _maint_active_filters_labels(self, active_filters, filter_options):
+        """Etiquetas legibles para los chips de filtros activos, a partir de
+        active_filters (ya saneado por _maint_parse_filters) y filter_options
+        (recordsets ya cargados por _maint_filter_options) -- sin disparar
+        ninguna query nueva. El rango de fechas se colapsa en un único chip
+        'date_range' aunque involucre los 2 params f_date_from/f_date_to. Si
+        el rango está invertido (date_range_invalid), no se genera el chip:
+        no está realmente aplicado al dominio, y mostrarlo sería confuso (el
+        alert-danger ya avisa)."""
+
+        def _fmt_date(iso):
+            try:
+                return _dt.strptime(iso, '%Y-%m-%d').strftime('%d/%m/%Y')
+            except (ValueError, TypeError):
+                return iso
+
+        def _record_name(options_key, rec_id):
+            record = filter_options[options_key].filtered(lambda r: r.id == rec_id)
+            return record.name if record else ('#%s' % rec_id)
+
+        chips = []
+
+        if active_filters.get('f_name'):
+            chips.append({'kind': 'name', 'label': 'Texto: "%s"' % active_filters['f_name']})
+
+        if active_filters.get('f_priority'):
+            chips.append({
+                'kind': 'priority',
+                'label': 'Prioridad: %s' % _PRIORITY_LABELS.get(
+                    active_filters['f_priority'], active_filters['f_priority']),
+            })
+
+        for kind, param, options_key, prefix in (
+            ('user', 'f_user_id', 'user_options', 'Técnico'),
+            ('department', 'f_department_id', 'department_options', 'Departamento'),
+            ('equipment', 'f_equipment_id', 'equipment_options', 'Equipo'),
+        ):
+            rec_id = active_filters.get(param)
+            if rec_id:
+                chips.append({'kind': kind, 'label': '%s: %s' % (prefix, _record_name(options_key, rec_id))})
+
+        date_from = active_filters.get('f_date_from')
+        date_to = active_filters.get('f_date_to')
+        if (date_from or date_to) and not active_filters.get('date_range_invalid'):
+            if date_from and date_to:
+                label = 'Fecha: %s a %s' % (_fmt_date(date_from), _fmt_date(date_to))
+            elif date_from:
+                label = 'Fecha: desde %s' % _fmt_date(date_from)
+            else:
+                label = 'Fecha: hasta %s' % _fmt_date(date_to)
+            chips.append({'kind': 'date_range', 'label': label})
+
+        return chips
+
     def _responsable_ids_from_request(self):
         """Read the 'responsable_ids' hidden inputs generated by the tag widget (multi-value form field)."""
         ids = []
@@ -434,19 +599,23 @@ class MaintenancePortalController(CustomerPortal):
         if redir:
             return redir
         MaintenanceRequest = request.env['maintenance.request'].sudo()
-        total = MaintenanceRequest.search_count(_MAINTENANCE_DOMAIN)
+        extra_domain, active_filters, url_args = self._maint_parse_filters(kw)
+        domain = _MAINTENANCE_DOMAIN + extra_domain
+        total = MaintenanceRequest.search_count(domain)
         pager = portal_pager(
             url='/my/maintenance',
             total=total,
             page=page,
             step=_MAINTENANCE_PER_PAGE,
+            url_args=url_args,
         )
         requests_list = MaintenanceRequest.search(
-            _MAINTENANCE_DOMAIN,
+            domain,
             order='request_date desc, id desc',
             limit=_MAINTENANCE_PER_PAGE,
             offset=pager['offset'],
         )
+        filter_options = self._maint_filter_options(_MAINTENANCE_DOMAIN)
         values = self._prepare_portal_layout_values()
         values.update({
             'maintenance_requests': requests_list,
@@ -455,6 +624,12 @@ class MaintenancePortalController(CustomerPortal):
             'priority_labels': _PRIORITY_LABELS,
             'priority_badge': _PRIORITY_BADGE,
             'maintenance_type_labels': _MAINTENANCE_TYPE_LABELS,
+            'active_filters': active_filters,
+            'active_filters_labels': self._maint_active_filters_labels(active_filters, filter_options),
+            'filter_options': filter_options,
+            'filter_base_url': '/my/maintenance',
+            'filter_clear_url': '/my/maintenance',
+            'show_done': False,
         })
         return request.render('maintenance_portal_ivess.portal_my_maintenance', values)
 
@@ -616,13 +791,17 @@ class MaintenancePortalController(CustomerPortal):
         domain = list(_WORKSHOP_DOMAIN)
         if not is_showing_done:
             domain.append(('stage_id.done', '=', False))
+        extra_domain, active_filters, url_args = self._maint_parse_filters(kw)
+        domain += extra_domain
+        if is_showing_done:
+            url_args['show_done'] = '1'
         total = MaintenanceRequest.search_count(domain)
         pager = portal_pager(
             url='/my/workshop',
             total=total,
             page=page,
             step=_WORKSHOP_PER_PAGE,
-            url_args={'show_done': '1'} if is_showing_done else {},
+            url_args=url_args,
         )
         requests_list = MaintenanceRequest.search(
             domain,
@@ -630,6 +809,7 @@ class MaintenancePortalController(CustomerPortal):
             limit=_WORKSHOP_PER_PAGE,
             offset=pager['offset'],
         )
+        filter_options = self._maint_filter_options(_WORKSHOP_DOMAIN)
         values = self._prepare_portal_layout_values()
         values.update({
             'maintenance_requests': requests_list,
@@ -639,6 +819,11 @@ class MaintenancePortalController(CustomerPortal):
             'priority_labels': _PRIORITY_LABELS,
             'priority_badge': _PRIORITY_BADGE,
             'maintenance_type_labels': _MAINTENANCE_TYPE_LABELS,
+            'active_filters': active_filters,
+            'active_filters_labels': self._maint_active_filters_labels(active_filters, filter_options),
+            'filter_options': filter_options,
+            'filter_base_url': '/my/workshop',
+            'filter_clear_url': '/my/workshop?show_done=1' if is_showing_done else '/my/workshop',
         })
         return request.render('maintenance_portal_ivess.portal_my_workshops', values)
 

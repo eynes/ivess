@@ -3,7 +3,7 @@ from odoo.exceptions import ValidationError
 
 
 class ResPartner(models.Model):
-    _inherit = 'res.partner'
+    _inherit = "res.partner"
 
     customer_discount_percentage = fields.Float(
         string="% de Descuento",
@@ -11,15 +11,18 @@ class ResPartner(models.Model):
         default=0.0,
     )
     special_price_ids = fields.One2many(
-        comodel_name='res.partner.special.price',
-        inverse_name='partner_id',
+        comodel_name="res.partner.special.price",
+        inverse_name="partner_id",
         string="Precios Especiales",
     )
+    has_special_price = fields.Boolean(
+        string="Tiene Precio Especial",
+    )
 
-    @api.constrains('customer_discount_percentage')
+    @api.constrains("customer_discount_percentage")
     def _check_discount_range(self):
         for rec in self:
             if not (0.0 <= rec.customer_discount_percentage <= 100.0):
                 raise ValidationError(
-                    'El porcentaje de descuento debe estar entre 0 y 100.'
+                    "El porcentaje de descuento debe estar entre 0 y 100."
                 )

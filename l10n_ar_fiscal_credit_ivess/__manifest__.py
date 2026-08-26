@@ -8,7 +8,7 @@
 
 {
     "name": "L10n AR Fiscal Credit Ivess",
-    "version": "19.0.0.0.1",
+    "version": "19.0.0.0.2",
     "author": "Eynes SRL",
     "website": "http://www.eynes.com.ar",
     "category": "Accounting/Accounting",
@@ -22,6 +22,8 @@
           Apportionable VAT) suma como "Exento" las líneas cuyo IVA es
           Exento o de alícuota 0%, aunque no tengan "Crédito Fiscal"
           cargado (ver punto anterior).
+        - En facturas de proveedores, los campos "CAE" y "Vencimiento CAE"
+          pasan a ser obligatorios en la vista.
     """,
     "depends": [
         "account",

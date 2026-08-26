@@ -1,0 +1,137 @@
+<odoo>
+    <record id="view_ivess_invoice_import_wizard_form" model="ir.ui.view">
+        <field name="name">ivess.invoice.import.wizard.form</field>
+        <field name="model">ivess.invoice.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Importar facturas de clientes desde Excel">
+                <field name="state" invisible="1"/>
+
+                <!-- Paso 1: carga de archivo -->
+                <group invisible="state != 'upload'">
+                    <field name="filename" invisible="1"/>
+                    <field name="file" filename="filename"/>
+                </group>
+
+                <!-- Paso 2: previsualización -->
+                <group invisible="state != 'preview'" col="4">
+                    <field name="total_count"/>
+                    <field name="ok_count"/>
+                    <field name="error_count"/>
+                </group>
+                <field name="result_line_ids" invisible="state not in ('preview', 'done')">
+                    <list decoration-danger="has_error and resultado != 'ok'" decoration-success="resultado == 'ok'">
+                        <field name="comprobante_display"/>
+                        <field name="journal_id" optional="show"/>
+                        <field name="partner_id"/>
+                        <field name="cliente_razon_social" invisible="partner_id"/>
+                        <field name="cliente_documento" invisible="partner_id"/>
+                        <field name="cliente_codigo" optional="show"/>
+                        <field name="fecha"/>
+                        <field name="importe_total" sum="Total"/>
+                        <field name="cae" optional="show"/>
+                        <field name="estado_proyectado" invisible="resultado != 'pending'"/>
+                        <field name="resultado" invisible="resultado == 'pending'" decoration-success="resultado == 'ok'" decoration-danger="resultado == 'error'"/>
+                        <field name="detail_count"/>
+                        <field name="has_error" invisible="1"/>
+                        <field name="error_message" optional="show"/>
+                        <field name="odoo_move_id" optional="show"/>
+                    </list>
+                    <form string="Factura">
+                        <group col="4">
+                            <field name="comprobante_display"/>
+                            <field name="journal_id"/>
+                            <field name="partner_id"/>
+                            <field name="cliente_razon_social" invisible="partner_id"/>
+                            <field name="cliente_documento" invisible="partner_id"/>
+                            <field name="fecha"/>
+                            <field name="fecha_vto"/>
+                            <field name="importe_total"/>
+                            <field name="cae"/>
+                            <field name="vto_cae"/>
+                            <field name="estado_proyectado"/>
+                            <field name="odoo_move_id"/>
+                        </group>
+                        <field name="error_message" invisible="not has_error"/>
+                        <field name="detail_line_ids">
+                            <list>
+                                <field name="tipo_item"/>
+                                <field name="cod_art"/>
+                                <field name="product_id"/>
+                                <field name="cantidad"/>
+                                <field name="precio_unitario"/>
+                                <field name="tasa_iva"/>
+                                <field name="tax_id"/>
+                                <field name="importe_total_neto_item"/>
+                                <field name="special_tax_display" optional="show" string="Imp. especiales/internos"/>
+                                <field name="has_error" invisible="1"/>
+                                <field name="error_message" decoration-danger="has_error"/>
+                            </list>
+                            <form string="Línea de detalle">
+                                <group col="4">
+                                    <field name="tipo_item"/>
+                                    <field name="cod_art"/>
+                                    <field name="product_id"/>
+                                    <field name="cantidad"/>
+                                    <field name="precio_unitario"/>
+                                    <field name="tasa_iva"/>
+                                    <field name="tax_id"/>
+                                    <field name="importe_total_neto_item"/>
+                                    <field name="importe_del_renglon"/>
+                                </group>
+                                <field name="error_message" invisible="not has_error"/>
+                                <field name="special_tax_ids">
+                                    <list editable="bottom">
+                                        <field name="cod"/>
+                                        <field name="tax_id"/>
+                                        <field name="base"/>
+                                        <field name="monto"/>
+                                    </list>
+                                </field>
+                            </form>
+                        </field>
+                    </form>
+                </field>
+
+                <footer>
+                    <button
+                        name="action_preview"
+                        type="object"
+                        string="Previsualizar"
+                        class="btn-primary"
+                        invisible="state != 'upload'"
+                    />
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirmar importación"
+                        class="btn-primary"
+                        invisible="state != 'preview'"
+                        confirm="Se van a crear las facturas sin errores. ¿Confirmar?"
+                    />
+                    <button
+                        name="action_back_to_upload"
+                        type="object"
+                        string="Volver"
+                        invisible="state != 'preview'"
+                    />
+                    <button string="Cerrar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ivess_invoice_import_wizard" model="ir.actions.act_window">
+        <field name="name">Importar facturas de clientes (Excel)</field>
+        <field name="res_model">ivess.invoice.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_ivess_invoice_import"
+        name="Importar facturas de clientes (Excel)"
+        parent="account.menu_finance_receivables"
+        action="action_ivess_invoice_import_wizard"
+        sequence="120"
+    />
+</odoo>
