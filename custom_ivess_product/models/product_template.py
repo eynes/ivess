@@ -3,12 +3,12 @@ from odoo.exceptions import ValidationError
 
 
 class ProductTemplate(models.Model):
-    _inherit = 'product.template'
+    _inherit = "product.template"
 
     abbreviation = fields.Char(
-        string='Abbreviation',
+        string="Abbreviation",
         size=10,
-        help=_('Short reference name (max 10 characters)'),
+        help=_("Short reference name (max 10 characters)"),
     )
     order = fields.Integer(string="Order")
     is_returnable = fields.Boolean(
@@ -22,68 +22,71 @@ class ProductTemplate(models.Model):
         default=False,
         tracking=True,
     )
-    litros_min_bonificacion = fields.Integer(
-        string="Litros mínimos para bonificación"
-    )
+    litros_min_bonificacion = fields.Integer(string="Litros mínimos para bonificación")
     allows_replacement = fields.Boolean(string="Allows Replacement")
     exclude_from_regular = fields.Boolean(string="Exclude from Regular")
     show_in_app = fields.Boolean(string="Mostrar en App")
     is_promo = fields.Boolean(string="Is Promo")
     codigo_bejerman = fields.Char(
-        string='Código Bejerman',
+        string="Código Bejerman",
         help=_(
-            'Código con el que este producto está identificado en el'
-            ' sistema Bejerman del cliente.'
+            "Código con el que este producto está identificado en el"
+            " sistema Bejerman del cliente."
         ),
         copy=False,
     )
+    rubro_credito_fiscal_id = fields.Many2one(
+        comodel_name="rubro.credito.fiscal",
+        string="Rubro Crédito Fiscal",
+    )
 
     _sql_constraints = [
+        ("unique_abbreviation", "unique(abbreviation)", _("Duplicate abbreviation.")),
         (
-            'unique_abbreviation',
-            'unique(abbreviation)',
-            _('Duplicate abbreviation.')
-        ),
-        (
-            'unique_codigo_bejerman',
-            'unique(codigo_bejerman)',
-            _('Duplicate Código Bejerman.')
+            "unique_codigo_bejerman",
+            "unique(codigo_bejerman)",
+            _("Duplicate Código Bejerman."),
         ),
     ]
 
     state = fields.Selection(
         selection=[
-            ('new', 'New'),
-            ('repairable', 'Repairable'),
+            ("new", "New"),
+            ("repairable", "Repairable"),
         ],
-        string='Status',
+        string="Status",
         copy=False,
         tracking=True,
-        default='new',
+        default="new",
     )
 
-    authorize_for_technical_service = fields.Boolean(string="Authorize for Technical Service")
+    authorize_for_technical_service = fields.Boolean(
+        string="Authorize for Technical Service"
+    )
 
-    @api.constrains('purchase_ok', 'state')
+    @api.constrains("purchase_ok", "state")
     def _check_purchase_required_fields(self):
         for rec in self:
             if not rec.purchase_ok:
                 continue
             if not rec.state:
-                raise ValidationError(
-                    _("Status is required for purchase products.")
-                )
+                raise ValidationError(_("Status is required for purchase products."))
 
-    @api.constrains('abbreviation')
+    @api.constrains("abbreviation")
     def _check_abbreviation(self):
         for rec in self:
             if rec.abbreviation:
                 if len(rec.abbreviation) > 10:
-                    raise ValidationError(_("The abbreviation cannot exceed 10 characters."))
-                duplicate = self.search([
-                    ('abbreviation', '=', rec.abbreviation),
-                    ('id', '!=', rec.id),
-                ], limit=1)
+                    raise ValidationError(
+                        _("The abbreviation cannot exceed 10 characters.")
+                    )
+                duplicate = self.search(
+                    [
+                        ("abbreviation", "=", rec.abbreviation),
+                        ("id", "!=", rec.id),
+                    ],
+                    limit=1,
+                )
                 if duplicate:
                     raise ValidationError(_("Duplicate abbreviation."))
 
@@ -100,16 +103,14 @@ class ProductTemplate(models.Model):
             vals = [vals]
         for val in vals:
             purchase_ok = val.get(
-                'purchase_ok',
-                self._fields['purchase_ok'].default(self)
+                "purchase_ok", self._fields["purchase_ok"].default(self)
             )
             if purchase_ok:
-                state = val.get(
-                    'state',
-                    self._fields['state'].default(self)
+                state = val.get("state", self._fields["state"].default(self))
+                categ_id = val.get("categ_id", False)
+                val.update(
+                    {"default_code": self._generate_default_code(state, categ_id)}
                 )
-                categ_id = val.get('categ_id', False)
-                val.update({'default_code': self._generate_default_code(state, categ_id)})
         return super(ProductTemplate, self).create(vals)
 
     def write(self, vals):
@@ -123,31 +124,31 @@ class ProductTemplate(models.Model):
         """
         for rec in self:
             new_vals = dict(vals)
-            purchase_ok = vals.get('purchase_ok', rec.purchase_ok)
+            purchase_ok = vals.get("purchase_ok", rec.purchase_ok)
             if purchase_ok and (
                 rec.has_change_state(vals)
                 or rec.has_change_categ(vals)
                 or rec.has_change_purchase_ok(vals)
             ):
-                state = vals.get('state', rec.state)
-                categ_id = vals.get('categ_id', rec.categ_id.id)
+                state = vals.get("state", rec.state)
+                categ_id = vals.get("categ_id", rec.categ_id.id)
                 default_code = self._generate_default_code(state, categ_id)
                 # Se actualiza aunque sea False / vacío
-                new_vals['default_code'] = default_code
+                new_vals["default_code"] = default_code
             super(ProductTemplate, rec).write(new_vals)
         return True
 
     def has_change_state(self, vals):
-        return 'state' in vals and vals['state'] != self.state
+        return "state" in vals and vals["state"] != self.state
 
     def has_change_categ(self, vals):
-        return 'categ_id' in vals and vals['categ_id'] != self.categ_id.id
+        return "categ_id" in vals and vals["categ_id"] != self.categ_id.id
 
     def has_change_purchase_ok(self, vals):
         return (
-            'purchase_ok' in vals
-            and vals['purchase_ok']
-            and vals['purchase_ok'] != self.purchase_ok
+            "purchase_ok" in vals
+            and vals["purchase_ok"]
+            and vals["purchase_ok"] != self.purchase_ok
         )
 
     def _generate_default_code(self, state, categ_id):
@@ -162,16 +163,18 @@ class ProductTemplate(models.Model):
         """
         if not categ_id:
             return False
-        categ = self.env['product.category'].browse(categ_id)
-        if state == 'new':
+        categ = self.env["product.category"].browse(categ_id)
+        if state == "new":
             if not categ.new_sequence_id:
                 raise ValidationError(
-                    _("Category %s does not have a New sequence configured.") % categ.name
+                    _("Category %s does not have a New sequence configured.")
+                    % categ.name
                 )
             return categ.new_sequence_id.next_by_id()
-        if state == 'repairable':
+        if state == "repairable":
             if not categ.repaired_sequence_id:
                 raise ValidationError(
-                    _("Category %s does not have a Repair sequence configured.") % categ.name
+                    _("Category %s does not have a Repair sequence configured.")
+                    % categ.name
                 )
             return categ.repaired_sequence_id.next_by_id()

@@ -8,19 +8,42 @@
                 <attribute name="required">1</attribute>
             </field>
             <field name="categ_id" position="after">
-                <field name="state" required="purchase_ok"/>
-                <field name="abbreviation" invisible="product_variant_count &gt; 1"/>
-                <field name="codigo_bejerman"/>
-                <field name="order"/>
-                <field name="is_returnable"/>
-                <field name="is_frio_calor"/>
-                <field name="authorize_for_technical_service" invisible="not sale_ok or type != 'service'"/>
-                <field name="litros_min_bonificacion" invisible="not is_frio_calor"/>
-                <field name="allows_replacement"/>
-                <field name="exclude_from_regular"/>
+                <field name="state" required="purchase_ok" />
+                <field name="abbreviation" invisible="product_variant_count &gt; 1" />
+                <field name="codigo_bejerman" />
+                <field name="order" />
+                <field name="is_returnable" />
+                <field name="is_frio_calor" />
+                <field
+          name="authorize_for_technical_service"
+          invisible="not sale_ok or type != 'service'"
+        />
+                <field name="litros_min_bonificacion" invisible="not is_frio_calor" />
+                <field name="allows_replacement" />
+                <field name="exclude_from_regular" />
             </field>
             <field name="type" position="after">
-                <field name="is_promo"/>
+                <field name="is_promo" />
+            </field>
+        </field>
+    </record>
+
+    <record
+    id="product_template_form_view_taxes_tab_ivess_inherit"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >product.template.taxes.tab.ivess.inherit</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view" />
+        <field name="priority" eval="20" />
+        <field name="arch" type="xml">
+            <field name="area_id" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </field>
+            <field name="show_fiscal_credit" position="before">
+                <field name="rubro_credito_fiscal_id" />
             </field>
         </field>
     </record>
@@ -32,7 +55,7 @@
         <field name="arch" type="xml">
             <page name="sales" position="inside">
                 <group name="show_in_app_group">
-                    <field name="show_in_app"/>
+                    <field name="show_in_app" />
                 </group>
             </page>
         </field>
