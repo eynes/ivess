@@ -15,18 +15,8 @@ class IvessRoadmapReport(models.Model):
     _auto = False
 
     customer_code = fields.Char(readonly=True)
-    day = fields.Selection(
-        [
-            ("monday", "Lunes"),
-            ("tuesday", "Martes"),
-            ("wednesday", "Miércoles"),
-            ("thursday", "Jueves"),
-            ("friday", "Viernes"),
-            ("saturday", "Sábado"),
-            ("sunday", "Domingo"),
-        ],
-        readonly=True,
-    )
+    template_delivery_route_id = fields.Many2one("template.delivery.route", readonly=True)
+    day = fields.Selection(related="template_delivery_route_id.day", readonly=True)
     receipt_required = fields.Boolean(readonly=True)
     name = fields.Char(readonly=True)
     avg_hour = fields.Float(readonly=True)
@@ -42,18 +32,12 @@ class IvessRoadmapReport(models.Model):
     city = fields.Char(readonly=True)
     phone = fields.Char(readonly=True)
     delivery_number_id = fields.Many2one("delivery.route.number", readonly=True)
-    property_payment_term_id = fields.Many2one("account.payment.term", readonly=True)
-    property_account_position_id = fields.Many2one("account.fiscal.position", readonly=True)
+    partner_id = fields.Many2one("res.partner", readonly=True)
+    property_payment_term_id = fields.Many2one(related="partner_id.property_payment_term_id", readonly=True)
+    property_account_position_id = fields.Many2one(related="partner_id.property_account_position_id", readonly=True)
     vat = fields.Char(readonly=True)
     final_balance = fields.Float(readonly=True)
-    state = fields.Selection(
-        [
-            ("discharge_review", "Revisión de baja"),
-            ("holidays", "Vacaciones"),
-            ("inactive", "Inactivo"),
-        ],
-        readonly=True,
-    )
+    state = fields.Selection(related="partner_id.state", readonly=True)
     date_to = fields.Date(readonly=True)
     date_from = fields.Date(readonly=True)
     frio_calor_count = fields.Integer(readonly=True)
@@ -71,7 +55,7 @@ class IvessRoadmapReport(models.Model):
                 SELECT
                     drl.id                              AS id,
                     drl.customer_code                   AS customer_code,
-                    tdr.day                             AS day,
+                    tdr.id                              AS template_delivery_route_id,
                     rp.requiere_comprobante    AS receipt_required,
                     rp.name                             AS name,
                     rp.average_hour                     AS avg_hour,
@@ -91,7 +75,7 @@ class IvessRoadmapReport(models.Model):
                     rp.address_details                  AS address_details,
                     rp.vat                              AS vat,
                     rp.final_balance                    AS final_balance,
-                    rp.state                            AS state,
+                    rp.id                               AS partner_id,
                     rp.date_to                          AS date_to,
                     rp.date_from                        AS date_from,
                     (
@@ -104,6 +88,8 @@ class IvessRoadmapReport(models.Model):
                         SELECT pt.litros_min_bonificacion
                         FROM product_template pt
                         WHERE pt.is_frio_calor = TRUE
+                        ORDER BY pt.id
+                        LIMIT 1
                     )                                   AS lts_min_bonification,
                     (
                         SELECT rpwc.consumption_liters
@@ -111,6 +97,7 @@ class IvessRoadmapReport(models.Model):
                         WHERE rpwc.partner_id = rp.id
                         AND rpwc.month = EXTRACT(MONTH FROM CURRENT_DATE)
                         AND rpwc.year  = EXTRACT(YEAR  FROM CURRENT_DATE)
+                        LIMIT 1
                     )                                   AS consumption_liters,
                     (
                         SELECT COALESCE(SUM(am.amount_total_in_currency_signed), 0)
@@ -192,6 +179,8 @@ class IvessRoadmapReport(models.Model):
             "mobile_number",
             "delivery_number_id",
             "address_details",
+            "property_payment_term_id",
+            "property_account_position_id",
             "vat",
             "final_balance",
             "state",
@@ -230,24 +219,14 @@ class IvessRoadmapReport(models.Model):
                     "mobile_number": rec["mobile_number"],
                     "delivery_number_id": rec["delivery_number_id"],
                     "address_details": rec["address_details"],
-                    "property_payment_term_id": False,
+                    "property_payment_term_id": rec["property_payment_term_id"],
                     "vat": rec["vat"],
                     "final_balance": rec["final_balance"],
                     "overdue_balance": rec["overdue_balance"],
-                    "property_account_position_id": False,
+                    "property_account_position_id": rec["property_account_position_id"],
                     "state": rec["state"],
                     "date_from": rec["date_from"],
                     "date_to": rec["date_to"],
                 }
-
-        partners = self.env["res.partner"].search([("customer_code", "in", list(grouped.keys()))])
-        for partner in partners:
-            code = partner.customer_code
-            if code not in grouped:
-                continue
-            pterm = partner.property_payment_term_id
-            fpos = partner.property_account_position_id
-            grouped[code]["property_payment_term_id"] = (pterm.id, pterm.display_name) if pterm else False
-            grouped[code]["property_account_position_id"] = (fpos.id, fpos.display_name) if fpos else False
 
         return list(grouped.values())

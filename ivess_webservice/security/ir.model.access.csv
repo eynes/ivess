@@ -12,12 +12,15 @@ access_ivess_fiscal_position_report_bot,ivess.fiscal.position.report.bot,model_i
 access_ivess_perception_report_bot,ivess.perception.report.bot,model_ivess_perception_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_customer_category_bot,ivess.customer.category.bot,model_ivess_customer_category,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_registration_channel_bot,registration.channel.bot,logistic_custom_ivess.model_registration_channel,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_container_loan_report_bot,ivess.container.loan.report.bot,model_ivess_container_loan_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_no_purchase_reason_report_bot,ivess.no.purchase.reason.report.bot,model_ivess_no_purchase_reason_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_no_purchase_reason_bot,no.purchase.reason.bot,logistic_custom_ivess.model_no_purchase_reason,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_replacement_reason_report_bot,ivess.replacement.reason.report.bot,model_ivess_replacement_reason_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_replacement_reason_bot,replacement.reason.bot,logistic_custom_ivess.model_replacement_reason,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_products_report_bot,ivess.products.report.bot,model_ivess_products_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
@@ -38,6 +41,7 @@ access_product_pricelist_item_bot,product.pricelist.item.bot,product.model_produ
 access_res_partner_special_price_bot,res.partner.special.price.bot,pricelist_custom.model_res_partner_special_price,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_localities_report_bot,ivess.localities.report.bot,model_ivess_localities_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_res_city_bot,res.city.bot,base_address_extended.model_res_city,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_limit_free_of_charge_report_bot,ivess.limit.free.of.charge.report.bot,model_ivess_limit_free_of_charge_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 access_delivery_route_bot,delivery.route.bot,logistic_custom_ivess.model_delivery_route,ivess_webservice.group_ivess_webservice_user,1,0,0,0
@@ -58,3 +62,5 @@ access_ivess_messages_report_bot,ivess.messages.report.bot,model_ivess_messages_
 access_delivery_route_number_message_bot,delivery.route.number.message.bot,logistic_custom_ivess.model_delivery_route_number_message,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_talonarios_report_bot,ivess.talonarios.report.bot,model_ivess_talonarios_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_ir_sequence_bot,ir.sequence.bot,base.model_ir_sequence,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_account_journal_bot,account.journal.bot,account.model_account_journal,ivess_webservice.group_ivess_webservice_user,1,0,0,0

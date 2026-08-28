@@ -1,25 +1,9 @@
 from datetime import timedelta
-from odoo import api, fields, models, tools
+from odoo import api, fields, models
 
 class IvessLimitFreeOfChargeReport(models.Model):
     _name = "ivess.limit.free.of.charge.report"
-    _description = "Vista SQL de  Topes sin cargo expuesta al middleware Ivess"
-    _auto = False
-
-    default_code = fields.Char(readonly=True)
-    monthly_limit_free_of_charge = fields.Integer(readonly=True)
-
-    def init(self):
-        tools.drop_view_if_exists(self.env.cr, self._table)
-        self.env.cr.execute("""
-            CREATE OR REPLACE VIEW ivess_limit_free_of_charge_report AS (
-                SELECT
-                id,
-                default_code,
-                monthly_limit_free_of_charge
-                FROM product_template
-            )
-        """)
+    _description = "Servicio de topes sin cargo expuesto al middleware Ivess"
 
     @api.model
     def get_limit_free_of_charge(self, **kwargs):

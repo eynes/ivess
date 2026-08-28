@@ -1,6 +1,6 @@
 {
     "name": "Ivess Webservice",
-    "version": "19.0.0.0.0",
+    "version": "19.0.0.0.1",
     "summary": "Integración con el middleware de Ivess vía JSON-2 API",
     "description": """
         Expone los servicios consumidos por el middleware de Ivess
@@ -12,6 +12,7 @@
     "category": "Tools",
     "depends": [
         "base",
+        "base_address_extended",
         "mrp",
         "l10n_ar_eynes",
         "helpdesk_maint_custom",

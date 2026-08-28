@@ -1,35 +1,16 @@
-from odoo import api, fields, models, tools
+from odoo import api, models
 
 
 class IvessCustomerCategory(models.Model):
     _name = "ivess.customer.category"
-    _description = "Vista SQL de categorías de clientes expuesta al middleware Ivess"
-    _auto = False
-
-    name = fields.Char(readonly=True)
-
-    def init(self):
-        tools.drop_view_if_exists(self.env.cr, self._table)
-        self.env.cr.execute(
-            """
-            CREATE OR REPLACE VIEW {table} AS (
-                SELECT
-                    id,
-                    name
-                FROM registration_channel
-            )
-            """.format(table=self._table)
-        )
+    _description = "Servicio de categorías de clientes expuesto al middleware Ivess"
 
     @api.model
     def get_customer_categories(self, **kwargs):
         if kwargs:
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
-        records = self.search([]).read(["id", "name"])
-        final_records = []
-        for r in records:
-            final_records.append({
-                "customer_category_id": r["id"],
-                "name": r["name"],
-            })
-        return final_records
+        categories = self.env["registration.channel"].search([])
+        return [
+            {"customer_category_id": categorie.id, "name": categorie.name}
+            for categorie in categories
+        ]

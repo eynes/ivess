@@ -1,41 +1,21 @@
-from odoo import api, fields, models, tools
+from odoo import api, models
 
 class IvessFiscalPositionReport(models.Model):
     _name = "ivess.fiscal.position.report"
-    _description = "Vista SQL de posiciones fiscales expuesta al middleware Ivess"
-    _auto = False
-
-    name = fields.Char(translate=True, readonly=True)
-    afip_code = fields.Integer(readonly=True)
-    supplier_denomination = fields.Char(readonly=True)
-
-    def init(self):
-        tools.drop_view_if_exists(self.env.cr, self._table)
-        self.env.cr.execute(
-            """
-            CREATE OR REPLACE VIEW {table} AS (
-                SELECT
-                    id,
-                    name,
-                    afip_code,
-                    supplier_denomination
-                FROM account_fiscal_position
-            )
-            """.format(table=self._table) 
-        )
+    _description = "Servicio de posiciones fiscales expuesto al middleware Ivess"
 
     @api.model
     def get_fiscal_positions(self, **kwargs):
         if kwargs:
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
-        records = self.search([]).read(["id", "name", "afip_code", "supplier_denomination"])
-        final_records = []
-        for r in records:
-            final_records.append({
-                "fiscal_position_id": r["id"],
-                "name": r["name"],
-                "afip_code": r["afip_code"],
-                "supplier_denomination": r["supplier_denomination"],
-            })
-        return final_records
+        positions = self.env["account.fiscal.position"].search([])
+        return [
+            {
+                "fiscal_position_id": position.id,
+                "name": position.name,
+                "afip_code": position.afip_code,
+                "supplier_denomination": position.supplier_denomination,
+            }
+            for position in positions
+        ]
 
