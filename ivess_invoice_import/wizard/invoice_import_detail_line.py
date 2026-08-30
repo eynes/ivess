@@ -18,11 +18,13 @@ class IvessInvoiceImportDetailLine(models.TransientModel):
     tasa_iva = fields.Float(string="Tasa de IVA (%)")
     tax_id = fields.Many2one("account.tax", string="Impuesto")
     importe_total_neto_item = fields.Float(string="Importe total neto del ítem")
-    importe_del_renglon = fields.Char(
+    importe_iva_inscripto = fields.Float(string="Importe IVA inscripto (origen)")
+    importe_iva_no_inscripto = fields.Float(string="Importe IVA no inscripto (origen)")
+    importe_del_renglon = fields.Float(
         string="Importe del renglón (origen)",
-        help="Valor tal como vino en el archivo. Es solo informativo: no se"
-        " usa para calcular la factura en Odoo (se recalcula a partir de"
-        " cantidad x precio unitario x impuesto).",
+        help="Valor tal como vino en el archivo, normalizado a número. Es"
+        " solo informativo: no se usa para calcular la factura en Odoo (se"
+        " recalcula a partir de cantidad x precio unitario x impuesto).",
     )
     special_tax_ids = fields.One2many(
         "ivess.invoice.import.detail.special.tax",
