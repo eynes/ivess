@@ -19,12 +19,13 @@
                 </attribute>
             </xpath>
 
-            <!-- En facturas de proveedor, CAE y su vencimiento son obligatorios -->
+            <!-- En facturas de proveedor, CAE y su vencimiento son obligatorios,
+                 excepto en diarios de comprobante interno (fiscal_type internal_voucher) -->
             <xpath expr="//field[@name='cae']" position="attributes">
-                <attribute name="required">move_type in ('in_invoice', 'in_refund')</attribute>
+                <attribute name="required">move_type in ('in_invoice', 'in_refund') and fiscal_type != 'internal_voucher'</attribute>
             </xpath>
             <xpath expr="//field[@name='cae_due_date']" position="attributes">
-                <attribute name="required">move_type in ('in_invoice', 'in_refund')</attribute>
+                <attribute name="required">move_type in ('in_invoice', 'in_refund') and fiscal_type != 'internal_voucher'</attribute>
             </xpath>
         </field>
     </record>
