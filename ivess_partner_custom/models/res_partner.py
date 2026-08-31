@@ -1,10 +1,7 @@
-import re
 from collections import defaultdict
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
-
-CODIGO_BEJERMAN_REGEX = re.compile(r"^[A-Za-z0-9]{6}$")
 
 
 class ResPartner(models.Model):
@@ -15,7 +12,6 @@ class ResPartner(models.Model):
     )
     codigo_bejerman = fields.Char(
         string="Código Bejerman",
-        size=6,
         copy=False,
     )
     fecha_alta = fields.Datetime(
@@ -82,12 +78,6 @@ class ResPartner(models.Model):
         for partner in self:
             if not partner.codigo_bejerman:
                 continue
-            if not CODIGO_BEJERMAN_REGEX.match(partner.codigo_bejerman):
-                raise ValidationError(
-                    _(
-                        "El Código Bejerman debe tener exactamente 6 caracteres alfanuméricos (letras y números)."
-                    )
-                )
             duplicate = self.with_context(active_test=False).search(
                 [
                     ("codigo_bejerman", "=", partner.codigo_bejerman),
@@ -105,22 +95,18 @@ class ResPartner(models.Model):
         self._check_pending_water_containers_before_archiving(vals)
         return super().write(vals)
 
-    def _set_multicompany_account_fiscal_position(
-        self, property_account_position_id
-    ):
+    def _set_multicompany_account_fiscal_position(self, property_account_position_id):
         # l10n_ar_eynes propaga property_account_position_id a las otras
         # compañías escribiendo el campo, lo que dispara write() de nuevo
         # y por ende otra llamada a este método: sin este guard entra en
         # recursión infinita (ping-pong entre compañías) y termina en
         # RecursionError / RPC_ERROR.
-        if self.env.context.get('skip_multicompany_fiscal_position'):
+        if self.env.context.get("skip_multicompany_fiscal_position"):
             return
         return super(
             ResPartner,
             self.with_context(skip_multicompany_fiscal_position=True),
-        )._set_multicompany_account_fiscal_position(
-            property_account_position_id
-        )
+        )._set_multicompany_account_fiscal_position(property_account_position_id)
 
     def unlink(self):
         for partner in self:
