@@ -346,15 +346,29 @@ class ResPartnerImportWizard(models.TransientModel):
             # para que openpyxl tire su propio error, más claro que este.
             return content
 
-    @staticmethod
-    def _effective_bejerman_value(raw):
+    # Prefijo para el código Bejerman sintético (ver _effective_bejerman_value):
+    # los códigos Bejerman reales son siempre numéricos, así que un valor con
+    # este prefijo no puede coincidir jamás con uno real de otro cliente.
+    NO_BEJERMAN_PREFIX = "SC-"
+
+    @classmethod
+    def _effective_bejerman_value(cls, raw):
         """Código Bejerman a usar para la fila: la columna B (codigo
         bejerman) tal cual si está seteada y no es 0; si no, se cae al
-        código de cliente de la columna A (customer_code)."""
+        código de cliente de la columna A (customer_code), prefijado con
+        NO_BEJERMAN_PREFIX.
+
+        El prefijo es necesario porque "código de cliente" y "código
+        Bejerman" son dos numeraciones independientes que se solapan en
+        rango: sin prefijo, dos clientes sin relación entre sí pueden
+        terminar con el mismo valor efectivo (el código de cliente de uno
+        coincide con el código Bejerman real de otro) y _count_bejerman_codes
+        los marca como duplicados, excluyendo ambas filas."""
         value = str(raw.get("codigo_bejerman") or "").strip()
         if value and value != "0":
             return value
-        return str(raw.get("customer_code") or "").strip()
+        customer_code = str(raw.get("customer_code") or "").strip()
+        return f"{cls.NO_BEJERMAN_PREFIX}{customer_code}" if customer_code else ""
 
     @classmethod
     def _count_bejerman_codes(cls, raw_rows):
