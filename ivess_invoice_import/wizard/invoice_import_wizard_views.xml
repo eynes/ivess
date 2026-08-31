@@ -18,7 +18,23 @@
                     <field name="ok_count"/>
                     <field name="error_count"/>
                 </group>
-                <field name="result_line_ids" invisible="state not in ('preview', 'done')">
+                <field name="preview_show_errors" invisible="1"/>
+                <button
+                    name="action_show_errors"
+                    type="object"
+                    string="Ver errores"
+                    invisible="state not in ('preview', 'done') or preview_show_errors"
+                />
+                <button
+                    name="action_show_ok"
+                    type="object"
+                    string="Ver OK"
+                    invisible="state not in ('preview', 'done') or not preview_show_errors"
+                />
+                <field
+                    name="result_line_error_ids"
+                    invisible="state not in ('preview', 'done') or not preview_show_errors"
+                >
                     <list decoration-danger="has_error and resultado != 'ok'" decoration-success="resultado == 'ok'">
                         <field name="comprobante_display"/>
                         <field name="journal_id" optional="show"/>
@@ -62,6 +78,9 @@
                                 <field name="tasa_iva"/>
                                 <field name="tax_id"/>
                                 <field name="importe_total_neto_item"/>
+                                <field name="importe_iva_inscripto" optional="hide"/>
+                                <field name="importe_iva_no_inscripto" optional="hide"/>
+                                <field name="importe_del_renglon" optional="hide"/>
                                 <field name="special_tax_display" optional="show" string="Imp. especiales/internos"/>
                                 <field name="has_error" invisible="1"/>
                                 <field name="error_message" decoration-danger="has_error"/>
@@ -76,6 +95,89 @@
                                     <field name="tasa_iva"/>
                                     <field name="tax_id"/>
                                     <field name="importe_total_neto_item"/>
+                                    <field name="importe_iva_inscripto"/>
+                                    <field name="importe_iva_no_inscripto"/>
+                                    <field name="importe_del_renglon"/>
+                                </group>
+                                <field name="error_message" invisible="not has_error"/>
+                                <field name="special_tax_ids">
+                                    <list editable="bottom">
+                                        <field name="cod"/>
+                                        <field name="tax_id"/>
+                                        <field name="base"/>
+                                        <field name="monto"/>
+                                    </list>
+                                </field>
+                            </form>
+                        </field>
+                    </form>
+                </field>
+                <field
+                    name="result_line_ok_ids"
+                    invisible="state not in ('preview', 'done') or preview_show_errors"
+                >
+                    <list decoration-danger="has_error and resultado != 'ok'" decoration-success="resultado == 'ok'">
+                        <field name="comprobante_display"/>
+                        <field name="journal_id" optional="show"/>
+                        <field name="partner_id"/>
+                        <field name="cliente_razon_social" invisible="partner_id"/>
+                        <field name="cliente_documento" invisible="partner_id"/>
+                        <field name="cliente_codigo" optional="show"/>
+                        <field name="fecha"/>
+                        <field name="importe_total" sum="Total"/>
+                        <field name="cae" optional="show"/>
+                        <field name="estado_proyectado" invisible="resultado != 'pending'"/>
+                        <field name="resultado" invisible="resultado == 'pending'" decoration-success="resultado == 'ok'" decoration-danger="resultado == 'error'"/>
+                        <field name="detail_count"/>
+                        <field name="has_error" invisible="1"/>
+                        <field name="error_message" optional="show"/>
+                        <field name="odoo_move_id" optional="show"/>
+                    </list>
+                    <form string="Factura">
+                        <group col="4">
+                            <field name="comprobante_display"/>
+                            <field name="journal_id"/>
+                            <field name="partner_id"/>
+                            <field name="cliente_razon_social" invisible="partner_id"/>
+                            <field name="cliente_documento" invisible="partner_id"/>
+                            <field name="fecha"/>
+                            <field name="fecha_vto"/>
+                            <field name="importe_total"/>
+                            <field name="cae"/>
+                            <field name="vto_cae"/>
+                            <field name="estado_proyectado"/>
+                            <field name="odoo_move_id"/>
+                        </group>
+                        <field name="error_message" invisible="not has_error"/>
+                        <field name="detail_line_ids">
+                            <list>
+                                <field name="tipo_item"/>
+                                <field name="cod_art"/>
+                                <field name="product_id"/>
+                                <field name="cantidad"/>
+                                <field name="precio_unitario"/>
+                                <field name="tasa_iva"/>
+                                <field name="tax_id"/>
+                                <field name="importe_total_neto_item"/>
+                                <field name="importe_iva_inscripto" optional="hide"/>
+                                <field name="importe_iva_no_inscripto" optional="hide"/>
+                                <field name="importe_del_renglon" optional="hide"/>
+                                <field name="special_tax_display" optional="show" string="Imp. especiales/internos"/>
+                                <field name="has_error" invisible="1"/>
+                                <field name="error_message" decoration-danger="has_error"/>
+                            </list>
+                            <form string="Línea de detalle">
+                                <group col="4">
+                                    <field name="tipo_item"/>
+                                    <field name="cod_art"/>
+                                    <field name="product_id"/>
+                                    <field name="cantidad"/>
+                                    <field name="precio_unitario"/>
+                                    <field name="tasa_iva"/>
+                                    <field name="tax_id"/>
+                                    <field name="importe_total_neto_item"/>
+                                    <field name="importe_iva_inscripto"/>
+                                    <field name="importe_iva_no_inscripto"/>
                                     <field name="importe_del_renglon"/>
                                 </group>
                                 <field name="error_message" invisible="not has_error"/>

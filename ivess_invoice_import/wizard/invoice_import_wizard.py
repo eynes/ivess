@@ -49,9 +49,9 @@ EXPECTED_HEADERS = [
 
 # Columnas de impuesto especial/interno del Excel: cada tupla es (columna de
 # código, columna de monto, columna de base imponible). "cod impuesto
-# interno" es la única sin columna de base propia: se usa como base el
-# "importe total neto del item" de la línea (comportamiento histórico). El
-# resto ("cod imp especiales", "...especiales1", "...especiales2") sí trae su
+# interno" es la única sin columna de base propia: el impuesto interno no
+# tiene base imponible, así que su base se informa siempre en 0. El resto
+# ("cod imp especiales", "...especiales1", "...especiales2") sí trae su
 # propia base imponible en el Excel. Todas matchean igual: por código
 # Bejerman (ver AccountTax.bejerman_code) o, si no matchea, por el mapeo
 # manual de ivess.invoice.import.tax.code.
@@ -174,9 +174,35 @@ class IvessInvoiceImportWizard(models.TransientModel):
         "wizard_id",
         string="Facturas",
     )
+    # Dos One2many al mismo modelo/inverse pero con domain propio: a
+    # diferencia del atributo "domain" de la vista (que en un widget
+    # one2many embebido solo se usa para el diálogo de "agregar
+    # existente", NO filtra las filas ya cargadas), un domain a nivel de
+    # campo sí restringe qué filas trae el ORM al leerlo. Se usan para que
+    # los botones "Ver OK"/"Ver errores" muestren cada uno una lista
+    # realmente filtrada (con su propia paginación), en vez de reutilizar
+    # result_line_ids (que siempre trae todo).
+    result_line_ok_ids = fields.One2many(
+        "ivess.invoice.import.result.line",
+        "wizard_id",
+        string="Facturas OK",
+        domain=[("has_error", "=", False)],
+    )
+    result_line_error_ids = fields.One2many(
+        "ivess.invoice.import.result.line",
+        "wizard_id",
+        string="Facturas con error",
+        domain=[("has_error", "=", True)],
+    )
     total_count = fields.Integer(string="Total", readonly=True)
     ok_count = fields.Integer(string="OK", readonly=True)
     error_count = fields.Integer(string="Errores", readonly=True)
+    preview_show_errors = fields.Boolean(
+        string="Mostrar errores",
+        default=True,
+        help="Controla si la previsualización muestra la lista de"
+        " comprobantes OK o la de comprobantes con error.",
+    )
 
     # ------------------------------------------------------------------
     # Paso 1 -> 2: leer archivo, agrupar y validar (no escribe account.move)
@@ -201,7 +227,18 @@ class IvessInvoiceImportWizard(models.TransientModel):
         self.total_count = len(self.result_line_ids)
         self.error_count = len(self.result_line_ids.filtered("has_error"))
         self.ok_count = self.total_count - self.error_count
+        self.preview_show_errors = True
         self.state = "preview"
+        return self._reopen()
+
+    def action_show_errors(self):
+        self.ensure_one()
+        self.preview_show_errors = True
+        return self._reopen()
+
+    def action_show_ok(self):
+        self.ensure_one()
+        self.preview_show_errors = False
         return self._reopen()
 
     def action_back_to_upload(self):
@@ -237,7 +274,28 @@ class IvessInvoiceImportWizard(models.TransientModel):
 
     @staticmethod
     def _to_float(value):
-        return float(str(value).strip())
+        """Normaliza un valor numérico del Excel a float, tolerando que venga
+        como número (int/float) o como texto con separador decimal ','
+        (formato AR, ej. "1.234,56") o '.' (ej. "1234.56" o "1,234.56" con
+        ',' de miles). Se usa para todas las columnas de importe/tasa
+        (precio unitario, tasa de iva, tasa de iva no inscripto, importe iva
+        inscripto/no inscripto, importe total neto del item, importe del
+        renglón, montos y bases de impuestos internos/especiales, cantidad,
+        importe total) para que no dependa de cómo haya venido formateada la
+        celda en cada renglón."""
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip().replace(" ", "")
+        if not text:
+            raise ValueError("empty value")
+        if "," in text and "." in text:
+            if text.rindex(",") > text.rindex("."):
+                text = text.replace(".", "").replace(",", ".")
+            else:
+                text = text.replace(",", "")
+        elif "," in text:
+            text = text.replace(",", ".")
+        return float(text)
 
     @staticmethod
     def _digits_to_int(value):
@@ -618,8 +676,10 @@ class IvessInvoiceImportWizard(models.TransientModel):
                     % line["cod_art"]
                 )
 
+            # Tasa de IVA 0: la línea no lleva impuesto de IVA (tax_id queda
+            # vacío), no se busca ni exige que exista una tasa "0%" en Odoo.
             tax = None
-            if not line_errors:
+            if not line_errors and tasa_iva:
                 tax, tax_candidates = self._find_tax(tasa_iva, company)
                 if not tax:
                     line_errors.append(
@@ -632,12 +692,25 @@ class IvessInvoiceImportWizard(models.TransientModel):
             except (TypeError, ValueError):
                 importe_total_neto_item = 0.0
 
+            try:
+                importe_iva_inscripto = self._to_float(line["importe_iva_inscripto"])
+            except (TypeError, ValueError):
+                importe_iva_inscripto = 0.0
+
+            try:
+                importe_iva_no_inscripto = self._to_float(line["importe_iva_no_inscripto"])
+            except (TypeError, ValueError):
+                importe_iva_no_inscripto = 0.0
+
             special_tax_vals, special_tax_errors = self._resolve_special_taxes(
-                line["special_taxes"], importe_total_neto_item
+                line["special_taxes"]
             )
             line_errors.extend(special_tax_errors)
 
-            importe_del_renglon = self._to_str(line["importe_del_renglon"])
+            try:
+                importe_del_renglon = self._to_float(line["importe_del_renglon"])
+            except (TypeError, ValueError):
+                importe_del_renglon = 0.0
 
             detail_vals.append(
                 (
@@ -652,6 +725,8 @@ class IvessInvoiceImportWizard(models.TransientModel):
                         "tasa_iva": tasa_iva,
                         "tax_id": tax.id if tax else False,
                         "importe_total_neto_item": importe_total_neto_item,
+                        "importe_iva_inscripto": importe_iva_inscripto,
+                        "importe_iva_no_inscripto": importe_iva_no_inscripto,
                         "importe_del_renglon": importe_del_renglon,
                         "special_tax_ids": special_tax_vals,
                         "has_error": bool(line_errors),
@@ -663,12 +738,13 @@ class IvessInvoiceImportWizard(models.TransientModel):
 
         return detail_vals, errors
 
-    def _resolve_special_taxes(self, special_taxes, importe_total_neto_item):
+    def _resolve_special_taxes(self, special_taxes):
         """Resuelve las columnas de impuesto especial/interno de una línea
         (ver SPECIAL_TAX_COLUMNS): cada una matchea por separado contra un
         impuesto Odoo (ver _find_special_tax) y aporta su propio monto y
         base imponible. "cod impuesto interno" no trae columna de base en el
-        Excel: se usa el importe total neto del ítem, igual que siempre."""
+        Excel y el impuesto interno no tiene base imponible: su base se
+        informa siempre en 0."""
         special_tax_vals = []
         errors = []
 
@@ -682,13 +758,13 @@ class IvessInvoiceImportWizard(models.TransientModel):
             except (TypeError, ValueError):
                 monto = 0.0
 
-            if slot["base"] is not None:
+            has_base_column = slot["base"] is not None
+            base = 0.0
+            if has_base_column:
                 try:
                     base = self._to_float(slot["base"])
                 except (TypeError, ValueError):
                     base = 0.0
-            else:
-                base = importe_total_neto_item
 
             special_tax = self._find_special_tax(cod)
             if not special_tax:
@@ -702,13 +778,17 @@ class IvessInvoiceImportWizard(models.TransientModel):
                     % cod
                 )
                 continue
-            if not monto or not base:
+            if not monto or (has_base_column and not base):
                 errors.append(
                     _(
                         "El código de impuesto especial '%s' está mapeado a"
-                        " '%s' pero el monto o la base informados son 0."
+                        " '%s' pero el monto%s informado es 0."
                     )
-                    % (cod, special_tax.name)
+                    % (
+                        cod,
+                        special_tax.name,
+                        _(" o la base") if has_base_column else "",
+                    )
                 )
                 continue
 
@@ -889,16 +969,16 @@ class IvessInvoiceImportWizard(models.TransientModel):
     @staticmethod
     def _line_tax_ids(detail, invoice_wide_tax_ids):
         """IDs de impuesto a asignar a una línea de producto del asiento: su
-        IVA, sus impuestos especiales/internos propios que NO sean IIBB
-        (impuesto interno y percepción de IVA: van por línea, ver
+        IVA (si tiene: con tasa de IVA 0 la línea no lleva tax_id de IVA),
+        sus impuestos especiales/internos propios que NO sean IIBB (impuesto
+        interno y percepción de IVA: van por línea, ver
         _resolve_special_taxes) y las percepciones IIBB de toda la factura
         (invoice_wide_tax_ids, ver _invoice_wide_special_tax_ids)."""
         per_line_tax_ids = detail.special_tax_ids.filtered(
             lambda s: s.tax_id.retention_type != "gross_income"
         ).tax_id.ids
-        return list(
-            dict.fromkeys([detail.tax_id.id] + per_line_tax_ids + invoice_wide_tax_ids)
-        )
+        iva_tax_ids = [detail.tax_id.id] if detail.tax_id else []
+        return list(dict.fromkeys(iva_tax_ids + per_line_tax_ids + invoice_wide_tax_ids))
 
     @staticmethod
     def _internal_number(pto_vta, numero_comprobante):
