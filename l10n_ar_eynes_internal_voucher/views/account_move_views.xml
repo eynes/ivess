@@ -13,6 +13,11 @@
           name="invisible"
         >move_type not in ('out_invoice', 'out_refund') and (move_type not in ('in_invoice', 'in_refund') or fiscal_type != 'internal_voucher')</attribute>
             </xpath>
+            <xpath expr="//field[@name='voucher_type_id']" position="attributes">
+                <attribute
+          name="required"
+        >move_type in ('in_invoice', 'in_refund', 'out_invoice', 'out_refund') and fiscal_type != 'internal_voucher'</attribute>
+            </xpath>
         </field>
     </record>
 </odoo>
