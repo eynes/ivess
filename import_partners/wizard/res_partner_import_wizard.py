@@ -68,12 +68,6 @@ HEADER_MAP = {
 }
 REQUIRED_KEYS = sorted({v for v in HEADER_MAP.values() if v != "_ignored"})
 
-# res.partner.codigo_bejerman exige exactamente esto (ver
-# ivess_partner_custom/models/res_partner.py, _check_codigo_bejerman): un
-# código que no matchee se guarda vacío en vez de violar esa regla apenas
-# alguien abra el contacto desde la interfaz.
-CODIGO_BEJERMAN_REGEX = re.compile(r"^[A-Za-z0-9]{6}$")
-
 # "Estado" en el Excel viene como display_name armado a mano en el sistema
 # origen ("Buenos Aires (AR)"), no como el name real de res.country.state:
 # hay que pelar el sufijo de país antes de buscar.
@@ -353,16 +347,25 @@ class ResPartnerImportWizard(models.TransientModel):
             return content
 
     @staticmethod
-    def _count_bejerman_codes(raw_rows):
-        """Cuenta ocurrencias de cada código Bejerman con formato válido en
-        TODO el archivo (ambas hojas): el que aparezca más de una vez se
-        excluye completo en _resolve_row, ver comentario ahí."""
+    def _effective_bejerman_value(raw):
+        """Código Bejerman a usar para la fila: la columna B (codigo
+        bejerman) tal cual si está seteada y no es 0; si no, se cae al
+        código de cliente de la columna A (customer_code)."""
+        value = str(raw.get("codigo_bejerman") or "").strip()
+        if value and value != "0":
+            return value
+        return str(raw.get("customer_code") or "").strip()
+
+    @classmethod
+    def _count_bejerman_codes(cls, raw_rows):
+        """Cuenta ocurrencias del código Bejerman efectivo (ver
+        _effective_bejerman_value) en TODO el archivo (ambas hojas): el que
+        aparezca más de una vez se excluye completo en _resolve_row, ver
+        comentario ahí."""
         return Counter(
-            code
-            for code in (
-                str(raw.get("codigo_bejerman") or "").strip() for raw in raw_rows
-            )
-            if CODIGO_BEJERMAN_REGEX.match(code)
+            value
+            for value in (cls._effective_bejerman_value(raw) for raw in raw_rows)
+            if value
         )
 
     # ------------------------------------------------------------------
@@ -439,6 +442,12 @@ class ResPartnerImportWizard(models.TransientModel):
             "dni_id": self.env.ref(
                 "l10n_ar_eynes.document_dni", raise_if_not_found=False
             ).id,
+            # Default cuando el Excel no trae tipo de documento ni CUIT (o
+            # el CUIT viene pero es inválido): "Doc. (Otro)" + vat marcador
+            # NOIMPORTADO, en vez de dejar el contacto sin documento.
+            "doc_otro_id": self.env.ref(
+                "l10n_ar_eynes.document_doc_otro", raise_if_not_found=False
+            ).id,
             "existing_bejerman": existing_bejerman,
             "existing_vat": existing_vat,
         }
@@ -497,9 +506,11 @@ class ResPartnerImportWizard(models.TransientModel):
         # limpiarlo ACÁ antes de validar el dígito verificador, si no un
         # CUIT/CUIL bien formado pero escrito "30-71767557-2" se descarta
         # por longitud/formato en vez de validarse correctamente.
-        vat = (
-            str(raw.get("vat") or "").strip().replace(".", "").replace("-", "") or None
-        )
+        tipo_documento_raw = str(raw.get("tipo_documento") or "").strip()
+        vat_raw = str(raw.get("vat") or "").strip()
+
+        vat = vat_raw.replace(".", "").replace("-", "") or None
+        invalid_vat = False
         if vat and not self._check_vat_ar(
             vat,
             doc_type_id,
@@ -508,14 +519,32 @@ class ResPartnerImportWizard(models.TransientModel):
             lookups["dni_id"],
         ):
             issues.append(("invalid_vat_format", vat))
+            invalid_vat = True
             vat = None
+
+        # Sin tipo de documento ni CUIT (columnas P/Q vacías o en 0), o con
+        # un CUIT/DNI que no pasa la validación del dígito verificador: se
+        # completa con "Doc. (Otro)" + NOIMPORTADO en vez de dejar el
+        # contacto sin documento.
+        doc_and_vat_blank = tipo_documento_raw in ("", "0") and vat_raw in ("", "0")
+        if doc_and_vat_blank or invalid_vat:
+            doc_type_id = lookups["doc_otro_id"]
+            vat = "NOIMPORTADO"
 
         # Evita duplicar contactos si el wizard se corre más de una vez:
         # se saltea la fila si su identificador ya existe en la base
-        # (codigo_bejerman primero; si la fila no tiene, se cae a vat).
+        # (codigo_bejerman primero; si la fila no tiene, se cae a vat). El
+        # marcador NOIMPORTADO no es un identificador real (lo comparten
+        # todos los contactos sin CUIT), así que se lo excluye de este
+        # chequeo para no saltear de más en corridas futuras.
         if codigo_bejerman and codigo_bejerman in lookups["existing_bejerman"]:
             return {"skip": True, "issues": [("already_imported", codigo_bejerman)]}
-        if not codigo_bejerman and vat and vat in lookups["existing_vat"]:
+        if (
+            not codigo_bejerman
+            and vat
+            and vat != "NOIMPORTADO"
+            and vat in lookups["existing_vat"]
+        ):
             return {"skip": True, "issues": [("already_imported", vat)]}
 
         values = {
@@ -607,19 +636,14 @@ class ResPartnerImportWizard(models.TransientModel):
             return remainder == int(vat[10])
         return True
 
-    @staticmethod
-    def _resolve_codigo_bejerman(raw, bejerman_counts):
-        raw_value = str(raw.get("codigo_bejerman") or "").strip()
-        if not raw_value or raw_value == "0":
+    @classmethod
+    def _resolve_codigo_bejerman(cls, raw, bejerman_counts):
+        value = cls._effective_bejerman_value(raw)
+        if not value:
             return None, None
-        if not CODIGO_BEJERMAN_REGEX.match(raw_value):
-            return None, (
-                "invalid_bejerman_format",
-                "(formato inválido, se guarda vacío)",
-            )
-        if bejerman_counts[raw_value] > 1:
-            return None, ("duplicate_bejerman", raw_value)
-        return raw_value, None
+        if bejerman_counts[value] > 1:
+            return None, ("duplicate_bejerman", value)
+        return value, None
 
     @staticmethod
     def _lookup(raw_value, mapping, issues, category):
