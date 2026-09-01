@@ -19,6 +19,12 @@
                     <field name="error_count" />
                     <field name="skipped_count" />
                 </group>
+                <button
+          name="action_export_errors"
+          type="object"
+          string="Exportar errores (CSV)"
+          invisible="state not in ('preview', 'done') or error_count == 0"
+        />
                 <field
           name="result_line_ids"
           invisible="state not in ('preview', 'done')"

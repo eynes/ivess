@@ -1,4 +1,5 @@
 import base64
+import csv
 import io
 from datetime import datetime
 
@@ -148,10 +149,18 @@ class IvessPaymentImportWizard(models.TransientModel):
             )
         rows = self._read_excel_rows(base64.b64decode(self.file))
         groups = group_payment_rows(rows)
+        # Ver _build_preview_cache: resuelve de una sola vez, contra todos
+        # los grupos, los lookups que antes se repetían con un search()
+        # propio por cada recibo/línea de aplicación.
+        cache = self._build_preview_cache(groups)
 
         self.result_line_ids.unlink()
-        for group in groups:
-            self._create_preview_line(group)
+        vals_list = [
+            self._prepare_preview_line_vals(index, group, cache)
+            for index, group in enumerate(groups)
+        ]
+        if vals_list:
+            self.env["ivess.payment.import.result.line"].create(vals_list)
 
         self.total_count = len(self.result_line_ids)
         self.error_count = len(self.result_line_ids.filtered("has_error"))
@@ -169,6 +178,57 @@ class IvessPaymentImportWizard(models.TransientModel):
         self.result_line_ids.unlink()
         self.state = "upload"
         return self._reopen()
+
+    def action_export_errors(self):
+        self.ensure_one()
+        lines = self.result_line_ids.filtered("has_error")
+        if not lines:
+            raise UserError(_("No hay errores para exportar."))
+        attachment = self.env["ir.attachment"].create(
+            {
+                "name": "errores_import_cobros_%s.csv"
+                % fields.Date.context_today(self),
+                "type": "binary",
+                "datas": base64.b64encode(self._build_errors_csv(lines)),
+                "res_model": self._name,
+                "res_id": self.id,
+            }
+        )
+        return {
+            "type": "ir.actions.act_url",
+            "url": "/web/content/%s?download=true" % attachment.id,
+            "target": "self",
+        }
+
+    @staticmethod
+    def _build_errors_csv(lines):
+        # ';' como delimitador y BOM utf-8: mismo criterio que
+        # IvessInvoiceImportWizard._build_errors_csv, para que lo abra bien
+        # Excel en configuración regional argentina.
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, delimiter=";")
+        writer.writerow(
+            [
+                _("Comprobante"),
+                _("Código cliente"),
+                _("Cliente"),
+                _("Fecha"),
+                _("Importe total"),
+                _("Error"),
+            ]
+        )
+        for line in lines:
+            writer.writerow(
+                [
+                    line.comprobante_display,
+                    line.cliente_codigo,
+                    line.partner_id.display_name or "",
+                    line.fecha or "",
+                    line.importe_total,
+                    (line.error_message or "").replace("\n", " | "),
+                ]
+            )
+        return buffer.getvalue().encode("utf-8-sig")
 
     def _reopen(self):
         return {
@@ -213,7 +273,11 @@ class IvessPaymentImportWizard(models.TransientModel):
 
     def _read_excel_rows(self, content):
         try:
-            workbook = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+            # read_only=True: lectura en modo streaming, ver el mismo
+            # comentario en IvessInvoiceImportWizard._read_excel_rows.
+            workbook = openpyxl.load_workbook(
+                io.BytesIO(content), read_only=True, data_only=True
+            )
         except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001
             raise UserError(
                 _("No se pudo leer el archivo como Excel: %s") % exc
@@ -279,25 +343,116 @@ class IvessPaymentImportWizard(models.TransientModel):
         }
 
     # ------------------------------------------------------------------
-    # Resolución de cada grupo contra Odoo (cliente vía la factura que
-    # cancela cada línea de aplicación) y creación de las líneas de
-    # previsualización.
+    # Cache de lookups para la previsualización: mismo criterio que
+    # IvessInvoiceImportWizard._build_preview_cache (ver comentario ahí):
+    # reemplaza los search() repetidos por recibo/línea de aplicación por
+    # un puñado de búsquedas en lote sobre todo el archivo.
     # ------------------------------------------------------------------
 
-    def _create_preview_line(self, group):
-        if group.get("error"):
-            self.env["ivess.payment.import.result.line"].create(
-                {
-                    "wizard_id": self.id,
-                    "tipo_comprobante": group["tipo_comprobante"],
-                    "letra": group["letra"],
-                    "pto_vta": group["pto_vta"],
-                    "numero_comprobante": group["num_compr"],
-                    "has_error": True,
-                    "error_message": group["error"],
-                }
+    def _build_preview_cache(self, groups):
+        invoice_refs = set()
+        for group in groups:
+            if group.get("error"):
+                continue
+            for line in group["lines"]:
+                if line["tipo_compr_asoc"] == "FC":
+                    invoice_refs.add(
+                        IvessInvoiceImportWizard._comprobante_ref(
+                            line["letra_asoc"],
+                            line["pto_venta_asoc"],
+                            line["numero_compr_asoc"],
+                        )
+                    )
+
+        invoice_by_ref = {}
+        if invoice_refs:
+            for move in self.env["account.move"].search(
+                [("move_type", "=", "out_invoice"), ("ref", "in", list(invoice_refs))]
+            ):
+                invoice_by_ref.setdefault(move.ref, move)
+
+        payment_mode_by_key = {}
+        for mapping in self.env["ivess.payment.import.payment.method.code"].search(
+            [("company_id", "=", self.env.company.id)]
+        ):
+            key = (
+                mapping.medio_pago,
+                mapping.caja,
+                mapping.cod_bco,
+                mapping.sucursal_bco,
             )
-            return
+            payment_mode_by_key.setdefault(key, mapping.journal_id)
+
+        receipt_journal, receipt_journal_candidates = self._find_receipt_journal()
+
+        # detail_results se calcula una sola vez por grupo (resuelve todas
+        # las líneas de aplicación contra los caches de arriba) y se
+        # reutiliza tanto para el prefetch de deduplicación de abajo como
+        # para el vals final en _prepare_preview_line_vals: evita repetir
+        # la misma resolución dos veces.
+        detail_results = {}
+        for index, group in enumerate(groups):
+            if group.get("error"):
+                continue
+            detail_results[index] = self._resolve_detail_lines(
+                group["lines"], invoice_by_ref, payment_mode_by_key
+            )
+
+        dedup_keys = set()
+        for index, group in enumerate(groups):
+            if group.get("error") or group["comprobante_anulado"]:
+                continue
+            _detail_vals, _detail_errors, matched_partners, _applied_total = (
+                detail_results[index]
+            )
+            if len(matched_partners) != 1:
+                continue
+            partner = next(iter(matched_partners))
+            ref = IvessInvoiceImportWizard._comprobante_ref(
+                group["letra"], group["pto_vta"], group["num_compr"]
+            )
+            dedup_keys.add((ref, partner.id))
+
+        orders_by_key = {}
+        if dedup_keys:
+            refs = {k[0] for k in dedup_keys}
+            partner_ids = {k[1] for k in dedup_keys}
+            for order in self.env["account.payment.order"].search(
+                [
+                    ("type", "=", "receipt"),
+                    ("reference", "in", list(refs)),
+                    ("partner_id", "in", list(partner_ids)),
+                ]
+            ):
+                okey = (order.reference, order.partner_id.id)
+                orders_by_key[okey] = (
+                    orders_by_key.get(okey, self.env["account.payment.order"]) | order
+                )
+
+        return {
+            "receipt_journal": receipt_journal,
+            "receipt_journal_candidates": receipt_journal_candidates,
+            "detail_results": detail_results,
+            "orders_by_key": orders_by_key,
+        }
+
+    # ------------------------------------------------------------------
+    # Resolución de cada grupo contra Odoo (cliente vía la factura que
+    # cancela cada línea de aplicación) y armado de los vals de la línea de
+    # previsualización (se crean todas juntas en lote, ver action_preview).
+    # ------------------------------------------------------------------
+
+    def _prepare_preview_line_vals(self, index, group, cache):
+        if group.get("error"):
+            return {
+                "wizard_id": self.id,
+                "tipo_comprobante": group["tipo_comprobante"],
+                "letra": group["letra"],
+                "pto_vta": group["pto_vta"],
+                "numero_comprobante": group["num_compr"],
+                "has_error": True,
+                "error_message": group["error"],
+            }
 
         errors = []
         if group["tipo_comprobante"] != "RMP":
@@ -325,7 +480,8 @@ class IvessPaymentImportWizard(models.TransientModel):
             group["letra"], group["pto_vta"], group["num_compr"]
         )
 
-        journal, journal_candidates = self._find_receipt_journal()
+        journal = cache["receipt_journal"]
+        journal_candidates = cache["receipt_journal_candidates"]
         if not journal:
             if journal_candidates:
                 errors.append(
@@ -345,9 +501,9 @@ class IvessPaymentImportWizard(models.TransientModel):
                     )
                 )
 
-        detail_vals, detail_errors, matched_partners, applied_total = (
-            self._resolve_detail_lines(group["lines"])
-        )
+        detail_vals, detail_errors, matched_partners, applied_total = cache[
+            "detail_results"
+        ][index]
         errors.extend(detail_errors)
 
         partner = False
@@ -379,14 +535,10 @@ class IvessPaymentImportWizard(models.TransientModel):
             )
 
         if partner and not group["comprobante_anulado"]:
-            existing = self.env["account.payment.order"].search(
-                [
-                    ("type", "=", "receipt"),
-                    ("reference", "=", comprobante_ref),
-                    ("partner_id", "=", partner.id),
-                ],
-                limit=1,
+            candidates = cache["orders_by_key"].get(
+                (comprobante_ref, partner.id), self.env["account.payment.order"]
             )
+            existing = candidates[:1]
             if existing:
                 errors.append(
                     _(
@@ -396,25 +548,23 @@ class IvessPaymentImportWizard(models.TransientModel):
                     % existing.id
                 )
 
-        self.env["ivess.payment.import.result.line"].create(
-            {
-                "wizard_id": self.id,
-                "tipo_comprobante": group["tipo_comprobante"],
-                "letra": group["letra"],
-                "pto_vta": group["pto_vta"],
-                "numero_comprobante": group["num_compr"],
-                "comprobante_ref": comprobante_ref,
-                "fecha": fecha,
-                "importe_total": importe_total,
-                "comprobante_anulado": bool(group["comprobante_anulado"]),
-                "cliente_codigo": group["cod_cliente"],
-                "partner_id": partner.id if partner else False,
-                "journal_id": journal.id if journal else False,
-                "has_error": bool(errors),
-                "error_message": "\n".join(errors) if errors else False,
-                "detail_line_ids": detail_vals,
-            }
-        )
+        return {
+            "wizard_id": self.id,
+            "tipo_comprobante": group["tipo_comprobante"],
+            "letra": group["letra"],
+            "pto_vta": group["pto_vta"],
+            "numero_comprobante": group["num_compr"],
+            "comprobante_ref": comprobante_ref,
+            "fecha": fecha,
+            "importe_total": importe_total,
+            "comprobante_anulado": bool(group["comprobante_anulado"]),
+            "cliente_codigo": group["cod_cliente"],
+            "partner_id": partner.id if partner else False,
+            "journal_id": journal.id if journal else False,
+            "has_error": bool(errors),
+            "error_message": "\n".join(errors) if errors else False,
+            "detail_line_ids": detail_vals,
+        }
 
     def _find_receipt_journal(self):
         """Resuelve el diario de Recibo de Cobranza (account.journal con
@@ -429,7 +579,9 @@ class IvessPaymentImportWizard(models.TransientModel):
         represente la letra "X" que usa "aguas" para sus recibos, y el
         código del diario no tiene por qué tener dígitos de punto de
         venta). En la práctica hay un único diario 'receipt' por compañía,
-        así que se usa ese directamente.
+        así que se usa ese directamente. Se resuelve una sola vez por
+        previsualización (no depende de datos de la fila), ver
+        _build_preview_cache.
 
         :return: tupla (diario o None, cantidad de diarios candidatos).
         """
@@ -441,31 +593,7 @@ class IvessPaymentImportWizard(models.TransientModel):
         )
         return (journals[0] if len(journals) == 1 else None), len(journals)
 
-    def _find_payment_mode_journal(self, medio_pago, caja, cod_bco, sucursal_bco):
-        """Resuelve el diario de caja/banco (payment_mode_line_ids.payment_mode_id)
-        a partir de las columnas "medio de pago" + "caja" + "cod bco" +
-        "sucursal del bco" de la línea de detalle, contra el mapeo
-        configurable ivess.payment.import.payment.method.code (mismo
-        patrón que IvessInvoiceImportWizard._find_special_tax usa para
-        impuestos especiales). "caja" desambigua medios de pago en
-        efectivo (varias cajas físicas); "cod bco" + "sucursal del bco"
-        desambiguan medios de pago bancarios cuando hay más de una cuenta
-        posible bajo el mismo medio de pago (ej. HSBC vs Mercado Pago)."""
-        if not medio_pago:
-            return None
-        mapping = self.env["ivess.payment.import.payment.method.code"].search(
-            [
-                ("medio_pago", "=", medio_pago),
-                ("caja", "=", caja or ""),
-                ("cod_bco", "=", cod_bco or ""),
-                ("sucursal_bco", "=", sucursal_bco or ""),
-                ("company_id", "=", self.env.company.id),
-            ],
-            limit=1,
-        )
-        return mapping.journal_id if mapping else None
-
-    def _resolve_detail_lines(self, lines):
+    def _resolve_detail_lines(self, lines, invoice_by_ref, payment_mode_by_key):
         detail_vals = []
         errors = []
         matched_partners = set()
@@ -496,10 +624,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                     line["pto_venta_asoc"],
                     line["numero_compr_asoc"],
                 )
-                invoice = self.env["account.move"].search(
-                    [("move_type", "=", "out_invoice"), ("ref", "=", invoice_ref)],
-                    limit=1,
-                )
+                invoice = invoice_by_ref.get(invoice_ref, self.env["account.move"])
                 if not invoice:
                     line_errors.append(
                         _("No se encontró la factura '%s' para conciliar.")
@@ -527,9 +652,16 @@ class IvessPaymentImportWizard(models.TransientModel):
                     matched_partners.add(invoice.partner_id)
                     applied_total += importe
 
-            payment_mode = self._find_payment_mode_journal(
-                line["medio_pago"], line["caja"], line["cod_bco"], line["sucursal_bco"]
-            )
+            payment_mode = None
+            if line["medio_pago"]:
+                payment_mode = payment_mode_by_key.get(
+                    (
+                        line["medio_pago"],
+                        line["caja"],
+                        line["cod_bco"],
+                        line["sucursal_bco"],
+                    )
+                )
             if not payment_mode:
                 line_errors.append(
                     _(
@@ -595,8 +727,19 @@ class IvessPaymentImportWizard(models.TransientModel):
     # Paso 2 -> 3: crear los cobros que no tengan error
     # ------------------------------------------------------------------
 
+    # Cada cuántos recibos se hace un commit() intermedio (ver
+    # action_confirm): mismo criterio que
+    # IvessInvoiceImportWizard._CONFIRM_CHUNK_SIZE, para que un import largo
+    # no dependa de una única transacción gigante.
+    _CONFIRM_COMMIT_EVERY = 200
+
     def action_confirm(self):
         self.ensure_one()
+        # Ver IvessInvoiceImportWizard.action_confirm: tracking_disable evita
+        # el overhead de chatter de mail.thread en cada create()/write(), que
+        # no aporta nada en una importación histórica.
+        self = self.with_context(tracking_disable=True)
+        processed = 0
         for result_line in self.result_line_ids:
             if result_line.has_error:
                 result_line.resultado = "error"
@@ -622,6 +765,15 @@ class IvessPaymentImportWizard(models.TransientModel):
                         "error_message": _("Error al crear el cobro: %s") % exc,
                     }
                 )
+            processed += 1
+            if processed % self._CONFIRM_COMMIT_EVERY == 0:
+                # Confirma en tandas en vez de dejar TODO el import en una
+                # sola transacción: si el proceso se corta a mitad de camino
+                # (timeout, reinicio), lo ya procesado queda guardado (ver
+                # el mismo comentario, con más detalle, en
+                # IvessInvoiceImportWizard.action_confirm).
+                # pylint: disable=invalid-commit
+                self.env.cr.commit()
 
         self.ok_count = len(
             self.result_line_ids.filtered(lambda r: r.resultado == "ok")
@@ -661,7 +813,7 @@ class IvessPaymentImportWizard(models.TransientModel):
     @staticmethod
     def _prepare_payment_mode_line_vals(result_line):
         """Agrupa las líneas de detalle por diario de medio de pago resuelto
-        (payment_mode_id, ver _find_payment_mode_journal) y arma una
+        (payment_mode_id, ver _resolve_detail_lines) y arma una
         payment_mode_line por cada diario distinto, con el importe sumado
         de las facturas aplicadas con ese medio de pago: un mismo recibo
         puede combinar más de un medio de pago (ej. parte efectivo, parte
