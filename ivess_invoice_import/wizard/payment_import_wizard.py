@@ -1,4 +1,5 @@
 import base64
+import csv
 import io
 from datetime import datetime
 
@@ -169,6 +170,57 @@ class IvessPaymentImportWizard(models.TransientModel):
         self.result_line_ids.unlink()
         self.state = "upload"
         return self._reopen()
+
+    def action_export_errors(self):
+        self.ensure_one()
+        lines = self.result_line_ids.filtered("has_error")
+        if not lines:
+            raise UserError(_("No hay errores para exportar."))
+        attachment = self.env["ir.attachment"].create(
+            {
+                "name": "errores_import_cobros_%s.csv"
+                % fields.Date.context_today(self),
+                "type": "binary",
+                "datas": base64.b64encode(self._build_errors_csv(lines)),
+                "res_model": self._name,
+                "res_id": self.id,
+            }
+        )
+        return {
+            "type": "ir.actions.act_url",
+            "url": "/web/content/%s?download=true" % attachment.id,
+            "target": "self",
+        }
+
+    @staticmethod
+    def _build_errors_csv(lines):
+        # ';' como delimitador y BOM utf-8: mismo criterio que
+        # IvessInvoiceImportWizard._build_errors_csv, para que lo abra bien
+        # Excel en configuración regional argentina.
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, delimiter=";")
+        writer.writerow(
+            [
+                _("Comprobante"),
+                _("Código cliente"),
+                _("Cliente"),
+                _("Fecha"),
+                _("Importe total"),
+                _("Error"),
+            ]
+        )
+        for line in lines:
+            writer.writerow(
+                [
+                    line.comprobante_display,
+                    line.cliente_codigo,
+                    line.partner_id.display_name or "",
+                    line.fecha or "",
+                    line.importe_total,
+                    (line.error_message or "").replace("\n", " | "),
+                ]
+            )
+        return buffer.getvalue().encode("utf-8-sig")
 
     def _reopen(self):
         return {
