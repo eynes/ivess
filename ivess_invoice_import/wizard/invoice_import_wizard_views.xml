@@ -31,6 +31,12 @@
                     string="Ver OK"
                     invisible="state not in ('preview', 'done') or not preview_show_errors"
                 />
+                <button
+                    name="action_export_errors"
+                    type="object"
+                    string="Exportar errores (CSV)"
+                    invisible="state not in ('preview', 'done') or error_count == 0"
+                />
                 <field
                     name="result_line_error_ids"
                     invisible="state not in ('preview', 'done') or not preview_show_errors"
