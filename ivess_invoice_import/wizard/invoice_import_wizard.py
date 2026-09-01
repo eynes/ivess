@@ -1186,7 +1186,10 @@ class IvessInvoiceImportWizard(models.TransientModel):
         impuesto Odoo (ver _find_special_tax) y aporta su propio monto y
         base imponible. "cod impuesto interno" no trae columna de base en el
         Excel y el impuesto interno no tiene base imponible: su base se
-        informa siempre en 0."""
+        informa siempre en 0. A diferencia del resto de los impuestos
+        especiales, si el impuesto interno viene con monto en 0 o vacío no
+        es un error: significa que esa línea no tiene impuesto interno y se
+        ignora esa columna sin frenar la importación."""
         special_tax_vals = []
         errors = []
 
@@ -1201,6 +1204,10 @@ class IvessInvoiceImportWizard(models.TransientModel):
                 monto = 0.0
 
             has_base_column = slot["base"] is not None
+
+            if not has_base_column and not monto:
+                continue
+
             base = 0.0
             if has_base_column:
                 try:
