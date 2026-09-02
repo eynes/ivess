@@ -7,6 +7,7 @@ from decimal import Decimal
 from odoo import _, api, fields, models
 from odoo.addons.l10n_ar_eynes.utils.sicore_fixed_width import FixedWidth, moneyfmt
 from odoo.exceptions import ValidationError
+from odoo.tools import float_compare
 
 from .bbva_fixed_width_dicts import (
     REGISTRO_010,
@@ -104,6 +105,15 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         string='Contrato BBVA Pago a Proveedores', required=True
     )
     preview_txt = fields.Text(string='Vista previa', readonly=True)
+    amount_mismatch_warning = fields.Text(
+        string='Diferencias de importe',
+        readonly=True,
+        help='Órdenes de pago cuyo monto no coincide con la suma de sus '
+        'cheques/Echeqs asociados. No bloquea la exportación: puede '
+        'deberse a retenciones, pagos parciales u otros conceptos que no '
+        'forman parte del instrumento bancario, pero conviene revisarlo '
+        'antes de enviar el archivo a BBVA.',
+    )
 
     def _default_bank_journal_id(self):
         return self._find_default_bank_journal(self.env.company)
@@ -245,7 +255,16 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         return codes
 
     def _total_amount(self):
-        return self._moneyfmt(sum(self.payment_order_ids.mapped('amount')))
+        # 010.IMPORTE_TOTAL y 095.SUMA-IMPORTE tienen que coincidir con la
+        # suma de los IMPORTE de todos los 020 del archivo. Se reutiliza acá
+        # la misma _importe_020 que arma cada línea 020 (en vez de sumar
+        # payment_order.amount de forma independiente) para que ambos
+        # cálculos no puedan divergir entre sí.
+        total = sum(
+            self._importe_020(payment_order, payment_order.issued_check_ids)
+            for payment_order in self.payment_order_ids
+        )
+        return self._moneyfmt(total)
 
     def _moneyfmt(self, amount):
         return moneyfmt(Decimal(str(amount)), places=2, ndigits=13, dp='')
@@ -340,6 +359,33 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         if checks:
             return sum(checks.mapped('amount'))
         return payment_order.amount
+
+    def _amount_mismatch_warnings(self):
+        # No bloqueante a propósito: una diferencia entre el monto de la OP
+        # y la suma de sus cheques/Echeqs puede ser legítima (retenciones,
+        # pagos parciales, u otros conceptos de la OP que no forman parte
+        # del instrumento bancario), así que solo se deja explícita para que
+        # el usuario la revise antes de enviar el archivo a BBVA.
+        warnings = []
+        for payment_order in self.payment_order_ids:
+            checks = payment_order.issued_check_ids
+            if not checks:
+                continue
+            checks_total = sum(checks.mapped('amount'))
+            if float_compare(payment_order.amount, checks_total, precision_digits=2):
+                warnings.append(
+                    _(
+                        '%(order)s: el monto de la orden (%(order_amount)s) '
+                        'no coincide con la suma de sus cheques/Echeqs '
+                        '(%(checks_total)s).'
+                    )
+                    % {
+                        'order': payment_order.number,
+                        'order_amount': '%.2f' % payment_order.amount,
+                        'checks_total': '%.2f' % checks_total,
+                    }
+                )
+        return warnings
 
     def _build_020_line(self, payment_order, checks, row_number, pro_nro_ord):
         partner = payment_order.partner_id
@@ -455,43 +501,81 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         fixed_width.update(**vals)
         return fixed_width.line
 
-    def _build_lines(self):
-        """Arma las líneas del archivo BBVA.
+    def _build_line_entries(self):
+        """Arma las líneas del archivo BBVA, con una etiqueta legible por línea.
 
         Cada orden de pago aporta un 020 seguido, si tiene más de un
         cheque/Echeq asociado, de un 025 por cada instrumento adicional, y
         finalmente su 090 (ver docs/ANALISIS_Y_DISENO.md, Apéndice A.3/B.3).
+
+        Devuelve tuplas (tipo_reg, etiqueta, línea): la etiqueta es solo para
+        mostrar en la vista previa, no forma parte del archivo exportado.
         """
         self._check_payment_orders()
+        self.amount_mismatch_warning = '\n'.join(self._amount_mismatch_warnings())
         province_codes = self._province_code_map()
         pro_nro_ord = self._pro_nro_ord()
-        lines = [self._build_header_line()]
+        entries = [('010', _('Cabecera del archivo'), self._build_header_line())]
         row_number = 1
         for payment_order in self.payment_order_ids:
             checks = payment_order.issued_check_ids
             row_number += 1
-            lines.append(
-                self._build_020_line(payment_order, checks, row_number, pro_nro_ord)
-            )
+            entries.append((
+                '020',
+                _('Orden de pago %(number)s (%(count)s cheque/s)')
+                % {'number': payment_order.number, 'count': len(checks)},
+                self._build_020_line(payment_order, checks, row_number, pro_nro_ord),
+            ))
             if len(checks) > 1:
                 for check in checks:
                     row_number += 1
-                    lines.append(
-                        self._build_025_line(payment_order, check, row_number)
-                    )
+                    entries.append((
+                        '025',
+                        _('Cheque/Echeq %(number)s ($%(amount)s) de la orden %(order)s')
+                        % {
+                            'number': check.number,
+                            'amount': '%.2f' % check.amount,
+                            'order': payment_order.number,
+                        },
+                        self._build_025_line(payment_order, check, row_number),
+                    ))
             row_number += 1
-            lines.append(
+            entries.append((
+                '090',
+                _('Proveedor de la orden %s') % payment_order.number,
                 self._build_090_line(
                     payment_order, row_number, pro_nro_ord, province_codes
-                )
-            )
+                ),
+            ))
         row_number += 1
-        lines.append(self._build_footer_line(row_number))
-        return lines
+        entries.append(
+            ('095', _('Pie del archivo'), self._build_footer_line(row_number))
+        )
+        return entries
+
+    def _build_lines(self):
+        return [line for _tipo_reg, _label, line in self._build_line_entries()]
+
+    def _compress_spaces_for_preview(self, line):
+        # Solo para mostrar: el relleno de posiciones (campos opcionales sin
+        # dato y el FILLER final hasta los 850 caracteres) son corridas
+        # largas de espacios que no aportan nada a la lectura humana. El TXT
+        # real (_build_lines) no pasa por acá y sale intacto.
+        return re.sub(
+            r' {2,}', lambda match: '[%d espacios]' % len(match.group()), line
+        )
+
+    def _build_preview_text(self):
+        return '\n\n'.join(
+            '[{}] {}\n{}'.format(
+                tipo_reg, label, self._compress_spaces_for_preview(line)
+            )
+            for tipo_reg, label, line in self._build_line_entries()
+        )
 
     def action_preview(self):
         self.ensure_one()
-        self.preview_txt = '\n'.join(self._build_lines())
+        self.preview_txt = self._build_preview_text()
         return {
             'type': 'ir.actions.act_window',
             'res_model': self._name,
