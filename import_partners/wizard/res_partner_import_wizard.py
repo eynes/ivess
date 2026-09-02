@@ -35,6 +35,8 @@ _AUTOFILTER_RE = re.compile(
 HEADER_MAP = {
     "codigo de cliente": "customer_code",
     "codigo bejerman": "codigo_bejerman",
+    "es cliente": "es_cliente",
+    "es proveedor": "es_proveedor",
     "nrosub": "_ignored",
     "tipo de empresa": "tipo_empresa",
     "nombre": "nombre",
@@ -92,6 +94,8 @@ RES_PARTNER_COLUMNS = [
     "partner_type_id",
     "customer_code",
     "codigo_bejerman",
+    "is_customer",
+    "is_supplier",
     "fecha_alta",
     "is_important_client",
     "requiere_comprobante",
@@ -266,7 +270,26 @@ class ResPartnerImportWizard(models.TransientModel):
             "UPDATE res_partner SET commercial_partner_id = id WHERE id = ANY(%s)",
             (new_ids,),
         )
+        self._bulk_insert_categories(new_ids, rows_by_column)
         return new_ids
+
+    def _bulk_insert_categories(self, new_ids, rows_by_column):
+        """category_id (res.partner.category) es un m2m: no tiene columna
+        propia en res_partner, se completa aparte insertando en la tabla de
+        relación. Un solo INSERT ... VALUES no reordena las filas: el orden
+        de new_ids (RETURNING id) coincide con el de rows_by_column."""
+        category_rows = [
+            (partner_id, row["category_id"])
+            for partner_id, row in zip(new_ids, rows_by_column, strict=False)
+            if row["category_id"]
+        ]
+        if not category_rows:
+            return
+        self.env.cr.execute_values(
+            "INSERT INTO res_partner_res_partner_category_rel"
+            " (partner_id, category_id) VALUES %s",
+            category_rows,
+        )
 
     # ------------------------------------------------------------------
     # Lectura del Excel
@@ -422,6 +445,10 @@ class ResPartnerImportWizard(models.TransientModel):
             _normalize(c["description"]): c["id"]
             for c in self.env["client.type"].search_read([], ["description"])
         }
+        category_map = {
+            _normalize(c["name"]): c["id"]
+            for c in self.env["res.partner.category"].search_read([], ["name"])
+        }
         # Para no duplicar contactos si el wizard se corre más de una vez
         # (mismo Excel, o uno que se superpone): se saltea una fila si su
         # codigo_bejerman ya existe en la base; si no tiene, se cae a
@@ -439,6 +466,7 @@ class ResPartnerImportWizard(models.TransientModel):
             "doc_type": doc_type_map,
             "afip": afip_map,
             "client_type": client_type_map,
+            "category": category_map,
             "company_id": self.env.company.id,
             "uid": self.env.uid,
             # Para validar el vat con el mismo criterio que
@@ -501,6 +529,23 @@ class ResPartnerImportWizard(models.TransientModel):
             issues,
             "unmatched_client_type",
         )
+        category_id = self._lookup(
+            raw.get("etiqueta"), lookups["category"], issues, "unmatched_category"
+        )
+
+        email = str(raw.get("email") or "").strip() or None
+
+        is_customer = self._to_bool(raw.get("es_cliente"))
+
+        # partner_vendor_custom exige email si supplier_rank > 0 (constraint
+        # que corre en cualquier write() posterior sobre el contacto, y
+        # supplier_rank>0 es lo que hace is_supplier=True vía compute): si
+        # la fila marca proveedor pero no trae email, se guarda como no
+        # proveedor en vez de dejar un dato que rompe el próximo write().
+        is_supplier = self._to_bool(raw.get("es_proveedor"))
+        if is_supplier and not email:
+            issues.append(("supplier_without_email", nombre))
+            is_supplier = False
 
         lat = self._normalize_coord(raw.get("lat"))
         lon = self._normalize_coord(raw.get("lon"))
@@ -564,7 +609,7 @@ class ResPartnerImportWizard(models.TransientModel):
         values = {
             "name": nombre,
             "is_company": _normalize(raw.get("tipo_empresa")) == "empresa",
-            "email": str(raw.get("email") or "").strip() or None,
+            "email": email,
             "phone": str(raw.get("phone") or "").strip() or None,
             "mobile_number": str(raw.get("mobile") or "").strip() or None,
             "street": street,
@@ -595,6 +640,8 @@ class ResPartnerImportWizard(models.TransientModel):
             "partner_type_id": client_type_id,
             "customer_code": str(raw.get("customer_code") or "").strip() or None,
             "codigo_bejerman": codigo_bejerman,
+            "is_customer": is_customer,
+            "is_supplier": is_supplier,
             "fecha_alta": fecha_alta,
             "is_important_client": self._to_bool(raw.get("cliente_importante")),
             "requiere_comprobante": self._to_bool(raw.get("requiere_comprobante")),
@@ -614,6 +661,10 @@ class ResPartnerImportWizard(models.TransientModel):
             "autopost_bills": "ask",
             "group_rfq": "default",
             "group_on": "default",
+            # category_id (m2m) no es una columna de res_partner: no forma
+            # parte de RES_PARTNER_COLUMNS, se usa aparte en
+            # _bulk_insert_categories después del INSERT.
+            "category_id": category_id,
         }
         return {
             "skip": False,

@@ -25,6 +25,11 @@ ISSUE_CATEGORIES = [
         "invalid_vat_format",
         "CUIT/CUIL/DNI con dígito verificador inválido (se guarda vacío)",
     ),
+    ("unmatched_category", "Etiqueta sin coincidencia (se guarda vacío)"),
+    (
+        "supplier_without_email",
+        "Marcado como proveedor pero sin email (se guarda como no proveedor)",
+    ),
 ]
 
 
