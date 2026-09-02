@@ -358,7 +358,7 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
             check = checks
             forma_pago = self._forma_pago_bbva(check)
             dispon_p = self._dispon_pago_bbva(check)
-            fecha_pago = (payment_order.date_due or self.fecha_proceso).strftime(
+            fecha_pago = (check.payment_date or self.fecha_proceso).strftime(
                 '%Y%m%d'
             )
             nro_cheque = self._nro_cheque_bbva(check)
