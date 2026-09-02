@@ -501,44 +501,81 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
         fixed_width.update(**vals)
         return fixed_width.line
 
-    def _build_lines(self):
-        """Arma las líneas del archivo BBVA.
+    def _build_line_entries(self):
+        """Arma las líneas del archivo BBVA, con una etiqueta legible por línea.
 
         Cada orden de pago aporta un 020 seguido, si tiene más de un
         cheque/Echeq asociado, de un 025 por cada instrumento adicional, y
         finalmente su 090 (ver docs/ANALISIS_Y_DISENO.md, Apéndice A.3/B.3).
+
+        Devuelve tuplas (tipo_reg, etiqueta, línea): la etiqueta es solo para
+        mostrar en la vista previa, no forma parte del archivo exportado.
         """
         self._check_payment_orders()
         self.amount_mismatch_warning = '\n'.join(self._amount_mismatch_warnings())
         province_codes = self._province_code_map()
         pro_nro_ord = self._pro_nro_ord()
-        lines = [self._build_header_line()]
+        entries = [('010', _('Cabecera del archivo'), self._build_header_line())]
         row_number = 1
         for payment_order in self.payment_order_ids:
             checks = payment_order.issued_check_ids
             row_number += 1
-            lines.append(
-                self._build_020_line(payment_order, checks, row_number, pro_nro_ord)
-            )
+            entries.append((
+                '020',
+                _('Orden de pago %(number)s (%(count)s cheque/s)')
+                % {'number': payment_order.number, 'count': len(checks)},
+                self._build_020_line(payment_order, checks, row_number, pro_nro_ord),
+            ))
             if len(checks) > 1:
                 for check in checks:
                     row_number += 1
-                    lines.append(
-                        self._build_025_line(payment_order, check, row_number)
-                    )
+                    entries.append((
+                        '025',
+                        _('Cheque/Echeq %(number)s ($%(amount)s) de la orden %(order)s')
+                        % {
+                            'number': check.number,
+                            'amount': '%.2f' % check.amount,
+                            'order': payment_order.number,
+                        },
+                        self._build_025_line(payment_order, check, row_number),
+                    ))
             row_number += 1
-            lines.append(
+            entries.append((
+                '090',
+                _('Proveedor de la orden %s') % payment_order.number,
                 self._build_090_line(
                     payment_order, row_number, pro_nro_ord, province_codes
-                )
-            )
+                ),
+            ))
         row_number += 1
-        lines.append(self._build_footer_line(row_number))
-        return lines
+        entries.append(
+            ('095', _('Pie del archivo'), self._build_footer_line(row_number))
+        )
+        return entries
+
+    def _build_lines(self):
+        return [line for _tipo_reg, _label, line in self._build_line_entries()]
+
+    def _compress_spaces_for_preview(self, line):
+        # Solo para mostrar: el relleno de posiciones (campos opcionales sin
+        # dato y el FILLER final hasta los 850 caracteres) son corridas
+        # largas de espacios que no aportan nada a la lectura humana. El TXT
+        # real (_build_lines) no pasa por acá y sale intacto.
+        return re.sub(
+            r' {2,}', lambda match: '[%d espacios]' % len(match.group()), line
+        )
+
+    def _build_preview_text(self):
+        return '\n\n'.join(
+            '[{}] {}\n{}'.format(
+                tipo_reg, label, self._compress_spaces_for_preview(line)
+            )
+            for tipo_reg, label, line in self._build_line_entries()
+        )
 
     def action_preview(self):
         self.ensure_one()
-        self.preview_txt = '\n'.join(self._build_lines())
+        self.preview_txt = self._build_preview_text()
         return {
             'type': 'ir.actions.act_window',
             'res_model': self._name,
