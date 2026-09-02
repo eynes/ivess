@@ -22,3 +22,9 @@ class AccountPaymentOrder(models.Model):
         help='Código de concepto exigido por Banco Nación para el '
         'archivo de transferencias masivas a proveedores.',
     )
+
+    def proforma_voucher(self):
+        res = super().proforma_voucher()
+        for order in self.filtered(lambda o: o.type == 'payment' and o.number):
+            order.reference = order.number
+        return res
