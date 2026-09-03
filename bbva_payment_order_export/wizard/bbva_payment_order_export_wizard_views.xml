@@ -29,6 +29,17 @@
                         <field name="contrato_prov" />
                     </group>
                 </group>
+                <div
+                    class="alert alert-warning"
+                    role="alert"
+                    invisible="not amount_mismatch_warning"
+                >
+                    <field
+                        name="amount_mismatch_warning"
+                        readonly="1"
+                        nolabel="1"
+                    />
+                </div>
                 <field
                     name="preview_txt"
                     readonly="1"
