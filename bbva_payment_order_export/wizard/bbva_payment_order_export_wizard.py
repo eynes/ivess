@@ -302,8 +302,11 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
             # Regla BBVA: chequera virtual -> el número arranca con "8"
             # (validado carácter por carácter contra el archivo real
             # JUMI_OP_ECHEQS_2026-06-23.txt).
-            return ('8' + number).ljust(13, '0')
-        return number.rjust(13, '0')
+            number = '8' + number
+        # NRO_CHEQUE (posición 286, longitud 13 de los registros 020 y 025):
+        # el banco lo espera alineado a la izquierda y justificado con ceros
+        # hacia la derecha (T16348).
+        return number.ljust(13, '0')
 
     def _pro_nro_beneficiario(self, partner):
         # Punto abierto #1 (ver ANALISIS_Y_DISENO.md): se usa el id interno
