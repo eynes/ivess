@@ -81,6 +81,7 @@ class ResPartner(models.Model):
             duplicate = self.with_context(active_test=False).search(
                 [
                     ("codigo_bejerman", "=", partner.codigo_bejerman),
+                    ("company_id", "=", partner.company_id.id),
                     ("id", "!=", partner.id),
                 ],
                 limit=1,
