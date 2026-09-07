@@ -1,0 +1,30 @@
+<odoo>
+    <record id="view_move_form_ivess_accounting_summary" model="ir.ui.view">
+        <field name="name">account.move.form.ivess.accounting.summary</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page name="ivess_accounting_summary" string="Contabilidad Resumida">
+                    <group>
+                        <field name="x_folio_legal" />
+                        <field name="x_is_summary_entry" />
+                        <field name="x_closed_by_summary_move_id" />
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_move_line_tree_ivess_accounting_summary" model="ir.ui.view">
+        <field name="name">account.move.line.list.ivess.accounting.summary</field>
+        <field name="model">account.move.line</field>
+        <field name="inherit_id" ref="account.view_move_line_tree" />
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <field name="x_origin_document_id" optional="hide" />
+                <field name="x_summary_move_id" optional="hide" />
+            </xpath>
+        </field>
+    </record>
+</odoo>
