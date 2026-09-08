@@ -141,6 +141,61 @@
     </record>
 
     <!--
+        Mismo fix, en la vista "Otros Pagos" (l10n_ar_eynes.other_payment_view_form),
+        pestañas "Información de pago" (Payment Information) y "Cheques" (Checks).
+    -->
+
+    <record id="other_payment_view_form_label_fix_payment_mode" model="ir.ui.view">
+        <field name="name">other.payment.view.form.label.fix.payment.mode</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.other_payment_view_form" />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='payment_mode_line_ids']" position="replace">
+                <separator string="Líneas del método de pago" />
+            </xpath>
+            <xpath expr="//field[@name='payment_mode_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="other_payment_view_form_label_fix_concept_line" model="ir.ui.view">
+        <field name="name">other.payment.view.form.label.fix.concept.line</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.other_payment_view_form" />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='concept_line_ids']" position="replace">
+                <separator string="Otros Conceptos" />
+            </xpath>
+            <xpath expr="//field[@name='concept_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="other_payment_view_form_label_fix_issued_check" model="ir.ui.view">
+        <field name="name">other.payment.view.form.label.fix.issued.check</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.other_payment_view_form" />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='issued_check_line_ids']" position="replace">
+                <separator string="Cheques propios" invisible="type == 'receipt'" />
+            </xpath>
+        </field>
+    </record>
+
+    <record id="other_payment_view_form_label_fix_third_party_check" model="ir.ui.view">
+        <field name="name">other.payment.view.form.label.fix.third.party.check</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.other_payment_view_form" />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='third_party_check_ids']" position="replace">
+                <separator string="Cheques de terceros" invisible="type == 'receipt'" />
+            </xpath>
+        </field>
+    </record>
+
+    <!--
         Mismo fix, para la página "ARBA A122R - Registros" (agregada por
         l10n_ar_eynes.arba_a122r_views.xml). Se hereda directamente de esa vista
         (no de la vista base) para asegurar que el label ya exista en el árbol
