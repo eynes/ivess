@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 {
     "name": "Ivess Padron Multi CUIT Fix",
     "version": "19.0.0.0.3",
