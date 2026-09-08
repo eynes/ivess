@@ -140,4 +140,45 @@
         </field>
     </record>
 
+    <!--
+        Mismo fix, para la página "ARBA A122R - Registros" (agregada por
+        l10n_ar_eynes.arba_a122r_views.xml). Se hereda directamente de esa vista
+        (no de la vista base) para asegurar que el label ya exista en el árbol
+        combinado cuando se aplica este fix.
+    -->
+
+    <record id="account_payment_order_view_form_arba_a122r_label_fix_request_log" model="ir.ui.view">
+        <field name="name">account.payment.order.view.form.arba.a122r.label.fix.request.log</field>
+        <field
+            name="inherit_id"
+            ref="l10n_ar_eynes.account_supplier_payment_order_view_form_inherit_arba_a122r"
+        />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='arba_a122r_request_log_ids']" position="replace">
+                <separator string="Solicitudes ARBA A122R" />
+            </xpath>
+            <xpath expr="//field[@name='arba_a122r_request_log_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="account_payment_order_view_form_arba_a122r_label_fix_retention_record" model="ir.ui.view">
+        <field name="name">account.payment.order.view.form.arba.a122r.label.fix.retention.record</field>
+        <field
+            name="inherit_id"
+            ref="l10n_ar_eynes.account_supplier_payment_order_view_form_inherit_arba_a122r"
+        />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='arba_retention_record_ids']" position="replace">
+                <separator string="Registros persistentes ARBA" />
+            </xpath>
+            <xpath expr="//field[@name='arba_retention_record_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
 </odoo>
