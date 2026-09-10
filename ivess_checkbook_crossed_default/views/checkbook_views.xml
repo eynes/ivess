@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="account_checkbook_view_form_crossed_default" model="ir.ui.view">
+        <field name="name">account.checkbook.view.form.crossed.default</field>
+        <field name="model">account.payment.method.line</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.account_checkbook_view_form" />
+        <field name="arch" type="xml">
+            <field name="bank_id" position="after">
+                <field name="crossed_by_default" />
+            </field>
+        </field>
+    </record>
+
+    <record id="account_checkbook_view_tree_crossed_default" model="ir.ui.view">
+        <field name="name">account.checkbook.view.tree.crossed.default</field>
+        <field name="model">account.payment.method.line</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.account_checkbook_view_tree" />
+        <field name="arch" type="xml">
+            <field name="bank_id" position="after">
+                <field name="crossed_by_default" />
+            </field>
+        </field>
+    </record>
+
+    <record id="create_checkbook_wizard_view_form_crossed_default" model="ir.ui.view">
+        <field name="name">create.checkbook.wizard.view.form.crossed.default</field>
+        <field name="model">create.checkbook.wizard</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.create_checkbook_wizard_view_form"
+    />
+        <field name="arch" type="xml">
+            <field name="required_num" position="after">
+                <field name="crossed_by_default" />
+            </field>
+        </field>
+    </record>
+
+</odoo>
