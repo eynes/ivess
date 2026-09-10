@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record
+    id="res_company_view_form_inherit_ivess_vendor_bill_cae_required"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >res.company.view.form.inherit.ivess.vendor.bill.cae.required</field>
+        <field name="model">res.company</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.res_company_view_form_inherit_l10n_ar_eynes"
+    />
+        <field name="arch" type="xml">
+            <field name="cbu" position="after">
+                <field name="require_cae_vendor_bill" />
+            </field>
+        </field>
+    </record>
+
+</odoo>
