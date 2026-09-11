@@ -61,6 +61,20 @@ def _only_digits(value):
     return re.sub(r'\D', '', value or '')
 
 
+def _non_latin1_char(value):
+    # El TXT de BBVA sale codificado en latin-1 (action_download): si algún
+    # campo de texto libre del proveedor tiene un carácter fuera de ese
+    # rango (típicamente un "�" que quedó grabado por un import/copy
+    # paste con la codificación mal detectada en algún momento), hay que
+    # detectarlo acá con un error legible en vez de que reviente
+    # UnicodeEncodeError recién al armar el archivo.
+    try:
+        (value or '').encode('latin-1')
+    except UnicodeEncodeError as exc:
+        return value[exc.start:exc.end]
+    return None
+
+
 class BbvaPaymentOrderExportWizard(models.TransientModel):
     _name = 'bbva.payment.order.export.wizard'
     _description = 'BBVA Payment Order Export Wizard'
@@ -244,6 +258,30 @@ class BbvaPaymentOrderExportWizard(models.TransientModel):
                 )
                 % (payment_order.number, partner.name, partner.cbu)
             )
+        text_fields = {
+            _('nombre/razón social'): partner.name,
+            _('calle'): partner.street,
+            _('localidad'): partner.city,
+            _('email'): partner.email,
+            _('inscripción en IIBB'): partner.nro_insc_iibb,
+        }
+        for label, value in text_fields.items():
+            bad_char = _non_latin1_char(value)
+            if bad_char:
+                errors.append(
+                    _(
+                        '%(order)s (%(partner)s): el campo "%(field)s" '
+                        'tiene un carácter ("%(char)s") que el formato '
+                        'BBVA no admite (codificación Latin-1); hay que '
+                        'corregirlo en la ficha del proveedor.'
+                    )
+                    % {
+                        'order': payment_order.number,
+                        'partner': partner.name,
+                        'field': label,
+                        'char': bad_char,
+                    }
+                )
         return errors
 
     def _province_code_map(self):
