@@ -11,7 +11,7 @@ access_ivess_fiscal_position_report_bot,ivess.fiscal.position.report.bot,model_i
 
 access_ivess_perception_report_bot,ivess.perception.report.bot,model_ivess_perception_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
-access_ivess_customer_category_report_bot,ivess.customer.category.report.bot,model_ivess_customer_category_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_ivess_registration_channel_report_bot,ivess.registration.channel.report.bot,model_ivess_registration_channel_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 access_registration_channel_bot,registration.channel.bot,logistic_custom_ivess.model_registration_channel,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_container_loan_report_bot,ivess.container.loan.report.bot,model_ivess_container_loan_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
