@@ -17,6 +17,7 @@
         "l10n_ar_eynes",
         "helpdesk_maint_custom",
         "logistic_custom_ivess",
+        "custom_ivess_product",
         "ivess_partner_custom",
         "pricelist_custom",
     ],

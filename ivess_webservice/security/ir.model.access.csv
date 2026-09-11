@@ -11,7 +11,7 @@ access_ivess_fiscal_position_report_bot,ivess.fiscal.position.report.bot,model_i
 
 access_ivess_perception_report_bot,ivess.perception.report.bot,model_ivess_perception_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
-access_ivess_customer_category_bot,ivess.customer.category.bot,model_ivess_customer_category,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_ivess_customer_category_report_bot,ivess.customer.category.report.bot,model_ivess_customer_category_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 access_registration_channel_bot,registration.channel.bot,logistic_custom_ivess.model_registration_channel,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_container_loan_report_bot,ivess.container.loan.report.bot,model_ivess_container_loan_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
@@ -23,6 +23,8 @@ access_ivess_replacement_reason_report_bot,ivess.replacement.reason.report.bot,m
 access_replacement_reason_bot,replacement.reason.bot,logistic_custom_ivess.model_replacement_reason,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_products_report_bot,ivess.products.report.bot,model_ivess_products_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_account_tax_bot,account.tax.bot,account.model_account_tax,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_mrp_bom_bot,mrp.bom.bot,mrp.model_mrp_bom,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_non_productive_container_report_bot,ivess.non.productive.container.report.bot,model_ivess_non_productive_container_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
@@ -56,7 +58,7 @@ access_ivess_delivery_and_assigned_route_report_bot,ivess.delivery.and.assigned.
 
 access_ivess_customer_fc_report_bot,ivess.customer.fc.report.bot,model_ivess_customer_fc_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
-access_ivess_fc_stock_in_truck_bot,ivess.fc.stock.in.truck.bot,model_ivess_fc_stock_in_truck,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_ivess_fc_stock_in_truck_report_bot,ivess.fc.stock.in.truck.report.bot,model_ivess_fc_stock_in_truck_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_messages_report_bot,ivess.messages.report.bot,model_ivess_messages_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 access_delivery_route_number_message_bot,delivery.route.number.message.bot,logistic_custom_ivess.model_delivery_route_number_message,ivess_webservice.group_ivess_webservice_user,1,0,0,0

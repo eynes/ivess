@@ -1,7 +1,7 @@
 from . import ivess_fiscal_position_report
 from . import ivess_perception_report
 from . import ivess_helpdesk_intake
-from . import ivess_customer_category
+from . import ivess_customer_category_report
 from . import ivess_container_loan_report
 from . import ivess_no_purchase_reason_report
 from . import ivess_replacement_reason_report
@@ -15,6 +15,6 @@ from . import ivess_limit_free_of_charge_report
 from . import ivess_stock_report
 from . import ivess_delivery_and_assigned_route_report
 from . import ivess_customer_fc_report
-from . import ivess_fc_stock_in_truck
+from . import ivess_fc_stock_in_truck_report
 from . import ivess_messages_report
-from . import ivess_talonarios
+from . import ivess_talonarios_report

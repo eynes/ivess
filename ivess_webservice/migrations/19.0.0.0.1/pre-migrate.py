@@ -7,4 +7,5 @@ def migrate(cr, version):
         DROP VIEW IF EXISTS ivess_no_purchase_reason_report CASCADE;
         DROP VIEW IF EXISTS ivess_replacement_reason_report CASCADE;
         DROP VIEW IF EXISTS ivess_talonarios_report CASCADE;
+        DROP VIEW IF EXISTS ivess_products_report CASCADE;
     """)

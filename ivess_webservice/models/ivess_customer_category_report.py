@@ -2,7 +2,7 @@ from odoo import api, models
 
 
 class IvessCustomerCategory(models.Model):
-    _name = "ivess.customer.category"
+    _name = "ivess.customer.category.report"
     _description = "Servicio de categorías de clientes expuesto al middleware Ivess"
 
     @api.model
