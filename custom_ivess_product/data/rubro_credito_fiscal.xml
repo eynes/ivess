@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+    <record id="rubro_credito_fiscal_compras_bienes_local" model="rubro.credito.fiscal">
+        <field
+      name="name"
+    >Compras de Bienes en el Mercado Local (Excepto Bs de Uso)</field>
+    </record>
+    <record
+    id="rubro_credito_fiscal_prestaciones_servicio"
+    model="rubro.credito.fiscal"
+  >
+        <field name="name">Por Prestaciones de Servicio</field>
+    </record>
+    <record
+    id="rubro_credito_fiscal_inversiones_bienes_uso"
+    model="rubro.credito.fiscal"
+  >
+        <field name="name">Por Inversiones de Bienes de Uso</field>
+    </record>
+    <record id="rubro_credito_fiscal_inversiones_bs_uso" model="rubro.credito.fiscal">
+        <field name="name">Por Inversiones de Bs de Uso</field>
+    </record>
+</odoo>

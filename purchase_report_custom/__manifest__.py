@@ -4,6 +4,7 @@
     "version": "19.0.0.0.1",
     "description": "",
     "author": "Eynes",
+    "license": "LGPL-3",
     "category": "Purchase",
     "depends": [
         "purchase",

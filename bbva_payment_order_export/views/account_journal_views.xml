@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="account_journal_view_form_inherit_bbva" model="ir.ui.view">
+        <field name="name">account.journal.view.form.inherit.bbva</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.view_account_journal_form" />
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page
+                    name="bbva_export"
+                    string="BBVA Pago a Proveedores"
+                    invisible="type != 'bank'"
+                >
+                    <group>
+                        <field name="bbva_is_default_debit_account" />
+                        <field name="bbva_suc_cta_debito" />
+                        <field name="bbva_dv_cta_debito" />
+                        <field name="bbva_nro_cta_debito" />
+                        <field name="bbva_contrato_prov" />
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+</odoo>

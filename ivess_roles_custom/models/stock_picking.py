@@ -15,11 +15,11 @@ class StockPicking(models.Model):
         ningún tipo de picking (fila 6: ❌ No).
         """
         user = self.env.user
-        is_purchase_user_only = user.has_group(
-            "purchase.group_purchase_user"
-        ) and not (
+        is_purchase_user_only = user.has_group("purchase.group_purchase_user") and not (
             user.has_group("purchase.group_purchase_manager")
             or user.has_group("base.group_system")
+            or user.has_group("stock.group_stock_user")
+            or user.has_group("stock.group_stock_manager")
         )
         if is_purchase_user_only and any(
             p.picking_type_code == "incoming" for p in self

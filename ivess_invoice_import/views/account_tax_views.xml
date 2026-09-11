@@ -1,0 +1,14 @@
+<odoo>
+    <record id="account_view_tax_form_inherit_ivess_invoice_import" model="ir.ui.view">
+        <field name="name">account.tax.view.form.inherit.ivess.invoice.import</field>
+        <field name="model">account.tax</field>
+        <field name="inherit_id" ref="account.view_tax_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='perception_application_ids']/.." position="after">
+                <group string="Importación de facturas (Excel)">
+                    <field name="bejerman_code" />
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

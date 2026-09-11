@@ -46,6 +46,17 @@ msgstr ""
 #, python-format
 msgid ""
 "Document: %s\n"
+"The invoice date (%s) cannot be later than the accounting date (%s)."
+msgstr ""
+"Documento: %s\n"
+"La fecha del comprobante (%s) no puede ser posterior a la fecha contable (%s)."
+
+#. module: ivess_validate_period
+#. odoo-python
+#: code:addons/ivess_validate_period/models/account_move.py:0
+#, python-format
+msgid ""
+"Document: %s\n"
 "The journal does not have a closing date established.\n"
 "Please configure it in: Accounting → Journals → Update journal periods."
 msgstr ""

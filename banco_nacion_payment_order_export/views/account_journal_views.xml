@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="account_journal_view_form_inherit_banco_nacion" model="ir.ui.view">
+        <field name="name">account.journal.view.form.inherit.banco.nacion</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.view_account_journal_form" />
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page
+                    name="banco_nacion_export"
+                    string="Banco Nación"
+                    invisible="type != 'bank'"
+                >
+                    <group>
+                        <field name="banco_nacion_is_default_account" />
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+</odoo>

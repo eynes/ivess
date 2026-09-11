@@ -9,6 +9,9 @@
                 <group name="group_requiere_comprobante">
                     <field name="requiere_comprobante"/>
                 </group>
+                <group name="group_codigo_bejerman">
+                    <field name="codigo_bejerman"/>
+                </group>
             </xpath>
             <xpath expr="//field[@name='category_id']" position="after">
                 <field name="total_invoiced"/>

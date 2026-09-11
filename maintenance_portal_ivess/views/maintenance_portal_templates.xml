@@ -23,6 +23,139 @@
 
 
     <!-- ============================================================
+         Barra de filtros combinables (compartida por /my/maintenance
+         y /my/workshop). Espera en contexto: active_filters,
+         active_filters_labels, filter_options, filter_base_url,
+         filter_clear_url, show_done.
+    ============================================================ -->
+    <template id="portal_maintenance_filter_bar" name="Maintenance Portal: Filter Bar">
+        <div class="mb-3">
+            <button class="btn btn-outline-secondary btn-sm d-md-none mb-2" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#o_maint_filter_bar_collapse"
+                    aria-expanded="false" aria-controls="o_maint_filter_bar_collapse">
+                <i class="fa fa-filter me-1"/> Filtros
+            </button>
+            <div class="collapse d-md-block" id="o_maint_filter_bar_collapse">
+                <div class="card card-body bg-light">
+                    <form method="get" t-att-action="filter_base_url" class="row g-2 align-items-end">
+                        <t t-if="show_done">
+                            <input type="hidden" name="show_done" value="1"/>
+                        </t>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-semibold mb-1" for="o_maint_f_name">Buscar por título</label>
+                            <input type="text" name="f_name" id="o_maint_f_name" class="form-control form-control-sm"
+                                   t-att-value="active_filters.get('f_name', '')" placeholder="Nombre de la solicitud"/>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small fw-semibold mb-1" for="o_maint_f_priority">Prioridad</label>
+                            <select name="f_priority" id="o_maint_f_priority" class="form-select form-select-sm">
+                                <option value="">— Todas —</option>
+                                <t t-foreach="filter_options['priority_options']" t-as="opt">
+                                    <option t-att-value="opt[0]"
+                                            t-att-selected="'selected' if active_filters.get('f_priority') == opt[0] else None">
+                                        <t t-esc="opt[1]"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small fw-semibold mb-1" for="o_maint_f_user_id">Técnico</label>
+                            <select name="f_user_id" id="o_maint_f_user_id" class="form-select form-select-sm">
+                                <option value="">— Todos —</option>
+                                <t t-foreach="filter_options['user_options']" t-as="usr">
+                                    <option t-att-value="usr.id"
+                                            t-att-selected="'selected' if active_filters.get('f_user_id') == usr.id else None">
+                                        <t t-esc="usr.name"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small fw-semibold mb-1" for="o_maint_f_department_id">Departamento</label>
+                            <select name="f_department_id" id="o_maint_f_department_id" class="form-select form-select-sm">
+                                <option value="">— Todos —</option>
+                                <t t-foreach="filter_options['department_options']" t-as="dept">
+                                    <option t-att-value="dept.id"
+                                            t-att-selected="'selected' if active_filters.get('f_department_id') == dept.id else None">
+                                        <t t-esc="dept.name"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small fw-semibold mb-1" for="o_maint_f_equipment_id">Equipo</label>
+                            <select name="f_equipment_id" id="o_maint_f_equipment_id" class="form-select form-select-sm">
+                                <option value="">— Todos —</option>
+                                <t t-foreach="filter_options['equipment_options']" t-as="equip">
+                                    <option t-att-value="equip.id"
+                                            t-att-selected="'selected' if active_filters.get('f_equipment_id') == equip.id else None">
+                                        <t t-esc="equip.name"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small fw-semibold mb-1" for="o_maint_f_date_from">Desde</label>
+                            <input type="date" name="f_date_from" id="o_maint_f_date_from"
+                                   class="form-control form-control-sm"
+                                   t-att-value="active_filters.get('f_date_from', '')"
+                                   t-att-max="active_filters.get('f_date_to') or None"/>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small fw-semibold mb-1" for="o_maint_f_date_to">Hasta</label>
+                            <input type="date" name="f_date_to" id="o_maint_f_date_to"
+                                   class="form-control form-control-sm"
+                                   t-att-value="active_filters.get('f_date_to', '')"
+                                   t-att-min="active_filters.get('f_date_from') or None"/>
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                                <i class="fa fa-search me-1"/> Aplicar
+                            </button>
+                        </div>
+                    </form>
+
+                    <div t-if="active_filters_labels" class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                        <t t-foreach="active_filters_labels" t-as="chip">
+                            <a t-if="chip['kind'] == 'name'" t-att-href="request.httprequest.path + '?' + keep_query('*', f_name=None)"
+                               class="badge rounded-pill text-bg-light border text-dark text-decoration-none">
+                                <t t-esc="chip['label']"/> <i class="fa fa-times ms-1"/>
+                            </a>
+                            <a t-elif="chip['kind'] == 'priority'" t-att-href="request.httprequest.path + '?' + keep_query('*', f_priority=None)"
+                               class="badge rounded-pill text-bg-light border text-dark text-decoration-none">
+                                <t t-esc="chip['label']"/> <i class="fa fa-times ms-1"/>
+                            </a>
+                            <a t-elif="chip['kind'] == 'user'" t-att-href="request.httprequest.path + '?' + keep_query('*', f_user_id=None)"
+                               class="badge rounded-pill text-bg-light border text-dark text-decoration-none">
+                                <t t-esc="chip['label']"/> <i class="fa fa-times ms-1"/>
+                            </a>
+                            <a t-elif="chip['kind'] == 'department'" t-att-href="request.httprequest.path + '?' + keep_query('*', f_department_id=None)"
+                               class="badge rounded-pill text-bg-light border text-dark text-decoration-none">
+                                <t t-esc="chip['label']"/> <i class="fa fa-times ms-1"/>
+                            </a>
+                            <a t-elif="chip['kind'] == 'equipment'" t-att-href="request.httprequest.path + '?' + keep_query('*', f_equipment_id=None)"
+                               class="badge rounded-pill text-bg-light border text-dark text-decoration-none">
+                                <t t-esc="chip['label']"/> <i class="fa fa-times ms-1"/>
+                            </a>
+                            <a t-elif="chip['kind'] == 'date_range'" t-att-href="request.httprequest.path + '?' + keep_query('*', f_date_from=None, f_date_to=None)"
+                               class="badge rounded-pill text-bg-light border text-dark text-decoration-none">
+                                <t t-esc="chip['label']"/> <i class="fa fa-times ms-1"/>
+                            </a>
+                        </t>
+                        <a t-att-href="filter_clear_url" class="small text-muted ms-2">Limpiar filtros</a>
+                    </div>
+
+                    <div t-if="active_filters.get('date_range_invalid')" class="alert alert-danger alert-dismissible mt-3 mb-0" role="alert">
+                        La fecha "desde" no puede ser posterior a la fecha "hasta". El rango de fechas no se aplicó.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+
+    <!-- ============================================================
          Vista lista: /my/maintenance
     ============================================================ -->
     <template id="portal_my_maintenance" name="Mis Órdenes de Mantenimiento">
@@ -37,6 +170,8 @@
                     <i class="fa fa-plus me-1"/> Nueva solicitud
                 </a>
             </div>
+
+            <t t-call="maintenance_portal_ivess.portal_maintenance_filter_bar"/>
 
             <t t-if="not maintenance_requests">
                 <div class="alert alert-warning mt-3">
@@ -84,6 +219,10 @@
                                 <span>
                                     <i class="fa fa-user me-1"/>
                                     <t t-esc="req.user_id.name or '—'"/>
+                                </span>
+                                <span>
+                                    <i class="fa fa-building me-1"/>
+                                    <t t-esc="req.department_id.name or '—'"/>
                                 </span>
                             </div>
                         </a>
@@ -1072,6 +1211,8 @@
                 </div>
             </div>
 
+            <t t-call="maintenance_portal_ivess.portal_maintenance_filter_bar"/>
+
             <t t-if="not maintenance_requests">
                 <div class="alert alert-warning mt-3">
                     <t t-if="not show_done">
@@ -1122,6 +1263,10 @@
                                 <span>
                                     <i class="fa fa-user me-1"/>
                                     <t t-esc="req.user_id.name or '—'"/>
+                                </span>
+                                <span>
+                                    <i class="fa fa-building me-1"/>
+                                    <t t-esc="req.department_id.name or '—'"/>
                                 </span>
                             </div>
                         </a>
