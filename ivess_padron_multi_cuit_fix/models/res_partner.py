@@ -47,14 +47,14 @@ class ResPartner(models.Model):
         }
 
         check_padron_server_state = (
-            self.env['ir.config_parameter']
+            self.env["ir.config_parameter"]
             .sudo()
-            .get_param('l10n_ar_padron_ws_consumer.check_padron_server_state')
+            .get_param("l10n_ar_padron_ws_consumer.check_padron_server_state")
         )
 
         if check_server_state or check_padron_server_state:
             try:
-                _logger.info('Checking Padron URL State')
+                _logger.info("Checking Padron URL State")
                 response = requests.head(
                     padron_url,
                     headers=HEADERS,
@@ -72,7 +72,7 @@ class ResPartner(models.Model):
 
         self._cleanup_old_padron_values()
 
-        _logger.info('Update Padron')
+        _logger.info("Update Padron")
 
         valid_document_types = [
             self.env.ref("l10n_ar_eynes.document_cuit").id,
@@ -81,26 +81,26 @@ class ResPartner(models.Model):
         padron_url = self._get_padron_url()
         current_period = get_current_period()
         domain = [
-            ('document_type_id', 'in', valid_document_types),
-            ('parent_id', '=', False),
-            ('vat', '!=', False),
+            ("document_type_id", "in", valid_document_types),
+            ("parent_id", "=", False),
+            ("vat", "!=", False),
         ]
         if only_from_today:
             today = date.today()
-            domain.append(('create_date', '>=', today))
-        partner_ids = self.env.context.get('active_ids', [])
+            domain.append(("create_date", ">=", today))
+        partner_ids = self.env.context.get("active_ids", [])
         if partner_ids:
-            domain_append = [('id', 'in', partner_ids)]
+            domain_append = [("id", "in", partner_ids)]
         else:
             domain_append = [
-                '|',
-                ('last_padron_update', '=', False),
-                ('last_padron_update', '<', current_period),
+                "|",
+                ("last_padron_update", "=", False),
+                ("last_padron_update", "<", current_period),
             ]
         domain = domain + domain_append
         res_partner_obj = self.env["res.partner"]
         partners = res_partner_obj.search(domain)
-        _logger.info('Getting Padron Information')
+        _logger.info("Getting Padron Information")
         if partners:
             valid_vat = self._validate_partners_vat(partners, from_cron)
 
@@ -108,7 +108,7 @@ class ResPartner(models.Model):
             response = self._get_padron_values(
                 valid_vat, padron_url, padron_name, padron_type, from_cron
             )
-            _logger.info('Padron Information Fetched')
+            _logger.info("Padron Information Fetched")
             for vat, partner_values in response.items():
                 try:
                     perceptions = False
@@ -131,9 +131,7 @@ class ResPartner(models.Model):
                             if d["T"] == "P" and d["P"] != "SALT"
                         ]
                     if not retentions:
-                        retentions = [
-                            d for d in partner_values if d["T"] == "R"
-                        ]
+                        retentions = [d for d in partner_values if d["T"] == "R"]
                     coeficients = [
                         d
                         for d in partner_values
@@ -162,8 +160,7 @@ class ResPartner(models.Model):
                     new_values = {
                         value
                         for value in [
-                            value["P"] + " - " + value["M"]
-                            for value in total_updates
+                            value["P"] + " - " + value["M"] for value in total_updates
                         ]
                     }
                     updates.update(new_values)
@@ -173,12 +170,12 @@ class ResPartner(models.Model):
                     )
 
             return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'type': 'info',
-                    'sticky': True,
-                    'message': (
+                "type": "ir.actions.client",
+                "tag": "display_notification",
+                "params": {
+                    "type": "info",
+                    "sticky": True,
+                    "message": (
                         "Se actualizaron los siguientes Padrones: "
                         + " | ".join([value for value in updates])
                     ),
@@ -201,52 +198,52 @@ class ResPartner(models.Model):
             ("company_id", "=", self.env.company.id),
         ]
         if padron_name == "IVA":
-            domain.append(("code", '=', 'PIVAE'))
+            domain.append(("code", "=", "PIVAE"))
         else:
             if padron_name == "ARBA":
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_b').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_b").id)
                 )
             elif padron_name in ("CABA", "SPECIAL"):
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_c').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_c").id)
                 )
             elif padron_name == "CORD":
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_x').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_x").id)
                 )
             elif padron_name == "JUJU":
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_y').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_y").id)
                 )
             elif padron_name == "TUCU":
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_t').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_t").id)
                 )
             elif padron_name == "MEND":
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_m').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_m").id)
                 )
             elif padron_name in ("SALT", "SALTD"):
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_a').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_a").id)
                 )
             elif padron_name == "FORM":
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_p').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_p").id)
                 )
             elif padron_name == "SANT":
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_s').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_s").id)
                 )
             elif padron_name == "ENTR":
                 domain.append(
-                    ("padron_state_id", '=', self.env.ref('base.state_ar_e').id)
+                    ("padron_state_id", "=", self.env.ref("base.state_ar_e").id)
                 )
 
-            if padron_type == 'perceptions':
-                domain.append(("code", 'like', 'PIE_'))
-            elif padron_type == 'retentions':
-                domain.append(("code", 'like', 'RIE_'))
+            if padron_type == "perceptions":
+                domain.append(("code", "like", "PIE_"))
+            elif padron_type == "retentions":
+                domain.append(("code", "like", "RIE_"))
 
         return self.env["account.journal"].search(domain)

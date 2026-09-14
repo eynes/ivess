@@ -3,7 +3,10 @@
 
     <record id="account_payment_order_view_form_concepto_bna" model="ir.ui.view">
         <field name="name">account.payment.order.view.form.concepto.bna</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_supplier_payment_order_view_form" />
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='receipt_number']" position="after">
@@ -12,9 +15,17 @@
         </field>
     </record>
 
-    <record id="account_payment_order_view_form_arba_history_layout_fix" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.arba.history.layout.fix</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_supplier_payment_order_view_form" />
+    <record
+    id="account_payment_order_view_form_arba_history_layout_fix"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.arba.history.layout.fix</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='arba_history_ids']" position="attributes">
@@ -34,9 +45,17 @@
         causa exacta del glitch del cliente.
     -->
 
-    <record id="account_payment_order_view_form_supplier_label_fix_payment_mode" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.supplier.label.fix.payment.mode</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_supplier_payment_order_view_form" />
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_payment_mode"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.payment.mode</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='payment_mode_line_ids']" position="replace">
@@ -48,9 +67,17 @@
         </field>
     </record>
 
-    <record id="account_payment_order_view_form_supplier_label_fix_debt_line" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.supplier.label.fix.debt.line</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_supplier_payment_order_view_form" />
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_debt_line"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.debt.line</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='debt_line_ids']" position="replace">
@@ -62,9 +89,17 @@
         </field>
     </record>
 
-    <record id="account_payment_order_view_form_supplier_label_fix_income_line" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.supplier.label.fix.income.line</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_supplier_payment_order_view_form" />
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_income_line"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.income.line</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='income_line_ids']" position="replace">
@@ -76,9 +111,17 @@
         </field>
     </record>
 
-    <record id="account_payment_order_view_form_supplier_label_fix_issued_check" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.supplier.label.fix.issued.check</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_supplier_payment_order_view_form" />
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_issued_check"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.issued.check</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='issued_check_line_ids']" position="replace">
@@ -87,9 +130,17 @@
         </field>
     </record>
 
-    <record id="account_payment_order_view_form_supplier_label_fix_third_party_check" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.supplier.label.fix.third.party.check</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_supplier_payment_order_view_form" />
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_third_party_check"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.third.party.check</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='third_party_check_ids']" position="replace">
@@ -98,9 +149,17 @@
         </field>
     </record>
 
-    <record id="account_payment_order_view_form_customer_label_fix_payment_mode" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.customer.label.fix.payment.mode</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_customer_payment_order_view_form" />
+    <record
+    id="account_payment_order_view_form_customer_label_fix_payment_mode"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.customer.label.fix.payment.mode</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_customer_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='payment_mode_line_ids']" position="replace">
@@ -112,9 +171,17 @@
         </field>
     </record>
 
-    <record id="account_payment_order_view_form_customer_label_fix_income_line" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.customer.label.fix.income.line</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_customer_payment_order_view_form" />
+    <record
+    id="account_payment_order_view_form_customer_label_fix_income_line"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.customer.label.fix.income.line</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_customer_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='income_line_ids']" position="replace">
@@ -126,9 +193,17 @@
         </field>
     </record>
 
-    <record id="account_payment_order_view_form_customer_label_fix_debt_line" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.customer.label.fix.debt.line</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_customer_payment_order_view_form" />
+    <record
+    id="account_payment_order_view_form_customer_label_fix_debt_line"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.customer.label.fix.debt.line</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_customer_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='debt_line_ids']" position="replace">
@@ -202,35 +277,51 @@
         combinado cuando se aplica este fix.
     -->
 
-    <record id="account_payment_order_view_form_arba_a122r_label_fix_request_log" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.arba.a122r.label.fix.request.log</field>
+    <record
+    id="account_payment_order_view_form_arba_a122r_label_fix_request_log"
+    model="ir.ui.view"
+  >
         <field
-            name="inherit_id"
-            ref="l10n_ar_eynes.account_supplier_payment_order_view_form_inherit_arba_a122r"
-        />
+      name="name"
+    >account.payment.order.view.form.arba.a122r.label.fix.request.log</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form_inherit_arba_a122r"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='arba_a122r_request_log_ids']" position="replace">
                 <separator string="Solicitudes ARBA A122R" />
             </xpath>
-            <xpath expr="//field[@name='arba_a122r_request_log_ids']" position="attributes">
+            <xpath
+        expr="//field[@name='arba_a122r_request_log_ids']"
+        position="attributes"
+      >
                 <attribute name="nolabel">1</attribute>
             </xpath>
         </field>
     </record>
 
-    <record id="account_payment_order_view_form_arba_a122r_label_fix_retention_record" model="ir.ui.view">
-        <field name="name">account.payment.order.view.form.arba.a122r.label.fix.retention.record</field>
+    <record
+    id="account_payment_order_view_form_arba_a122r_label_fix_retention_record"
+    model="ir.ui.view"
+  >
         <field
-            name="inherit_id"
-            ref="l10n_ar_eynes.account_supplier_payment_order_view_form_inherit_arba_a122r"
-        />
+      name="name"
+    >account.payment.order.view.form.arba.a122r.label.fix.retention.record</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form_inherit_arba_a122r"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//label[@for='arba_retention_record_ids']" position="replace">
                 <separator string="Registros persistentes ARBA" />
             </xpath>
-            <xpath expr="//field[@name='arba_retention_record_ids']" position="attributes">
+            <xpath
+        expr="//field[@name='arba_retention_record_ids']"
+        position="attributes"
+      >
                 <attribute name="nolabel">1</attribute>
             </xpath>
         </field>
