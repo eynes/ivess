@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="account_invoice_report_view_search_ivess" model="ir.ui.view">
+        <field name="name">account.invoice.report.search.ivess</field>
+        <field name="model">account.invoice.report</field>
+        <field name="inherit_id" ref="account.view_account_invoice_report_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='product_categ_id']" position="after">
+                <field name="area_id"/>
+                <field name="rubro_credito_fiscal_id"/>
+            </xpath>
+            <xpath expr="//filter[@name='category_product']" position="after">
+                <filter string="Rubro" name="group_by_area"
+                        context="{'group_by': 'area_id'}"/>
+                <filter string="Rubro Crédito Fiscal" name="group_by_rubro_credito_fiscal"
+                        context="{'group_by': 'rubro_credito_fiscal_id'}"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
