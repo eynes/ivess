@@ -2,7 +2,7 @@
 # License LGPL-3.0 or later (https://www.gnu.org/licenses/lgpl.html).
 {
     "name": "Custom Helpdesk Maintenance",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "summary": "Extends Helpdesk with team types and maintenance ticket fields",
     "author": "Eynes",
     "category": "Helpdesk",

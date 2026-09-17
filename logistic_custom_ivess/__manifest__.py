@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': "Sale Custom Ivess",
-    'version': '19.0.0.0.17',
+    'version': '19.0.0.0.18',
     'description': """
     """,
     'author': "Eynes",
@@ -15,6 +15,7 @@
         'fleet',
         'mail',
         'stock',
+        'crm',
         'l10n_ar_eynes',
         'custom_ivess_product',
     ],
