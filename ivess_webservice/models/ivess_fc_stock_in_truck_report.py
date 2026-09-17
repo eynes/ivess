@@ -1,7 +1,7 @@
 from odoo import fields, models, tools, api
 
 class IvessFcStockInTruck(models.Model):
-    _name = "ivess.fc.stock.in.truck"
+    _name = "ivess.fc.stock.in.truck.report"
     _description = "Vista SQL de stock de equipos frio/calor en camión expuesta al middleware Ivess"
     _auto = False
 
