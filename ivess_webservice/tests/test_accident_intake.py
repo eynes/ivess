@@ -8,7 +8,7 @@ class TestAccidentIntake(IntakeTestCommon):
     def _base_payload(self, **overrides):
         payload = {
             "business_unit": "El Jumillano",
-            "patente": "PQU191",
+            "patente": self.plate,
             "dispatch": str(self.dispatch_number.number),
             "driver_file_number": "1234",
             "driver_name": "Juan Perez",

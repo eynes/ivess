@@ -8,7 +8,7 @@ class TestWorkshopNewsIntake(IntakeTestCommon):
     def _base_payload(self, **overrides):
         payload = {
             "dispatch": str(self.dispatch_number.number),
-            "patente": "PQU191",
+            "patente": self.plate,
             "observations": "Ruido en el tren delantero al frenar",
         }
         payload.update(overrides)
@@ -49,7 +49,8 @@ class TestWorkshopNewsIntake(IntakeTestCommon):
         self.assertEqual(self.env["helpdesk.ticket"].search_count([]), before)
 
     def test_oversized_photo_is_rejected(self):
-        oversized_data = "A" * (6 * 1024 * 1024)  # ~6 MB una vez "decodificado"
+        # base64 infla ~4/3: 8 MB de texto codificado ~= 6 MB decodificados
+        oversized_data = "A" * (8 * 1024 * 1024)
         payload = self._base_payload(
             attachments=[self._make_attachment("image", data=oversized_data)]
         )
@@ -59,7 +60,7 @@ class TestWorkshopNewsIntake(IntakeTestCommon):
 
     def test_patente_with_spaces_and_lowercase_resolves_equipment(self):
         result = self.env["ivess.workshop.news.intake"].create_ticket(
-            **self._base_payload(patente="pqu 191")
+            **self._base_payload(patente=self._messy_plate())
         )
         ticket = self.env["helpdesk.ticket"].browse(result["ticket_id"])
         self.assertEqual(ticket.equipment_id, self.equipment)

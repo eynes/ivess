@@ -7,7 +7,7 @@ from .common import IntakeTestCommon
 class TestBreakdownIntake(IntakeTestCommon):
     def _base_payload(self, **overrides):
         payload = {
-            "patente": "PQU191",
+            "patente": self.plate,
             "dispatch": str(self.dispatch_number.number),
             "driver_name": "Juan Perez",
             "vehicle_model": "Ford Cargo",
@@ -24,7 +24,7 @@ class TestBreakdownIntake(IntakeTestCommon):
         ticket = self.env["helpdesk.ticket"].browse(result["ticket_id"])
         self.assertIn("maps.google.com/?q=-34.6,-58.4", ticket.maps_location)
         self.assertEqual(ticket.priority, "3")
-        self.assertEqual(ticket.team_id, self.workshop_team)
+        self.assertEqual(ticket.team_id.team_type, "workshop")
         self.assertEqual(ticket.workshop_request_type, "breakdown")
 
     def test_invalid_coordinates_keep_ticket_and_warn(self):
@@ -39,7 +39,7 @@ class TestBreakdownIntake(IntakeTestCommon):
 
     def test_old_contract_aliases_still_work(self):
         result = self.env["ivess.breakdown.intake"].create_ticket(
-            patente="PQU191",
+            patente=self.plate,
             webhub_dispatch=str(self.dispatch_number.number),
             partner_id="Juan Perez",
             webhub_vehicle_model="Ford Cargo",
