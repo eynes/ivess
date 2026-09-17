@@ -4,6 +4,62 @@
         <field name="model">account.move</field>
         <field name="inherit_id" ref="account.view_move_form" />
         <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+          name="action_view_summarized_moves"
+          type="object"
+          class="oe_stat_button"
+          icon="fa-list"
+          invisible="not x_is_summary_entry or not x_summarized_move_count"
+        >
+                    <field name="x_summarized_move_count" widget="statinfo" string="Resumidos" />
+                </button>
+                <button
+          name="action_view_closing_summary_move"
+          type="object"
+          class="oe_stat_button"
+          icon="fa-file-text-o"
+          invisible="not x_closed_by_summary_move_id"
+        >
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Asiento Resumen</span>
+                    </div>
+                </button>
+            </xpath>
+            <!-- Los widgets web_ribbon no tienen un atributo único utilizable
+                 como selector de herencia ('title' está prohibido como
+                 selector), así que se ubican por su expresión 'invisible'
+                 completa, que sí es válida como selector y es estable. -->
+            <xpath
+        expr="//widget[@invisible=&quot;payment_state != 'paid' or move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt')&quot;]"
+        position="attributes"
+      >
+                <attribute name="invisible">payment_state != 'paid' or move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt') or x_closed_by_summary_move_id</attribute>
+            </xpath>
+            <xpath
+        expr="//widget[@invisible=&quot;payment_state != 'in_payment' or move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt')&quot;]"
+        position="attributes"
+      >
+                <attribute name="invisible">payment_state != 'in_payment' or move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt') or x_closed_by_summary_move_id</attribute>
+            </xpath>
+            <xpath
+        expr="//widget[@invisible=&quot;payment_state != 'partial' or move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt')&quot;]"
+        position="attributes"
+      >
+                <attribute name="invisible">payment_state != 'partial' or move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt') or x_closed_by_summary_move_id</attribute>
+            </xpath>
+            <xpath
+        expr="//widget[@invisible=&quot;payment_state != 'blocked' or move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt')&quot;]"
+        position="after"
+      >
+                <widget
+          name="web_ribbon"
+          title="Cerrado por Resumen"
+          bg_color="text-bg-info"
+          invisible="not x_closed_by_summary_move_id"
+          tooltip="Este comprobante ya fue absorbido por un Cierre Mensual: cualquier saldo pendiente se traslad&#243; al asiento resumen del Diario Legal (bot&#243;n 'Asiento Resumen'). El estado de pago que ves aqu&#237; puede no reflejar la deuda real; gestion&#225; la cobranza/pago desde ese asiento."
+        />
+            </xpath>
             <xpath expr="//notebook" position="inside">
                 <page name="ivess_accounting_summary" string="Contabilidad Resumida">
                     <group>

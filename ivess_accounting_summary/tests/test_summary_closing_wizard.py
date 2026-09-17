@@ -139,3 +139,126 @@ class TestAccountSummaryClosingWizard(IvessAccountingSummaryTestCommon):
             lambda line: line.x_origin_document_id == self.invoice_a
         )
         self.assertAlmostEqual(sum(debt_line.mapped("debit")), 500.0)
+
+    def test_full_collection_uses_bridge_account_without_partner(self):
+        # Cobro total de la factura B antes del cierre: no genera deuda
+        # legal (nada pendiente), pero su venta debe reconocerse igual, de
+        # forma agregada (sin partner) en la cuenta puente. El comprobante
+        # queda igualmente trazado hacia el asiento resumen que lo absorbió.
+        collection_move = self.env["account.move"].create(
+            {
+                "journal_id": self.operational_journal.id,
+                "date": "2024-03-28",
+                "move_type": "entry",
+                "line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": self.receivable_account.id,
+                            "partner_id": self.partner_b.id,
+                            "debit": 0.0,
+                            "credit": 2000.0,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": self.revenue_account.id,
+                            "debit": 2000.0,
+                            "credit": 0.0,
+                        },
+                    ),
+                ],
+            }
+        )
+        collection_move.action_post()
+        (self._receivable_line(self.invoice_b) | self._receivable_line(collection_move)).reconcile()
+
+        wizard = self._make_wizard()
+        wizard.action_generate_summary()
+
+        bridge_line = wizard.summary_move_id.line_ids.filtered(
+            lambda line: line.account_id == self.bridge_account
+        )
+        self.assertAlmostEqual(sum(bridge_line.mapped("debit")), 2000.0)
+        self.assertFalse(bridge_line.partner_id)
+        self.assertFalse(
+            wizard.summary_move_id.line_ids.filtered(
+                lambda line: line.x_origin_document_id == self.invoice_b
+            )
+        )
+        # Aunque no tiene deuda abierta, queda trazado hacia el cierre.
+        self.assertEqual(
+            self.invoice_b.x_closed_by_summary_move_id, wizard.summary_move_id
+        )
+
+    def test_generate_summary_requires_legal_debt_account_mapping(self):
+        # Una cuenta de deudores reconciliable sin Cuenta de Deuda Legal
+        # configurada no puede resumirse: se perdería el desglose por
+        # comprobante/contacto al mezclarse como si fuera una cuenta de
+        # resultado.
+        unmapped_receivable = self.env["account.account"].create(
+            {
+                "code": "TEST.1.1.2",
+                "name": "Deudores por Ventas (Sin Mapear) - Test",
+                "account_type": "asset_receivable",
+                "reconcile": True,
+            }
+        )
+        move = self.env["account.move"].create(
+            {
+                "journal_id": self.operational_journal.id,
+                "date": "2024-03-18",
+                "move_type": "entry",
+                "line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": unmapped_receivable.id,
+                            "partner_id": self.partner_a.id,
+                            "debit": 300.0,
+                            "credit": 0.0,
+                        },
+                    ),
+                    (
+                        0,
+                        0,
+                        {
+                            "account_id": self.revenue_account.id,
+                            "debit": 0.0,
+                            "credit": 300.0,
+                        },
+                    ),
+                ],
+            }
+        )
+        move.action_post()
+
+        with self.assertRaises(UserError):
+            self._make_wizard().action_generate_summary()
+
+    def test_summarized_moves_navigation_both_directions(self):
+        wizard = self._make_wizard()
+        wizard.action_generate_summary()
+        summary_move = wizard.summary_move_id
+        netting_move = wizard.netting_move_ids
+
+        # Desde el asiento legal: ve los comprobantes que quedaron con deuda.
+        self.assertEqual(summary_move.x_summarized_move_count, 2)
+        action = summary_move.action_view_summarized_moves()
+        found = self.env["account.move"].search(action["domain"])
+        self.assertEqual(found, self.invoice_a | self.invoice_b)
+
+        # Desde el neteo operativo: ve los mismos comprobantes originales,
+        # trazados a nivel línea (x_summary_move_id), no por deuda.
+        self.assertEqual(netting_move.x_summarized_move_count, 2)
+        netting_action = netting_move.action_view_summarized_moves()
+        netting_found = self.env["account.move"].search(netting_action["domain"])
+        self.assertEqual(netting_found, self.invoice_a | self.invoice_b)
+
+        # Desde la factura: navega de vuelta al asiento legal que la resumió.
+        invoice_action = self.invoice_a.action_view_closing_summary_move()
+        self.assertEqual(invoice_action["res_id"], summary_move.id)

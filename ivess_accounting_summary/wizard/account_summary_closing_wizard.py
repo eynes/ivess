@@ -78,6 +78,27 @@ class AccountSummaryClosingWizard(models.TransientModel):
         )
         pl_lines = candidate_lines - debt_lines
 
+        # Una cuenta de deudores/acreedores reconciliable sin Cuenta de Deuda
+        # Legal configurada caería en pl_lines y se netearía como una cuenta
+        # de resultado más: todos los partners mezclados en un único monto,
+        # sin desglose por comprobante/contacto. Se bloquea en vez de generar
+        # un asiento legal con la deuda perdida.
+        unmapped_debt_accounts = pl_lines.account_id.filtered(
+            lambda account: account.account_type
+            in ("asset_receivable", "liability_payable")
+            and not account.x_legal_debt_account_id
+        )
+        if unmapped_debt_accounts:
+            raise UserError(
+                _(
+                    "Las siguientes cuentas de deudores/acreedores no tienen "
+                    "configurada una Cuenta de Deuda Legal: %s. Configurala "
+                    "antes de cerrar el período o se perdería el desglose "
+                    "por comprobante/contacto."
+                )
+                % ", ".join(unmapped_debt_accounts.mapped("display_name"))
+            )
+
         currency = self.company_id.currency_id
         # Se cachea el residual ANTES de reconciliar nada: una vez conciliada
         # contra el neteo, amount_residual pasa a 0 y perderíamos el monto
@@ -289,7 +310,11 @@ class AccountSummaryClosingWizard(models.TransientModel):
         )
         summary_move.action_post()
 
-        open_debt_lines.move_id.write({"x_closed_by_summary_move_id": summary_move.id})
+        # Se marca TODO comprobante con una línea de deuda resumida en este
+        # cierre, no solo los que quedaron con saldo abierto: también el que
+        # ya estaba cobrado/pagado antes del cierre necesita trazabilidad
+        # hacia el asiento legal que absorbió su venta/impuesto.
+        debt_lines.move_id.write({"x_closed_by_summary_move_id": summary_move.id})
 
         self.write(
             {

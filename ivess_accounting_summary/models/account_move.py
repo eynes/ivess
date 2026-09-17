@@ -1,9 +1,12 @@
-from odoo import fields, models
+from odoo import _, api, fields, models
 
 
 class AccountMove(models.Model):
     _inherit = "account.move"
 
+    status_in_payment = fields.Selection(
+        selection_add=[("x_closed_by_summary", "Cerrado por Resumen")],
+    )
     x_folio_legal = fields.Char(
         string="Folio Legal",
         readonly=True,
@@ -31,13 +34,88 @@ class AccountMove(models.Model):
         readonly=True,
         copy=False,
         help=(
-            "Asiento resumen del Diario Legal que trasladó el saldo "
-            "pendiente de este comprobante a la cuenta de deuda legal. "
-            "Un comprobante con este campo asignado está 'Cerrado por "
-            "Resumen': su cobranza/pago debe gestionarse a partir de aquí "
-            "contra la línea correspondiente de ese asiento resumen."
+            "Asiento resumen del Diario Legal que absorbió la línea de "
+            "deuda de este comprobante en el cierre mensual. Si a la fecha "
+            "de cierre quedaba saldo pendiente, ese saldo viajó a la cuenta "
+            "de deuda legal y la cobranza/pago debe gestionarse desde aquí "
+            "contra la línea correspondiente de ese asiento resumen. Si el "
+            "comprobante ya estaba cobrado/pagado antes del cierre, este "
+            "campo solo indica en qué cierre mensual quedó resumido (su "
+            "importe fue a la cuenta puente, sin línea propia por partner)."
         ),
     )
+    x_summarized_move_count = fields.Integer(
+        string="Comprobantes Resumidos",
+        compute="_compute_x_summarized_move_count",
+        help=(
+            "Cantidad de comprobantes originales que este asiento (neteo "
+            "operativo o resumen legal) absorbió en el Asistente de Cierre "
+            "Mensual."
+        ),
+    )
+
+    def _compute_x_summarized_move_count(self):
+        for move in self:
+            move.x_summarized_move_count = self.search_count(
+                move._ivess_summarized_moves_domain()
+            )
+
+    def _ivess_summarized_moves_domain(self):
+        self.ensure_one()
+        return [
+            "|",
+            ("x_closed_by_summary_move_id", "=", self.id),
+            ("line_ids.x_summary_move_id", "=", self.id),
+        ]
+
+    def action_view_summarized_moves(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Comprobantes Resumidos"),
+            "res_model": "account.move",
+            "view_mode": "list,form",
+            "domain": self._ivess_summarized_moves_domain(),
+        }
+
+    def action_view_closing_summary_move(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "account.move",
+            "res_id": self.x_closed_by_summary_move_id.id,
+            "view_mode": "form",
+        }
+
+    @api.depends("x_closed_by_summary_move_id")
+    def _compute_status_in_payment(self):
+        super()._compute_status_in_payment()
+        # La vista de lista de facturas usa este campo (no payment_state
+        # directamente) para pintar el badge "Estado". Un comprobante
+        # cerrado por resumen no debe seguir mostrando "Pagado"/"Cobrado":
+        # su estado de pago real ahora se gestiona desde el asiento legal.
+        for move in self:
+            if move.x_closed_by_summary_move_id:
+                move.status_in_payment = "x_closed_by_summary"
+
+    def _get_view(self, view_id=None, view_type="form", **options):
+        arch, view = super()._get_view(view_id=view_id, view_type=view_type, **options)
+        if view_type == "form":
+            # l10n_ar_eynes agrega sus propios ribbons "COBRADO"/"PAGADO"
+            # (payment_state == 'paid') sobre este mismo form. No se pueden
+            # tocar por herencia XML normal: esa vista arrastra referencias
+            # a campos de otros módulos AFIP que en este árbol de módulos
+            # rompen la validación de vistas nuevas que la hereden. Se
+            # parchea acá, sobre el arch ya resuelto, para que un
+            # comprobante "cerrado por resumen" no siga mostrando esos
+            # ribbons como si hubiera sido cobrado/pagado de verdad.
+            for node in arch.xpath(
+                "//widget[@name='web_ribbon' and (@title='COBRADO' or @title='PAGADO')]"
+            ):
+                invisible = node.get("invisible") or "0"
+                if "x_closed_by_summary_move_id" not in invisible:
+                    node.set("invisible", f"({invisible}) or x_closed_by_summary_move_id")
+        return arch, view
 
     def _ivess_renumber_legal_folio(self, company):
         """Renumera x_folio_legal sin huecos para los diarios legales de `company`.
