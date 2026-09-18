@@ -365,6 +365,12 @@ class AguasFCIntake(models.AbstractModel):
             mensajes_chatter.append(f"entraron: {', '.join(sorted(agregadas))}")
 
         if quitadas:
+            # Mismo tipo de operación que el ingreso (no uno de otro almacén
+            # elegido a ciegas: con varios almacenes por compañía, cualquier
+            # tipo "interno" que no sea el de este numera el traslado con el
+            # prefijo de secuencia de otro almacén). El efecto no deseado de
+            # reusarlo -- que se cree una reparación nueva para un equipo que
+            # está saliendo del taller -- se corta con skip_auto_repair.
             self._crear_traslado_correccion(
                 company=company,
                 src_location=taller_location,
@@ -372,34 +378,23 @@ class AguasFCIntake(models.AbstractModel):
                 product=product,
                 lots=[current_lots[s] for s in quitadas],
                 origin=origin,
-                picking_type=self._picking_type_salida_correccion(company),
+                picking_type=company.aguas_fc_picking_type_id,
+                skip_auto_repair=True,
             )
             mensajes_chatter.append(f"salieron: {', '.join(sorted(quitadas))}")
 
         return mensajes_chatter
 
-    def _picking_type_salida_correccion(self, company):
-        # Tipo de operación distinto del de ingreso (sin is_frio_calor): si
-        # reusáramos el mismo, _create_frio_calor_repair_orders() (en
-        # quality_control_custom) generaría una orden de reparación nueva
-        # para un equipo que está saliendo del taller.
-        picking_type = self.env["stock.picking.type"].search(
-            [
-                ("code", "=", "internal"),
-                ("company_id", "in", [company.id, False]),
-                ("is_frio_calor", "=", False),
-            ],
-            limit=1,
-        )
-        if not picking_type:
-            raise UserError(
-                f"No se encontró un tipo de operación interno (no FC) en la "
-                f"empresa {company.name}."
-            )
-        return picking_type
-
     def _crear_traslado_correccion(
-        self, company, src_location, dest_location, product, lots, origin, picking_type
+        self,
+        company,
+        src_location,
+        dest_location,
+        product,
+        lots,
+        origin,
+        picking_type,
+        skip_auto_repair=False,
     ):
         picking = (
             self.env["stock.picking"]
@@ -450,6 +445,7 @@ class AguasFCIntake(models.AbstractModel):
         picking.with_context(
             skip_sanity_check=True,
             picking_ids_not_to_backorder=picking.ids,
+            skip_frio_calor_auto_repair=skip_auto_repair,
         ).button_validate()
 
         _logger.info(
