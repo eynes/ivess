@@ -41,3 +41,15 @@ class ResCompany(models.Model):
         domain=[('code', '=', 'internal')],
         help='Tipo de operación para el picking interno diario de taller → expedición.',
     )
+    aguas_fc_no_normalizado_location_id = fields.Many2one(
+        comodel_name='stock.location',
+        string='Ubicación No Normalizados FC',
+        domain=[('usage', '=', 'internal')],
+        help='Ubicación destino para los equipos no normalizados que ingresan desde Loop (AC/EQUIPOS FC NO NORMALIZADOS).',
+    )
+    aguas_fc_no_normalizado_picking_type_id = fields.Many2one(
+        comodel_name='stock.picking.type',
+        string='Tipo de Operación No Normalizados FC',
+        domain=[('code', '=', 'internal')],
+        help='Tipo de operación para los traslados de ingreso de equipos no normalizados desde Loop. No tiene que generar orden de reparación: dejar desmarcado "Es operación FC" y sin puntos de calidad Frío/Calor.',
+    )

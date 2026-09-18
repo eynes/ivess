@@ -13,9 +13,7 @@ class AguasFCIntake(models.AbstractModel):
     @api.model
     def process_entrada(self, idreparto, equipos, fecha, tecnico, usuario):
         self = self.with_user(SUPERUSER_ID)
-        src_location = self.env["stock.location"].search(
-            [("aguas_idreparto", "=", str(idreparto))], limit=1
-        )
+        src_location = self._localizar_reparto(idreparto)
         if not src_location:
             return {
                 "success": False,
@@ -40,6 +38,76 @@ class AguasFCIntake(models.AbstractModel):
                 f"No está configurado el producto Equipo FC en la empresa {company.name}."
             )
 
+        return self._crear_ingreso(
+            idreparto=idreparto,
+            equipos=equipos,
+            company=company,
+            src_location=src_location,
+            dest_location=taller_location,
+            picking_type=picking_type,
+            product=product,
+            origin=f"AGUAS-{idreparto}-{fecha}",
+        )
+
+    # ------------------------------------------------------------------
+    # Ingreso de equipos no normalizados (Loop -> Odoo): no van al taller y
+    # no tienen que generar orden de reparación.
+    # ------------------------------------------------------------------
+    @api.model
+    def process_no_normalizados(self, idreparto, equipos, fecha, tecnico, usuario):
+        self = self.with_user(SUPERUSER_ID)
+        src_location = self._localizar_reparto(idreparto)
+        if not src_location:
+            return {
+                "success": False,
+                "error": f"No existe ubicación para idreparto={idreparto}",
+            }
+
+        company = src_location.company_id
+        no_normalizado_location = company.aguas_fc_no_normalizado_location_id
+        picking_type = company.aguas_fc_no_normalizado_picking_type_id
+        product = company.aguas_fc_product_id
+
+        if not no_normalizado_location:
+            raise UserError(
+                f"No está configurada la ubicación No Normalizados FC en la empresa {company.name}."
+            )
+        if not picking_type:
+            raise UserError(
+                f"No está configurado el tipo de operación No Normalizados FC en la empresa {company.name}."
+            )
+        if not product:
+            raise UserError(
+                f"No está configurado el producto Equipo FC en la empresa {company.name}."
+            )
+
+        return self._crear_ingreso(
+            idreparto=idreparto,
+            equipos=equipos,
+            company=company,
+            src_location=src_location,
+            dest_location=no_normalizado_location,
+            picking_type=picking_type,
+            product=product,
+            origin=f"AGUAS-NN-{idreparto}-{fecha}",
+        )
+
+    def _localizar_reparto(self, idreparto):
+        return self.env["stock.location"].search(
+            [("aguas_idreparto", "=", str(idreparto))], limit=1
+        )
+
+    def _crear_ingreso(
+        self,
+        idreparto,
+        equipos,
+        company,
+        src_location,
+        dest_location,
+        picking_type,
+        product,
+        origin,
+    ):
         lots = []
         for serial in equipos:
             lot = self.env["stock.lot"].search(
@@ -70,8 +138,8 @@ class AguasFCIntake(models.AbstractModel):
                 {
                     "picking_type_id": picking_type.id,
                     "location_id": src_location.id,
-                    "location_dest_id": taller_location.id,
-                    "origin": f"AGUAS-{idreparto}-{fecha}",
+                    "location_dest_id": dest_location.id,
+                    "origin": origin,
                     "company_id": company.id,
                 }
             )
@@ -87,7 +155,7 @@ class AguasFCIntake(models.AbstractModel):
                     "product_uom_qty": len(lots),
                     "product_uom": product.uom_id.id,
                     "location_id": src_location.id,
-                    "location_dest_id": taller_location.id,
+                    "location_dest_id": dest_location.id,
                     "company_id": company.id,
                 }
             )
@@ -106,7 +174,7 @@ class AguasFCIntake(models.AbstractModel):
                     "lot_id": lot.id,
                     "quantity": 1,
                     "location_id": src_location.id,
-                    "location_dest_id": taller_location.id,
+                    "location_dest_id": dest_location.id,
                     "company_id": company.id,
                 }
             )

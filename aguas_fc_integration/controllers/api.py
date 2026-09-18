@@ -74,6 +74,47 @@ class AguasFCController(http.Controller):
             return {"success": False, "error": str(e)}
 
     # ------------------------------------------------------------------
+    # Ingreso de equipos no normalizados (Loop -> Odoo): no van al taller y
+    # no generan orden de reparación.
+    # ------------------------------------------------------------------
+    @http.route(
+        "/api/v1/equipos/no-normalizados",
+        type="json",
+        auth="none",
+        methods=["POST"],
+        csrf=False,
+    )
+    def registrar_no_normalizados(self, **kwargs):
+        error = self._check_api_key()
+        if error:
+            return error
+
+        data = kwargs
+
+        required = ["fecha", "idreparto", "tecnico", "usuario", "equipos"]
+        error = self._check_required(data, required)
+        if error:
+            return error
+
+        equipos = self._as_list(data["equipos"])
+
+        try:
+            return (
+                request.env["aguas.fc.intake"]
+                .sudo()
+                .process_no_normalizados(
+                    idreparto=data["idreparto"],
+                    equipos=equipos,
+                    fecha=data["fecha"],
+                    tecnico=data["tecnico"],
+                    usuario=data["usuario"],
+                )
+            )
+        except Exception as e:
+            _logger.exception("Error en /api/v1/equipos/no-normalizados")
+            return {"success": False, "error": str(e)}
+
+    # ------------------------------------------------------------------
     # Corrección de un ingreso ya registrado (Loop -> Odoo)
     # ------------------------------------------------------------------
     @http.route(
