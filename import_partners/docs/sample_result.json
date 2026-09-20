@@ -1,0 +1,263 @@
+{
+  "source": {
+    "total": 3000,
+    "files": {
+      "page_clientes_jumillano.csv": 1000,
+      "page_clientes_lufran.csv": 1000,
+      "page_ctas_madres_hijas_all.csv": 1000
+    },
+    "rejected": {
+      "duplicate_key": 276,
+      "missing_or_rejected_mother": 49
+    },
+    "fingerprint": "06c230390dca40dc4c375eee79c2f65aa685518de184c478f13d31ae56101630",
+    "hashes": {
+      "page_clientes_jumillano.csv": "04988bc2dec4f9c3f5f6e371d5361ee70a3858cdce3ff85985b17e1e4b0a430b",
+      "page_clientes_lufran.csv": "4e70b1f04dc9ce8b4db88f7b04896e82e5011263512766120082b2a18597a28f",
+      "page_ctas_madres_hijas_all.csv": "609cb1dbbc3d8a3a28abc4e6830c9e1e6ababdb88536f45bd56d42daef104f3e"
+    },
+    "source_total": 156268,
+    "source_files": {
+      "page_clientes_jumillano.csv": 133056,
+      "page_clientes_lufran.csv": 20848,
+      "page_ctas_madres_hijas_all.csv": 2364
+    },
+    "source_rejected": {
+      "duplicate_key": 572,
+      "missing_or_rejected_mother": 68
+    },
+    "source_fingerprint": "ce8637a730a087216f235f2c7b083274b97d26d3c7de8e7da05dec838ab700a5",
+    "per_file_limit": 1000
+  },
+  "sample_files": {
+    "page_clientes_jumillano.csv": 1000,
+    "page_clientes_lufran.csv": 1000,
+    "page_ctas_madres_hijas_all.csv": 1000
+  },
+  "dry": {
+    "run_id": null,
+    "dry_run": true,
+    "checkpoint": 3000,
+    "total": 3000,
+    "counts": {
+      "unchanged": 93,
+      "created": 2582,
+      "rejected": 325
+    },
+    "preflight": {
+      "total": 3000,
+      "files": {
+        "page_clientes_jumillano.csv": 1000,
+        "page_clientes_lufran.csv": 1000,
+        "page_ctas_madres_hijas_all.csv": 1000
+      },
+      "rejected": {
+        "duplicate_key": 276,
+        "missing_or_rejected_mother": 49
+      },
+      "fingerprint": "06c230390dca40dc4c375eee79c2f65aa685518de184c478f13d31ae56101630",
+      "hashes": {
+        "page_clientes_jumillano.csv": "04988bc2dec4f9c3f5f6e371d5361ee70a3858cdce3ff85985b17e1e4b0a430b",
+        "page_clientes_lufran.csv": "4e70b1f04dc9ce8b4db88f7b04896e82e5011263512766120082b2a18597a28f",
+        "page_ctas_madres_hijas_all.csv": "609cb1dbbc3d8a3a28abc4e6830c9e1e6ababdb88536f45bd56d42daef104f3e"
+      },
+      "source_total": 156268,
+      "source_files": {
+        "page_clientes_jumillano.csv": 133056,
+        "page_clientes_lufran.csv": 20848,
+        "page_ctas_madres_hijas_all.csv": 2364
+      },
+      "source_rejected": {
+        "duplicate_key": 572,
+        "missing_or_rejected_mother": 68
+      },
+      "source_fingerprint": "ce8637a730a087216f235f2c7b083274b97d26d3c7de8e7da05dec838ab700a5",
+      "per_file_limit": 1000
+    },
+    "file_counts": {
+      "page_clientes_jumillano.csv": {
+        "unchanged": 40,
+        "created": 960
+      },
+      "page_clientes_lufran.csv": {
+        "unchanged": 40,
+        "created": 960
+      },
+      "page_ctas_madres_hijas_all.csv": {
+        "unchanged": 13,
+        "created": 662,
+        "rejected": 325
+      }
+    },
+    "issue_counts": {
+      "document_fallback": 834,
+      "phone_format_preserved:Teléfono": 15,
+      "phone_format_preserved:Teléfono,document_fallback": 4,
+      "phone_format_preserved:Teléfono,phone_format_preserved:Numero de Celular,document_fallback": 3,
+      "duplicate_key": 276,
+      "phone_format_preserved:Numero de Celular": 3,
+      "phone_format_preserved:Teléfono,phone_format_preserved:Numero de Celular": 2,
+      "inherited_from_mother:vat": 10,
+      "document_fallback,inherited_from_mother:vat,inherited_from_mother:document_type_id": 5,
+      "missing_or_rejected_mother": 49,
+      "inherited_from_mother:vat,inherited_from_mother:document_type_id": 1,
+      "inherited_from_mother:property_account_position_id": 1
+    }
+  },
+  "apply": {
+    "run_id": 22,
+    "dry_run": false,
+    "checkpoint": 3000,
+    "total": 3000,
+    "counts": {
+      "unchanged": 93,
+      "created": 2582,
+      "rejected": 325
+    },
+    "preflight": {
+      "total": 3000,
+      "files": {
+        "page_clientes_jumillano.csv": 1000,
+        "page_clientes_lufran.csv": 1000,
+        "page_ctas_madres_hijas_all.csv": 1000
+      },
+      "rejected": {
+        "duplicate_key": 276,
+        "missing_or_rejected_mother": 49
+      },
+      "fingerprint": "06c230390dca40dc4c375eee79c2f65aa685518de184c478f13d31ae56101630",
+      "hashes": {
+        "page_clientes_jumillano.csv": "04988bc2dec4f9c3f5f6e371d5361ee70a3858cdce3ff85985b17e1e4b0a430b",
+        "page_clientes_lufran.csv": "4e70b1f04dc9ce8b4db88f7b04896e82e5011263512766120082b2a18597a28f",
+        "page_ctas_madres_hijas_all.csv": "609cb1dbbc3d8a3a28abc4e6830c9e1e6ababdb88536f45bd56d42daef104f3e"
+      },
+      "source_total": 156268,
+      "source_files": {
+        "page_clientes_jumillano.csv": 133056,
+        "page_clientes_lufran.csv": 20848,
+        "page_ctas_madres_hijas_all.csv": 2364
+      },
+      "source_rejected": {
+        "duplicate_key": 572,
+        "missing_or_rejected_mother": 68
+      },
+      "source_fingerprint": "ce8637a730a087216f235f2c7b083274b97d26d3c7de8e7da05dec838ab700a5",
+      "per_file_limit": 1000
+    },
+    "file_counts": {
+      "page_clientes_jumillano.csv": {
+        "unchanged": 40,
+        "created": 960
+      },
+      "page_clientes_lufran.csv": {
+        "unchanged": 40,
+        "created": 960
+      },
+      "page_ctas_madres_hijas_all.csv": {
+        "unchanged": 13,
+        "created": 662,
+        "rejected": 325
+      }
+    },
+    "issues": []
+  },
+  "replay": {
+    "run_id": 23,
+    "dry_run": false,
+    "checkpoint": 3000,
+    "total": 3000,
+    "counts": {
+      "unchanged": 2675,
+      "rejected": 325
+    },
+    "preflight": {
+      "total": 3000,
+      "files": {
+        "page_clientes_jumillano.csv": 1000,
+        "page_clientes_lufran.csv": 1000,
+        "page_ctas_madres_hijas_all.csv": 1000
+      },
+      "rejected": {
+        "duplicate_key": 276,
+        "missing_or_rejected_mother": 49
+      },
+      "fingerprint": "06c230390dca40dc4c375eee79c2f65aa685518de184c478f13d31ae56101630",
+      "hashes": {
+        "page_clientes_jumillano.csv": "04988bc2dec4f9c3f5f6e371d5361ee70a3858cdce3ff85985b17e1e4b0a430b",
+        "page_clientes_lufran.csv": "4e70b1f04dc9ce8b4db88f7b04896e82e5011263512766120082b2a18597a28f",
+        "page_ctas_madres_hijas_all.csv": "609cb1dbbc3d8a3a28abc4e6830c9e1e6ababdb88536f45bd56d42daef104f3e"
+      },
+      "source_total": 156268,
+      "source_files": {
+        "page_clientes_jumillano.csv": 133056,
+        "page_clientes_lufran.csv": 20848,
+        "page_ctas_madres_hijas_all.csv": 2364
+      },
+      "source_rejected": {
+        "duplicate_key": 572,
+        "missing_or_rejected_mother": 68
+      },
+      "source_fingerprint": "ce8637a730a087216f235f2c7b083274b97d26d3c7de8e7da05dec838ab700a5",
+      "per_file_limit": 1000
+    },
+    "file_counts": {
+      "page_clientes_jumillano.csv": {
+        "unchanged": 1000
+      },
+      "page_clientes_lufran.csv": {
+        "unchanged": 1000
+      },
+      "page_ctas_madres_hijas_all.csv": {
+        "unchanged": 675,
+        "rejected": 325
+      }
+    },
+    "issues": []
+  },
+  "checked_by_company": {
+    "1": 1606,
+    "8": 1069
+  },
+  "rejection_counts": {
+    "duplicate_key": 276,
+    "missing_or_rejected_mother": 49
+  },
+  "default_pricelist_ids": {
+    "1": 1,
+    "8": 7
+  },
+  "attachment_ids": [
+    15218,
+    15217,
+    15216,
+    15215,
+    15214,
+    15213,
+    15212,
+    15211,
+    15210,
+    15209,
+    15208,
+    15207,
+    15206,
+    15205,
+    15204,
+    15203,
+    15202,
+    15201,
+    15200,
+    15199,
+    15198,
+    15197,
+    15196,
+    15195,
+    15194,
+    15193,
+    15192,
+    15191,
+    15190,
+    15189
+  ],
+  "partner_count_before": 7337,
+  "partner_count_after": 9919
+}
