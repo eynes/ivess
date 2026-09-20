@@ -1,0 +1,60 @@
+{
+  "database": "devel_partner_import_test",
+  "odoo_tests": 16,
+  "failures": 0,
+  "errors": 0,
+  "sample_rows_per_file": 1000,
+  "real_sample_rows": 3000,
+  "apply": {
+    "unchanged": 93,
+    "created": 2582,
+    "rejected": 325
+  },
+  "apply_by_file": {
+    "page_clientes_jumillano.csv": {
+      "unchanged": 40,
+      "created": 960
+    },
+    "page_clientes_lufran.csv": {
+      "unchanged": 40,
+      "created": 960
+    },
+    "page_ctas_madres_hijas_all.csv": {
+      "unchanged": 13,
+      "created": 662,
+      "rejected": 325
+    }
+  },
+  "replay": {
+    "unchanged": 2675,
+    "rejected": 325
+  },
+  "transaction_tests": {
+    "transaction_tests": "PASS",
+    "dry_run": {
+      "created": 3,
+      "rejected": 1
+    },
+    "resumed": {
+      "created": 3,
+      "rejected": 1
+    },
+    "replay": {
+      "unchanged": 3,
+      "rejected": 1
+    },
+    "per_file_resume": {
+      "page_clientes_jumillano.csv": {
+        "created": 2
+      },
+      "page_clientes_lufran.csv": {
+        "created": 2
+      },
+      "page_ctas_madres_hijas_all.csv": {
+        "created": 2
+      }
+    }
+  },
+  "phone_and_mobile_source_text_verified": true,
+  "mother_child_relationships_verified": true
+}

@@ -1,6 +1,6 @@
 {
     "name": "Import Partners",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "author": "Eynes",
     "category": "Contacts",
     "depends": [
@@ -9,6 +9,7 @@
         "logistic_custom_ivess",
         "ivess_partner_custom",
         "pricelist_custom",
+        "ivess_padron_error_handling",
     ],
     "external_dependencies": {"python": ["openpyxl"]},
     "data": [

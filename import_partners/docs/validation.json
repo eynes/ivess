@@ -1,0 +1,28 @@
+{
+  "total": 156268,
+  "files": {
+    "page_clientes_jumillano.csv": 133056,
+    "page_clientes_lufran.csv": 20848,
+    "page_ctas_madres_hijas_all.csv": 2364
+  },
+  "rejected": {
+    "duplicate_key": 572,
+    "missing_or_rejected_mother": 68
+  },
+  "fingerprint": "880ccf53a03fc32f9efa27ebaed6dbea39194a6a6a2fa13443ea93bc42746628",
+  "hashes": {
+    "page_clientes_jumillano.csv": "04988bc2dec4f9c3f5f6e371d5361ee70a3858cdce3ff85985b17e1e4b0a430b",
+    "page_clientes_lufran.csv": "4e70b1f04dc9ce8b4db88f7b04896e82e5011263512766120082b2a18597a28f",
+    "page_ctas_madres_hijas_all.csv": "609cb1dbbc3d8a3a28abc4e6830c9e1e6ababdb88536f45bd56d42daef104f3e"
+  },
+  "validation_errors": {
+    "duplicate_key": 572,
+    "missing_or_rejected_mother": 68
+  },
+  "warnings": {
+    "document_fallback": 68487,
+    "phone_format_preserved:Teléfono": 487,
+    "phone_format_preserved:Numero de Celular": 128
+  },
+  "valid_scalar_and_relation_rows": 155628
+}
