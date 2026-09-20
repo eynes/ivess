@@ -178,3 +178,54 @@ class HelpdeskTicket(models.Model):
     webhub_description = fields.Char(string="WebHub Descripción")
     warehouse_id = fields.Many2one('stock.warehouse', string="Planta")
     intake_payload = fields.Html(string="Payload de ingreso", readonly=True, sanitize=False)
+
+    # Chatbot WhatsApp (T16556): tipo de solicitud e idempotencia comunes
+    # a los 4 servicios de intake (checklist, novedad, auxilio, siniestro).
+    workshop_request_type = fields.Selection(
+        selection=[
+            ('checklist', 'Checklist jMobile'),
+            ('news', 'Novedad'),
+            ('breakdown', 'Auxilio'),
+            ('accident', 'Siniestro'),
+        ],
+        string="Tipo de solicitud",
+        index=True,
+    )
+    intake_external_id = fields.Char(
+        string="ID externo de intake",
+        index=True,
+        copy=False,
+        readonly=True,
+        help="ID del envío en el chatbot, usado para no duplicar tickets ante reintentos.",
+    )
+
+    # Siniestro (workshop_request_type = accident)
+    accident_business_unit = fields.Char(string="Unidad de negocio")
+    driver_file_number = fields.Char(string="Legajo")
+    driver_identification = fields.Char(string="DNI del conductor")
+    driver_address = fields.Char(string="Dirección del conductor")
+    accident_vehicle_damage = fields.Text(string="Daños del vehículo")
+    accident_facts = fields.Text(string="Descripción de los hechos")
+    third_party_name = fields.Char(string="Nombre y apellido del tercero")
+    third_party_vehicle = fields.Char(string="Vehículo del tercero")
+    third_party_plate = fields.Char(string="Patente del tercero")
+    third_party_identification = fields.Char(string="DNI del tercero")
+    third_party_phone = fields.Char(string="Contacto del tercero")
+    third_party_insurer = fields.Char(string="Compañía de seguro del tercero")
+    third_party_vehicle_damage = fields.Text(string="Daños del vehículo del tercero")
+    accident_date = fields.Date(string="Fecha del siniestro")
+    accident_time = fields.Float(string="Hora del siniestro")
+    accident_address = fields.Char(string="Dirección del siniestro")
+    accident_city = fields.Char(string="Localidad del siniestro")
+    accident_notes = fields.Text(string="Observaciones del siniestro")
+
+    # Recargas (team_type = refill, workshop_request_type no aplica: no es taller)
+    refill_type = fields.Selection(
+        selection=[
+            ('factory', 'Recarga Fábrica'),
+            ('street', 'Recarga en Calle'),
+        ],
+        string="Tipo de recarga",
+    )
+    refill_to_dispatch = fields.Char(string="Hacia el reparto (texto)")
+    refill_to_dispatch_id = fields.Many2one("delivery.route.number", string="Hacia el reparto")

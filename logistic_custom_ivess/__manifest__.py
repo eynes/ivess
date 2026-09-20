@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': "Sale Custom Ivess",
-    'version': '19.0.0.0.15',
+    'version': '19.0.0.0.18',
     'description': """
     """,
     'author': "Eynes",
@@ -15,6 +15,7 @@
         'fleet',
         'mail',
         'stock',
+        'crm',
         'l10n_ar_eynes',
         'custom_ivess_product',
     ],
@@ -48,6 +49,7 @@
         'views/stock_move.xml',
         'views/purchase_order.xml',
         'views/sale_report.xml',
+        'views/account_invoice_report.xml',
         'views/menuitems.xml',
         'views/delivery_route_number_message.xml',
         'wizard/res_partner_message_wizard.xml',

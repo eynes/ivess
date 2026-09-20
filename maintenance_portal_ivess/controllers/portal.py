@@ -157,7 +157,6 @@ class MaintenancePortalController(CustomerPortal):
             ('user_id', 'f_user_id'),
             ('department_id', 'f_department_id'),
             ('equipment_id', 'f_equipment_id'),
-            ('maintenance_team_id', 'f_team_id'),
         ):
             val = self._maint_cast_int(kw.get(param))
             if val:
@@ -216,7 +215,6 @@ class MaintenancePortalController(CustomerPortal):
             'user_options': _options_for('user_id'),
             'department_options': _options_for('department_id'),
             'equipment_options': _options_for('equipment_id'),
-            'team_options': _options_for('maintenance_team_id'),
         }
 
     def _maint_active_filters_labels(self, active_filters, filter_options):
@@ -255,7 +253,6 @@ class MaintenancePortalController(CustomerPortal):
             ('user', 'f_user_id', 'user_options', 'Técnico'),
             ('department', 'f_department_id', 'department_options', 'Departamento'),
             ('equipment', 'f_equipment_id', 'equipment_options', 'Equipo'),
-            ('team', 'f_team_id', 'team_options', 'Equipo de mantenimiento'),
         ):
             rec_id = active_filters.get(param)
             if rec_id:

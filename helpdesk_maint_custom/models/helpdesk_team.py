@@ -6,6 +6,7 @@ from odoo import fields, models
 TEAM_TYPE_SELECTION = [
     ('workshop', 'Taller Mecánico'),
     ('maintenance', 'Mantenimiento'),
+    ('refill', 'Recargas'),
     ('other', 'Otro'),
 ]
 

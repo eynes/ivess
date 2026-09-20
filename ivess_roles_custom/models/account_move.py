@@ -7,11 +7,12 @@ class AccountMove(models.Model):
 
     def action_post(self):
         user = self.env.user
-        is_purchase_user_only = user.has_group(
-            "purchase.group_purchase_user"
-        ) and not (
+        is_purchase_user_only = user.has_group("purchase.group_purchase_user") and not (
             user.has_group("purchase.group_purchase_manager")
             or user.has_group("base.group_system")
+            or user.has_group("account.group_account_invoice")
+            or user.has_group("account.group_account_user")
+            or user.has_group("account.group_account_manager")
         )
         if is_purchase_user_only and any(
             move.move_type in ("in_invoice", "in_refund") for move in self

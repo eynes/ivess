@@ -1,0 +1,44 @@
+<odoo>
+    <record id="view_ivess_legal_folio_renumber_wizard_form" model="ir.ui.view">
+        <field name="name">ivess.legal.folio.renumber.wizard.form</field>
+        <field name="model">ivess.legal.folio.renumber.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Renumeración de Folio Legal">
+                <group>
+                    <field name="company_id" groups="base.group_multi_company" />
+                    <field name="renumbered_count" invisible="not renumbered_count" />
+                </group>
+                <p>
+                    Recalcula, en orden de fecha y sin dejar huecos, el folio
+                    legal (x_folio_legal) de todos los asientos posteados de
+                    los diarios marcados como "Diario Legal (Refundición /
+                    Cierre)".
+                </p>
+                <footer>
+                    <button
+            name="action_renumber"
+            type="object"
+            string="Renumerar"
+            class="btn-primary"
+          />
+                    <button string="Cerrar" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ivess_legal_folio_renumber_wizard" model="ir.actions.act_window">
+        <field name="name">Renumeración de Folio Legal</field>
+        <field name="res_model">ivess.legal.folio.renumber.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+    id="menu_ivess_legal_folio_renumber_wizard"
+    name="Renumeración de Folio Legal"
+    parent="account.account_closing_menu"
+    action="action_ivess_legal_folio_renumber_wizard"
+    sequence="11"
+  />
+</odoo>

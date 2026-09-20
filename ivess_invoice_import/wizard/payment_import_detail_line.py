@@ -3,7 +3,9 @@ from odoo import fields, models
 
 class IvessPaymentImportDetailLine(models.TransientModel):
     _name = "ivess.payment.import.detail.line"
-    _description = "Línea de aplicación a factura (previsualización) de importación de cobros"
+    _description = (
+        "Línea de aplicación a factura (previsualización) de importación de cobros"
+    )
 
     result_line_id = fields.Many2one(
         "ivess.payment.import.result.line",
@@ -16,16 +18,17 @@ class IvessPaymentImportDetailLine(models.TransientModel):
     numero_compr_asoc = fields.Char(string="Número")
     invoice_id = fields.Many2one("account.move", string="Factura")
     importe = fields.Float(string="Importe aplicado")
-    medio_pago = fields.Char(
-        string="Medio de pago (origen)",
-        help="Informativo: no determina el diario/método de pago usado en Odoo.",
+    payment_mode_id = fields.Many2one(
+        "account.journal",
+        string="Diario del medio de pago",
+        help="Diario de caja/banco resuelto a partir de 'medio de pago' +"
+        " 'caja' contra el mapeo configurable"
+        " ivess.payment.import.payment.method.code.",
     )
+    medio_pago = fields.Char(string="Medio de pago (origen)")
     moneda = fields.Char(string="Moneda (origen)")
     tipo_cambio = fields.Char(string="Tipo de cambio (origen)")
-    caja = fields.Char(
-        string="Caja (origen)",
-        help="Informativo: no determina el diario usado en Odoo.",
-    )
+    caja = fields.Char(string="Caja (origen)")
     importe_movimiento = fields.Float(string="Importe del movimiento (origen)")
     cod_bco = fields.Char(string="Cód. banco (origen)")
     sucursal_bco = fields.Char(string="Sucursal banco (origen)")

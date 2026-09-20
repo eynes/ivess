@@ -1,1 +1,2 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_rubro_credito_fiscal,access_rubro_credito_fiscal,model_rubro_credito_fiscal,base.group_user,1,1,1,1

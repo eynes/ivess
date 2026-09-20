@@ -126,7 +126,7 @@ se informa en cada `020`). `FECHA_ENTREGA`/`FECHA_PAGO` van fijos en
 | `FECHA_PAGO` | `check.payment_date` (varía por instrumento — cuotas escalonadas) |
 | `FORMA_PAGO` | `CH` (cheque físico) o `EC` (Echeq), según `check.checkbook_format` |
 | `DISPON_P` | código real de modalidad de este instrumento (ver tabla más abajo) |
-| `NRO_CHEQUE` | `check.number`, con el `8` inicial si es chequera virtual |
+| `NRO_CHEQUE` | `check.number`, con el `8` inicial si es chequera virtual, alineado a la izquierda y completado con ceros a la derecha |
 | `PRO_CBU_NRO` | se deja en ceros (solo aplica si `FORMA_PAGO=AB`, transferencia — no soportado todavía) |
 
 ### 090 — Datos del proveedor (una línea por orden, 1 a 1 con su `020`/`025`)
@@ -154,6 +154,10 @@ cada orden.
 - **Chequera virtual**: si `check.checkbook_id.format == 'virtual'`, el
   número de cheque/Echeq se completa con un `8` inicial (regla BBVA,
   `_nro_cheque_bbva`).
+- **`NRO_CHEQUE`** (registros `020` y `025`, posición 286, largo 13): se
+  informa **alineado a la izquierda y justificado con ceros hacia la
+  derecha** (p. ej. el Echeq `80110548` va como `8011054800000`, no como
+  `0000080110548`). Confirmado por el área de soporte de BBVA.
 - **Tabla de modalidad (`DISPON_P`)**, según si el cheque es CPD (pago
   diferido, códigos 0-3) o al día (4-7), combinado con cruzado/no cruzado y
   a la orden/no a la orden (`_dispon_pago_bbva`):

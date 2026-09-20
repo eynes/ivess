@@ -18,26 +18,35 @@ class IvessInvoiceImportDetailLine(models.TransientModel):
     tasa_iva = fields.Float(string="Tasa de IVA (%)")
     tax_id = fields.Many2one("account.tax", string="Impuesto")
     importe_total_neto_item = fields.Float(string="Importe total neto del ítem")
-    importe_del_renglon = fields.Char(
+    importe_iva_inscripto = fields.Float(string="Importe IVA inscripto (origen)")
+    importe_iva_no_inscripto = fields.Float(string="Importe IVA no inscripto (origen)")
+    importe_del_renglon = fields.Float(
         string="Importe del renglón (origen)",
-        help="Valor tal como vino en el archivo. Es solo informativo: no se"
-        " usa para calcular la factura en Odoo (se recalcula a partir de"
-        " cantidad x precio unitario x impuesto).",
+        help="Valor tal como vino en el archivo, normalizado a número. Es"
+        " solo informativo: no se usa para calcular la factura en Odoo (se"
+        " recalcula a partir de cantidad x precio unitario x impuesto).",
     )
-    cod_impuesto_especial = fields.Char(string="Código impuesto especial")
-    special_tax_id = fields.Many2one(
-        "account.tax",
-        string="Impuesto especial (mapeado)",
-        help="Impuesto Odoo resuelto a partir de 'Código impuesto especial'"
-        " según el mapeo configurado en Contabilidad > Configuración >"
-        " Códigos de impuesto especial (importación).",
+    special_tax_ids = fields.One2many(
+        "ivess.invoice.import.detail.special.tax",
+        "detail_line_id",
+        string="Impuestos especiales/internos",
+        help="Impuestos especiales o internos detectados en esta línea (columnas"
+        " 'cod impuesto interno', 'cod imp especiales', 'cod imp especiales1' y"
+        " 'cod imp especiales2' del Excel). Cada uno se agrega tal cual (base y"
+        " monto del Excel, sin recalcular) como percepción o impuesto interno"
+        " de la factura.",
     )
-    monto_imp = fields.Float(
-        string="Monto impuesto especial",
-        help="Importe informado en el origen para 'cod impuesto especial'."
-        " Si el código está mapeado a un impuesto Odoo, este importe se usa"
-        " tal cual como monto de la percepción/impuesto interno agregado a"
-        " la factura (no se recalcula a partir de una alícuota).",
+    special_tax_display = fields.Char(
+        string="Impuestos especiales/internos",
+        compute="_compute_special_tax_display",
+        help="Resumen de special_tax_ids para mostrar en la lista.",
     )
     has_error = fields.Boolean(string="Con error")
     error_message = fields.Char(string="Detalle del error")
+
+    def _compute_special_tax_display(self):
+        for line in self:
+            line.special_tax_display = ", ".join(
+                "%s: %.2f" % (special.tax_id.name, special.monto)
+                for special in line.special_tax_ids
+            )

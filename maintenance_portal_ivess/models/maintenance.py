@@ -21,6 +21,10 @@ class MaintenanceRequest(models.Model):
     is_workshop = fields.Boolean(string='Es taller', related='maintenance_team_id.is_workshop', store=True)
     is_internal_maintenance = fields.Boolean(string='Es mantenimiento interno', related='maintenance_team_id.is_internal_maintenance', store=True)
 
+    # Override del label: el core define string='Team'; se pisa acá para mostrar
+    # "Equipo de mantenimiento" en las vistas backend (form/tree/kanban/search).
+    maintenance_team_id = fields.Many2one(string='Equipo de mantenimiento')
+
     closure_reason_id = fields.Many2one(
         'maintenance.closure.reason',
         string='Motivo de cierre',

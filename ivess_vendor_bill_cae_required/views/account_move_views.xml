@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record
+    id="account_move_view_form_inherit_ivess_vendor_bill_cae_required"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.move.view.form.inherit.ivess.vendor.bill.cae.required</field>
+        <field name="model">account.move</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_move_view_form_inherit_l10n_ar_eynes"
+    />
+        <field name="arch" type="xml">
+            <field name="cae" position="before">
+                <field name="required_cae" invisible="1" />
+            </field>
+            <field name="cae" position="attributes">
+                <attribute name="required">required_cae</attribute>
+            </field>
+            <field name="cae_due_date" position="attributes">
+                <attribute name="required">required_cae</attribute>
+            </field>
+        </field>
+    </record>
+
+</odoo>

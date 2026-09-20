@@ -230,10 +230,7 @@ class BancoNacionPaymentOrderExportWizard(models.TransientModel):
     def action_download(self):
         self.ensure_one()
         content = ''.join(line + '\r\n' for line in self._build_lines())
-        filename = 'BancoNacion_Transferencias_{}_{}.csv'.format(
-            re.sub(r'\W+', '', self.company_id.name or 'BNA'),
-            fields.Date.context_today(self).strftime('%Y-%m-%d'),
-        )
+        filename = 'pagosmasivos.csv'
         attachment = self.env['ir.attachment'].create(
             {
                 'name': filename,

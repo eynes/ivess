@@ -3,11 +3,326 @@
 
     <record id="account_payment_order_view_form_concepto_bna" model="ir.ui.view">
         <field name="name">account.payment.order.view.form.concepto.bna</field>
-        <field name="inherit_id" ref="l10n_ar_eynes.account_supplier_payment_order_view_form" />
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
         <field name="model">account.payment.order</field>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='receipt_number']" position="after">
                 <field name="concepto_bna" />
+            </xpath>
+        </field>
+    </record>
+
+    <record
+    id="account_payment_order_view_form_arba_history_layout_fix"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.arba.history.layout.fix</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='arba_history_ids']" position="attributes">
+                <attribute name="colspan">2</attribute>
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+        Los siguientes registros reemplazan los <label for="one2many_field"/> por
+        <separator/> en las vistas de orden de pago (proveedor y cliente). Cuando
+        varias tablas one2many con label conviven en un mismo formulario, Odoo.sh
+        renderiza el formulario de forma intermitente (campos/labels desplazados o
+        faltantes) - reproducido en stage con hasta 5 casos distintos. El separator
+        no usa el atributo "for" y evita el problema sin depender de entender la
+        causa exacta del glitch del cliente.
+    -->
+
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_payment_mode"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.payment.mode</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='payment_mode_line_ids']" position="replace">
+                <separator string="Líneas del método de pago" />
+            </xpath>
+            <xpath expr="//field[@name='payment_mode_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_debt_line"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.debt.line</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='debt_line_ids']" position="replace">
+                <separator string="Facturas de proveedor y transacciones pendientes" />
+            </xpath>
+            <xpath expr="//field[@name='debt_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_income_line"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.income.line</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='income_line_ids']" position="replace">
+                <separator string="Créditos" />
+            </xpath>
+            <xpath expr="//field[@name='income_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_issued_check"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.issued.check</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='issued_check_line_ids']" position="replace">
+                <separator string="Cheques propios" />
+            </xpath>
+        </field>
+    </record>
+
+    <record
+    id="account_payment_order_view_form_supplier_label_fix_third_party_check"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.supplier.label.fix.third.party.check</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='third_party_check_ids']" position="replace">
+                <separator string="Cheques de terceros" />
+            </xpath>
+        </field>
+    </record>
+
+    <record
+    id="account_payment_order_view_form_customer_label_fix_payment_mode"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.customer.label.fix.payment.mode</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_customer_payment_order_view_form"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='payment_mode_line_ids']" position="replace">
+                <separator string="Líneas del método de pago" />
+            </xpath>
+            <xpath expr="//field[@name='payment_mode_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record
+    id="account_payment_order_view_form_customer_label_fix_income_line"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.customer.label.fix.income.line</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_customer_payment_order_view_form"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='income_line_ids']" position="replace">
+                <separator string="Facturas y transacciones pendientes" />
+            </xpath>
+            <xpath expr="//field[@name='income_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record
+    id="account_payment_order_view_form_customer_label_fix_debt_line"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.customer.label.fix.debt.line</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_customer_payment_order_view_form"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='debt_line_ids']" position="replace">
+                <separator string="Créditos" />
+            </xpath>
+            <xpath expr="//field[@name='debt_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+        Mismo fix, en la vista "Otros Pagos" (l10n_ar_eynes.other_payment_view_form),
+        pestañas "Información de pago" (Payment Information) y "Cheques" (Checks).
+    -->
+
+    <record id="other_payment_view_form_label_fix_payment_mode" model="ir.ui.view">
+        <field name="name">other.payment.view.form.label.fix.payment.mode</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.other_payment_view_form" />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='payment_mode_line_ids']" position="replace">
+                <separator string="Líneas del método de pago" />
+            </xpath>
+            <xpath expr="//field[@name='payment_mode_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="other_payment_view_form_label_fix_concept_line" model="ir.ui.view">
+        <field name="name">other.payment.view.form.label.fix.concept.line</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.other_payment_view_form" />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='concept_line_ids']" position="replace">
+                <separator string="Otros Conceptos" />
+            </xpath>
+            <xpath expr="//field[@name='concept_line_ids']" position="attributes">
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="other_payment_view_form_label_fix_issued_check" model="ir.ui.view">
+        <field name="name">other.payment.view.form.label.fix.issued.check</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.other_payment_view_form" />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='issued_check_line_ids']" position="replace">
+                <separator string="Cheques propios" invisible="type == 'receipt'" />
+            </xpath>
+        </field>
+    </record>
+
+    <record id="other_payment_view_form_label_fix_third_party_check" model="ir.ui.view">
+        <field name="name">other.payment.view.form.label.fix.third.party.check</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.other_payment_view_form" />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='third_party_check_ids']" position="replace">
+                <separator string="Cheques de terceros" invisible="type == 'receipt'" />
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+        Mismo fix, para la página "ARBA A122R - Registros" (agregada por
+        l10n_ar_eynes.arba_a122r_views.xml). Se hereda directamente de esa vista
+        (no de la vista base) para asegurar que el label ya exista en el árbol
+        combinado cuando se aplica este fix.
+    -->
+
+    <record
+    id="account_payment_order_view_form_arba_a122r_label_fix_request_log"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.arba.a122r.label.fix.request.log</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form_inherit_arba_a122r"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='arba_a122r_request_log_ids']" position="replace">
+                <separator string="Solicitudes ARBA A122R" />
+            </xpath>
+            <xpath
+        expr="//field[@name='arba_a122r_request_log_ids']"
+        position="attributes"
+      >
+                <attribute name="nolabel">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record
+    id="account_payment_order_view_form_arba_a122r_label_fix_retention_record"
+    model="ir.ui.view"
+  >
+        <field
+      name="name"
+    >account.payment.order.view.form.arba.a122r.label.fix.retention.record</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_supplier_payment_order_view_form_inherit_arba_a122r"
+    />
+        <field name="model">account.payment.order</field>
+        <field name="arch" type="xml">
+            <xpath expr="//label[@for='arba_retention_record_ids']" position="replace">
+                <separator string="Registros persistentes ARBA" />
+            </xpath>
+            <xpath
+        expr="//field[@name='arba_retention_record_ids']"
+        position="attributes"
+      >
+                <attribute name="nolabel">1</attribute>
             </xpath>
         </field>
     </record>

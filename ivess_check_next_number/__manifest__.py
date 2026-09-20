@@ -1,6 +1,6 @@
 {
     "name": "Ivess Check Next Number",
-    "version": "19.0.0.0.0",
+    "version": "19.0.0.0.1",
     "summary": "Autocompleta el próximo número de cheque disponible al elegir la chequera",
     "description": """
         En el wizard "Crear Cheques propios" (emisión desde Orden de Pago),
@@ -15,7 +15,9 @@
     "depends": [
         "l10n_ar_eynes",
     ],
-    "data": [],
+    "data": [
+        "views/perception_tax_line_view.xml",
+    ],
     "demo": [],
     "installable": True,
     "auto_install": False,

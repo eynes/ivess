@@ -9,7 +9,7 @@
             <xpath expr="//notebook" position="inside">
                 <field name="team_type" invisible="1"/>
                 <page string="Additional Information" name="maint_additional_info"
-                    invisible="team_type not in ('maintenance', 'workshop')">
+                    invisible="team_type not in ('maintenance', 'workshop', 'refill')">
                     <group col="2" invisible="team_type != 'maintenance'">
                         <group string="Classification">
                             <field name="ticket_source"/>
@@ -39,7 +39,9 @@
                     <group col="2" invisible="team_type != 'workshop'">
                         <group string="Datos del Vehículo">
                             <field name="intake_user"/>
+                            <field name="workshop_request_type"/>
                             <field name="dispatch_id"/>
+                            <field name="dispatch"/>
                             <field name="driver_name"/>
                             <field name="vehicle_model"/>
                             <field name="equipment_id"/>
@@ -47,7 +49,8 @@
                         <group string="Ubicación y Auxilio">
                             <field name="vehicle_location"/>
                             <field name="breakdown_reason"/>
-                            <field name="maps_location"/>
+                            <field name="maps_location" widget="url"/>
+                            <field name="intake_external_id"/>
                         </group>
                     </group>
                     <field name="item_ids" string="Ítems" invisible="team_type != 'workshop'"
@@ -57,11 +60,91 @@
                             <field name="value"/>
                         </list>
                     </field>
+                    <group col="2" invisible="workshop_request_type != 'accident'">
+                        <group string="Conductor">
+                            <field name="accident_business_unit"/>
+                            <field name="driver_file_number"/>
+                            <field name="driver_identification"/>
+                            <field name="driver_address"/>
+                        </group>
+                        <group string="Siniestro">
+                            <field name="accident_date"/>
+                            <field name="accident_time" widget="float_time"/>
+                            <field name="accident_address"/>
+                            <field name="accident_city"/>
+                        </group>
+                    </group>
+                    <group col="2" invisible="workshop_request_type != 'accident'">
+                        <group string="Tercero">
+                            <field name="third_party_name"/>
+                            <field name="third_party_identification"/>
+                            <field name="third_party_phone"/>
+                            <field name="third_party_vehicle"/>
+                            <field name="third_party_plate"/>
+                            <field name="third_party_insurer"/>
+                        </group>
+                        <group string="Textos">
+                            <field name="accident_vehicle_damage"/>
+                            <field name="accident_facts"/>
+                            <field name="third_party_vehicle_damage"/>
+                            <field name="accident_notes"/>
+                        </group>
+                    </group>
                     <group string="Payload de ingreso" invisible="team_type != 'workshop'">
+                        <field name="intake_payload" nolabel="1" readonly="1"/>
+                    </group>
+                    <group col="2" invisible="team_type != 'refill'">
+                        <group string="Datos de Recarga">
+                            <field name="refill_type"/>
+                            <field name="dispatch_id"/>
+                            <field name="dispatch"/>
+                            <field name="refill_to_dispatch_id" invisible="refill_type != 'street'"/>
+                            <field name="refill_to_dispatch" invisible="refill_type != 'street'"/>
+                            <field name="vehicle_location" invisible="refill_type != 'factory'"/>
+                            <field name="intake_external_id"/>
+                        </group>
+                    </group>
+                    <group string="Payload de ingreso" invisible="team_type != 'refill'">
                         <field name="intake_payload" nolabel="1" readonly="1"/>
                     </group>
                 </page>
             </xpath>
+        </field>
+    </record>
+
+    <!-- Search view: filtros y agrupamiento por tipo de solicitud del chatbot -->
+    <record id="helpdesk_tickets_view_search_inherit_maint" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.search.inherit.maint</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="helpdesk.helpdesk_tickets_view_search_base"/>
+        <field name="arch" type="xml">
+            <field name="team_id" position="after">
+                <field name="dispatch" string="Reparto"/>
+                <field name="equipment_id"/>
+            </field>
+            <filter name="archive" position="before">
+                <separator/>
+                <filter string="Checklist jMobile" name="filter_checklist"
+                    domain="[('workshop_request_type', '=', 'checklist')]"/>
+                <filter string="Novedades" name="filter_news"
+                    domain="[('workshop_request_type', '=', 'news')]"/>
+                <filter string="Auxilios" name="filter_breakdown"
+                    domain="[('workshop_request_type', '=', 'breakdown')]"/>
+                <filter string="Siniestros" name="filter_accident"
+                    domain="[('workshop_request_type', '=', 'accident')]"/>
+                <filter string="Sin equipo" name="filter_workshop_no_equipment"
+                    domain="[('team_type', '=', 'workshop'), ('equipment_id', '=', False)]"/>
+                <separator/>
+                <filter string="Recarga fábrica" name="filter_refill_factory"
+                    domain="[('refill_type', '=', 'factory')]"/>
+                <filter string="Recarga en calle" name="filter_refill_street"
+                    domain="[('refill_type', '=', 'street')]"/>
+                <separator/>
+            </filter>
+            <filter name="assignee" position="after">
+                <filter string="Tipo de solicitud" name="group_workshop_request_type"
+                    context="{'group_by': 'workshop_request_type'}"/>
+            </filter>
         </field>
     </record>
 

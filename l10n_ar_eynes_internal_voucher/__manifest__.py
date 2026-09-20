@@ -19,18 +19,19 @@
 # pylint: disable=manifest-required-author, missing-readme
 
 {
-    'name': 'Internal Voucher',
-    'version': '19.0.1.0.0',
-    'author': 'Eynes',
-    'website': 'https://gitlab.eynes.com.ar/localization/l10n_ar_eynes/',
-    'license': 'AGPL-3',
-    'category': 'Accounting/Accounting',
-    'depends': [
-        'l10n_ar_eynes',
+    "name": "Internal Voucher",
+    "version": "19.0.1.0.0",
+    "author": "Eynes",
+    "website": "https://gitlab.eynes.com.ar/localization/l10n_ar_eynes/",
+    "license": "AGPL-3",
+    "category": "Accounting/Accounting",
+    "depends": [
+        "l10n_ar_eynes",
     ],
-    'data': [
-        'views/account_journal_views.xml',
+    "data": [
+        "views/account_journal_views.xml",
+        "views/account_move_views.xml",
     ],
-    'installable': True,
-    'application': False,
+    "installable": True,
+    "application": False,
 }

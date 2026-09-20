@@ -1,0 +1,20 @@
+<odoo>
+    <record id="view_account_form_ivess_accounting_summary" model="ir.ui.view">
+        <field name="name">account.account.form.ivess.accounting.summary</field>
+        <field name="model">account.account</field>
+        <field name="inherit_id" ref="account.view_account_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='tag_ids']" position="after">
+                <field name="x_summarize_on_report" />
+                <field
+          name="x_legal_debt_account_id"
+          invisible="account_type not in ('asset_receivable', 'liability_payable')"
+        />
+                <field
+          name="x_legal_bridge_account_id"
+          invisible="account_type not in ('asset_receivable', 'liability_payable')"
+        />
+            </xpath>
+        </field>
+    </record>
+</odoo>

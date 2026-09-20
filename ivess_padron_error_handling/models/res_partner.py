@@ -36,8 +36,11 @@ class ResPartner(models.Model):
         if partner_ids:
             partners = self.env["res.partner"].browse(partner_ids)
             partners.write({"padron_update_error": False})
+            message = ""
+            if result:
+                message = result.get("params", {}).get("message", "")
             for partner in partners:
                 partner.message_post(
-                    body=_("Padrón de Perc/Ret actualizado correctamente. %s", result.get('params').get('message')),
+                    body=_("Padrón de Perc/Ret actualizado correctamente. %s", message),
                 )
         return result

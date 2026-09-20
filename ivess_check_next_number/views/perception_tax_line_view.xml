@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="perception_tax_line_view_tree_inherit" model="ir.ui.view">
+        <field name="name">perception.tax.line.tree.inherit.invoice.date</field>
+        <field name="model">perception.tax.line</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.perception_tax_line_view_tree" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='invoice_id']" position="after">
+                <field name="invoice_date" />
+            </xpath>
+        </field>
+    </record>
+</odoo>

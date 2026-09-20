@@ -8,10 +8,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
     # delivery.route
     route_id = fields.Many2one('delivery.route', readonly=True)
     delivery_date = fields.Date(readonly=True)
-    state_dr = fields.Selection(
-        selection=lambda self: self.env['delivery.route']._fields['state'].selection,
-        readonly=True,
-    )
+    state_dr = fields.Selection(related='route_id.state', readonly=True)
     template_delivery_route_id = fields.Many2one('template.delivery.route', readonly=True)
 
     #delivery.route.number
@@ -36,10 +33,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
 
     #res.partner
     partner_id = fields.Many2one('res.partner', readonly=True)
-    state_rp = fields.Selection(
-        selection=lambda self: self.env['res.partner']._fields['state'].selection,
-        readonly=True,
-    )
+    state_rp = fields.Selection(related='partner_id.state', readonly=True)
     date_from_rp = fields.Date(readonly=True)
     date_to_rp = fields.Date(readonly=True)
 
@@ -51,7 +45,6 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
                     drl.id AS id,
                     dr.id AS route_id,
                     dr.delivery_date AS delivery_date,
-                    dr.state AS state_dr,
                     dr.template_delivery_route_id AS template_delivery_route_id,
                     drn.id AS delivery_number_id,
                     drn.allow_price_editing AS allow_price_editing,
@@ -68,7 +61,6 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
                     drn.allow_reordering AS allow_reordering,
                     drn.repair_order_sequence_id AS repair_order_sequence_id,
                     rp.id AS partner_id,
-                    rp.state AS state_rp,
                     rp.date_from AS date_from_rp,
                     rp.date_to AS date_to_rp
                 FROM delivery_route dr

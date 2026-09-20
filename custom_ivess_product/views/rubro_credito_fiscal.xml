@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="rubro_credito_fiscal_view_tree" model="ir.ui.view">
+        <field name="name">rubro.credito.fiscal.view.tree</field>
+        <field name="model">rubro.credito.fiscal</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name" />
+            </list>
+        </field>
+    </record>
+
+    <record id="rubro_credito_fiscal_view_form" model="ir.ui.view">
+        <field name="name">rubro.credito.fiscal.view.form</field>
+        <field name="model">rubro.credito.fiscal</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="rubro_credito_fiscal_action" model="ir.actions.act_window">
+        <field name="name">Rubro Crédito Fiscal</field>
+        <field name="res_model">rubro.credito.fiscal</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem
+    id="menu_rubro_credito_fiscal"
+    name="Rubro Crédito Fiscal"
+    sequence="61"
+    parent="stock.menu_product_in_config_stock"
+    action="rubro_credito_fiscal_action"
+  />
+</odoo>

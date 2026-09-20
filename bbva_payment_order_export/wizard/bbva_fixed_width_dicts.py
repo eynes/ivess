@@ -484,7 +484,7 @@ REGISTRO_020 = {
         'start_pos': 286,
         'length': 13,
         'type': 'string',
-        'alignment': 'right',
+        'alignment': 'left',
         'padding': '0',
         'required': True,
     },
@@ -654,8 +654,11 @@ REGISTRO_025 = {
     'nro_cheque': {
         'start_pos': 286,
         'length': 13,
+        # BBVA (soporte del banco, T16348): el número de cheque/Echeq se
+        # informa alineado a la izquierda y justificado con ceros hacia la
+        # derecha, no alineado a la derecha.
         'type': 'string',
-        'alignment': 'right',
+        'alignment': 'left',
         'padding': '0',
         'required': True,
     },

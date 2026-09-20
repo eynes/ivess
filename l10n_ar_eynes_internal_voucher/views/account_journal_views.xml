@@ -4,12 +4,17 @@
         <field name="name">account.journal.view.form.inherit.internal.voucher</field>
         <field name="model">account.journal</field>
         <field
-            name="inherit_id"
-            ref="l10n_ar_eynes.account_journal_view_form_inherit_l10n_ar_eynes"
-        />
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_journal_view_form_inherit_l10n_ar_eynes"
+    />
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='fiscal_type']" position="attributes">
+                <attribute name="invisible">type not in ('sale', 'purchase')</attribute>
+            </xpath>
             <xpath expr="//page[@name='sequences']" position="attributes">
-                <attribute name="invisible">type == 'sale' and fiscal_type not in ('internal', 'internal_voucher') or type not in ('sale', 'receipt', 'payment', 'retentions')</attribute>
+                <attribute
+          name="invisible"
+        >type == 'sale' and fiscal_type not in ('internal', 'internal_voucher') or type not in ('sale', 'receipt', 'payment', 'retentions')</attribute>
             </xpath>
         </field>
     </record>

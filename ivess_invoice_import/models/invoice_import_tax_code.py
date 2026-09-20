@@ -9,8 +9,8 @@ class IvessInvoiceImportTaxCode(models.Model):
     code = fields.Char(
         string="Código (origen)",
         required=True,
-        help="Valor tal como viene en la columna 'cod impuesto especial' del"
-        " Excel de importación de facturas/cobros.",
+        help="Valor tal como viene en las columnas 'cod impuesto interno' /"
+        " 'cod imp especiales*' del Excel de importación de facturas/cobros.",
     )
     tax_id = fields.Many2one(
         "account.tax",

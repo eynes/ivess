@@ -1,0 +1,58 @@
+<odoo>
+    <record id="view_ivess_accounting_summary_wizard_form" model="ir.ui.view">
+        <field name="name">ivess.accounting.summary.wizard.form</field>
+        <field name="model">ivess.accounting.summary.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Asistente de Cierre Mensual (Contabilidad Resumida)">
+                <group>
+                    <group>
+                        <field name="company_id" groups="base.group_multi_company" />
+                        <field name="date_from" />
+                        <field name="date_to" />
+                    </group>
+                    <group>
+                        <field name="operational_journal_ids" widget="many2many_tags" />
+                        <field name="legal_journal_id" />
+                    </group>
+                </group>
+                <group invisible="not summary_move_id" string="Resultado">
+                    <field name="netting_move_ids" widget="many2many_tags" />
+                    <field name="summary_move_id" />
+                </group>
+                <footer>
+                    <button
+            name="action_generate_summary"
+            type="object"
+            string="Generar Resumen"
+            class="btn-primary"
+            invisible="summary_move_id"
+            confirm="Esta acción neteará los diarios operativos y generará un único asiento resumen en el diario legal. ¿Confirma continuar?"
+          />
+                    <button
+            name="action_view_summary_move"
+            type="object"
+            string="Ver Asiento Resumen"
+            class="btn-primary"
+            invisible="not summary_move_id"
+          />
+                    <button string="Cerrar" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ivess_accounting_summary_wizard" model="ir.actions.act_window">
+        <field name="name">Cierre Mensual (Contabilidad Resumida)</field>
+        <field name="res_model">ivess.accounting.summary.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+    id="menu_ivess_accounting_summary_wizard"
+    name="Cierre Mensual (Contabilidad Resumida)"
+    parent="account.account_closing_menu"
+    action="action_ivess_accounting_summary_wizard"
+    sequence="10"
+  />
+</odoo>
