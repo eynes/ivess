@@ -87,9 +87,8 @@ class StockMove(models.Model):
             if others:
                 super(StockMove, others).write(vals)
             if frio:
-                super(StockMove, frio).with_context(_frio_calor_no_auto_lot=True).write(
-                    vals
-                )
+                frio_ctx = frio.with_context(_frio_calor_no_auto_lot=True)
+                super(StockMove, frio_ctx).write(vals)
             return True
         return super().write(vals)
 
@@ -100,11 +99,8 @@ class StockMove(models.Model):
         if others:
             res = super(StockMove, others)._action_assign(force_qty=force_qty)
         if frio:
-            res = (
-                super(StockMove, frio)
-                .with_context(_frio_calor_no_auto_lot=True)
-                ._action_assign(force_qty=force_qty)
-            )
+            frio_ctx = frio.with_context(_frio_calor_no_auto_lot=True)
+            res = super(StockMove, frio_ctx)._action_assign(force_qty=force_qty)
         return res
 
 
@@ -157,11 +153,8 @@ class StockPicking(models.Model):
         if others:
             res = super(StockPicking, others)._action_assign(force_qty=force_qty)
         if frio:
-            res = (
-                super(StockPicking, frio)
-                .with_context(_frio_calor_no_auto_lot=True)
-                ._action_assign(force_qty=force_qty)
-            )
+            frio_ctx = frio.with_context(_frio_calor_no_auto_lot=True)
+            res = super(StockPicking, frio_ctx)._action_assign(force_qty=force_qty)
         return res
 
     def _action_done(self):
