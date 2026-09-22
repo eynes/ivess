@@ -15,6 +15,7 @@
     "data": [
         "security/ir.model.access.csv",
         "wizard/res_partner_import_wizard_views.xml",
+        "wizard/res_partner_csv_upload_wizard_views.xml",
     ],
     "demo": [],
     "installable": True,

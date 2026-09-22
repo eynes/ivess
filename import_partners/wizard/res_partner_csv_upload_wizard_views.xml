@@ -1,0 +1,47 @@
+<odoo>
+    <record id="view_res_partner_csv_upload_wizard_form" model="ir.ui.view">
+        <field name="name">res.partner.csv.upload.wizard.form</field>
+        <field name="model">res.partner.csv.upload.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Subir CSV de importación de partners">
+                <p>
+                    Sube los 3 CSV de origen (delimitador `;`, UTF-8), con el
+                    nombre de archivo exacto: page_clientes_jumillano.csv,
+                    page_clientes_lufran.csv, page_ctas_madres_hijas_all.csv.
+                    Se guardan en el servidor para que el import real se corra
+                    después desde Odoo shell, como documenta
+                    import_partners/docs/CSV_IMPORT.md.
+                </p>
+                <field name="attachment_ids" widget="many2many_binary" />
+                <group invisible="not target_dir">
+                    <field name="target_dir" />
+                    <field name="summary" widget="text" />
+                </group>
+                <footer>
+                    <button
+            name="action_upload"
+            type="object"
+            string="Subir y validar"
+            class="btn-primary"
+          />
+                    <button string="Cerrar" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_res_partner_csv_upload_wizard" model="ir.actions.act_window">
+        <field name="name">Subir CSV de importación de partners</field>
+        <field name="res_model">res.partner.csv.upload.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+    id="menu_res_partner_csv_upload_wizard"
+    name="Subir CSV de importación de partners"
+    parent="contacts.res_partner_menu_config"
+    action="action_res_partner_csv_upload_wizard"
+    sequence="101"
+  />
+</odoo>

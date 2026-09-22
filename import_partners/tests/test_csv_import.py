@@ -1,12 +1,16 @@
+import base64
 import csv
+import io
+import json
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 from odoo.tests import TransactionCase, tagged
-from ..csv_source import FILES, HEADERS, load
+from ..csv_source import FILES, HEADERS, excluded_report, load, parse_exclude
 from ..models.csv_import_run import CONTEXT
 
 
@@ -65,6 +69,46 @@ class TestCsvImport(TransactionCase):
             with self.env.cr.savepoint():
                 self.service._apply_row(row, self.service._lookups())
         self.assertFalse(self.partners.search([('codigo_bejerman', '=', row['key'])]))
+
+    def test_parse_exclude(self):
+        self.assertEqual(parse_exclude(None), set())
+        self.assertEqual(parse_exclude(''), set())
+        self.assertEqual(
+            parse_exclude('page_ctas_madres_hijas_all.csv:697, page_ctas_madres_hijas_all.csv:424'),
+            {('page_ctas_madres_hijas_all.csv', 697), ('page_ctas_madres_hijas_all.csv', 424)})
+
+    def test_load_excludes_operator_specified_rows(self):
+        # A known source-data duplicate (e.g. same CUIT under two different
+        # customer codes) can be skipped upfront by (file, row) without
+        # editing the CSV or the importer. Her children cascade with their
+        # own distinct reason, separate from a genuinely missing mother, so
+        # they can be reported to the client as "skipped on purpose".
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[2]:
+                        writer.writerow(self.row('EXC-MOTHER')['data'])
+                        writer.writerow(self.row('EXC-KEPT')['data'])
+                        writer.writerow(self.row('EXC-CHILD', nrosub='EXC-MOTHER')['data'])
+            rows, summary = load(directory, exclude={(FILES[2], 2)})
+            self.assertEqual(summary['rejected'],
+                             {'excluded_by_operator': 1, 'mother_excluded_by_operator': 1})
+            excluded = next(r for r in rows if r['data']['Código de Cliente'] == 'EXC-MOTHER')
+            kept = next(r for r in rows if r['data']['Código de Cliente'] == 'EXC-KEPT')
+            child = next(r for r in rows if r['data']['Código de Cliente'] == 'EXC-CHILD')
+            self.assertEqual(excluded['error'], 'excluded_by_operator')
+            self.assertEqual(kept['error'], '')
+            self.assertEqual(child['error'], 'mother_excluded_by_operator')
+            # Changing the exclude set changes the resumable fingerprint.
+            self.assertNotEqual(summary['fingerprint'], load(directory)[1]['fingerprint'])
+
+            report = excluded_report(rows)
+            self.assertEqual(len(report), 2)
+            self.assertIn(f'{FILES[2]}:2\tEXC-MOTHER\tCSV test partner\texcluida a pedido del operador', report)
+            self.assertIn(f'{FILES[2]}:4\tEXC-CHILD\tCSV test partner\tmadre excluida a pedido del operador',
+                          report)
 
     def test_preflight_rejects_child_across_companies(self):
         # A mother tagged with a different Empresa than her child in the
@@ -313,3 +357,44 @@ class TestCsvImport(TransactionCase):
             self.assertEqual(select_rows(rows, summary, 0), (rows, summary))
             with self.assertRaisesRegex(ValueError, 'fewer than'):
                 select_rows(rows, summary, 5)
+
+    def _build_csv_bytes(self, rows_data):
+        stream = io.StringIO(newline='')
+        writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+        writer.writeheader()
+        writer.writerows(rows_data)
+        return stream.getvalue().encode('utf-8-sig')
+
+    def _attachment(self, filename, rows_data):
+        return self.env['ir.attachment'].create(dict(
+            name=filename, datas=base64.b64encode(self._build_csv_bytes(rows_data))))
+
+    def test_upload_wizard_writes_files_and_validates(self):
+        attachments = (
+            self._attachment(FILES[0], [self.row('UP-JUMI')['data']])
+            | self._attachment(FILES[1], [self.row('UP-LUFRAN', Empresa='Lufrán S.A.')['data']])
+            | self._attachment(FILES[2], [self.row('UP-MOTHER')['data']])
+        )
+        wizard = self.env['res.partner.csv.upload.wizard'].create(dict(
+            attachment_ids=[(6, 0, attachments.ids)]))
+        wizard.action_upload()
+        self.assertTrue(wizard.target_dir)
+        self.assertEqual(wizard.target_dir, self.service._csv_dir())
+        for filename in FILES:
+            self.assertTrue(os.path.isfile(os.path.join(wizard.target_dir, filename)))
+        summary = json.loads(wizard.summary)
+        self.assertEqual(summary['files'], dict(zip(FILES, (1, 1, 1))))
+        self.assertEqual(summary['rejected'], {})
+        # The scripts default to the same directory when PARTNER_CSV_DIR is unset.
+        rows, _ = load(self.service._csv_dir())
+        self.assertEqual(len(rows), 3)
+
+    def test_upload_wizard_requires_exact_filenames(self):
+        attachments = (
+            self._attachment(FILES[0], [self.row('UP-JUMI3')['data']])
+            | self._attachment('wrong_name.csv', [self.row('UP-LUFRAN3', Empresa='Lufrán S.A.')['data']])
+        )
+        wizard = self.env['res.partner.csv.upload.wizard'].create(dict(
+            attachment_ids=[(6, 0, attachments.ids)]))
+        with self.assertRaisesRegex(UserError, 'page_clientes_lufran.csv'):
+            wizard.action_upload()
