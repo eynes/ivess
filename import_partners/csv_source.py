@@ -6,7 +6,7 @@ import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
-VERSION = 12
+VERSION = 17
 COMPANIES = {'El Jumillano S.A.': 1, 'Lufrán S.A.': 8}
 FILES = ('page_clientes_jumillano.csv', 'page_clientes_lufran.csv',
          'page_ctas_madres_hijas_all.csv')
@@ -69,17 +69,25 @@ def load(directory, exclude=frozenset()):
             customers[r['data']['Código de Cliente']].append(r)
     for r in rows:
         r['parent_candidates'] = customers[r['data']['nrosub']] if r['data']['nrosub'] else []
+    # Candidate code for every row, mothers included, computed in its own
+    # pass so a child (processed below regardless of file order) can always
+    # compare against her already-resolved mother's candidate.
+    for r in rows:
+        code = r['data']['Código Bejerman']
+        if code in ('', '0'):
+            code = r['data']['Código de Cliente']
+        r['_candidate'] = code
     for r in rows:
         data, filename = r['data'], r['file']
-        # Código Bejerman only identifies the mother. Every child is left
-        # with no code at all: she is identified by Código de Cliente
-        # instead (see csv_import_run._apply_row), never by Bejerman.
-        if data['nrosub']:
+        candidates = r['parent_candidates']
+        # A hija uses her own Bejerman (or Código de Cliente if blank/0),
+        # like anyone else, unless it equals her mother's own resolved
+        # code: that collision means the source only meant to identify the
+        # mother, not give the hija a separate identity.
+        if data['nrosub'] and len(candidates) == 1 and r['_candidate'] == candidates[0]['_candidate']:
             code = ''
         else:
-            code = data['Código Bejerman']
-            if code in ('', '0'):
-                code = 'SC-' + data['Código de Cliente'] if data['Código de Cliente'] else ''
+            code = r['_candidate']
         error = ''
         if (filename, r['row']) in exclude:
             error = 'excluded_by_operator'
@@ -91,11 +99,13 @@ def load(directory, exclude=frozenset()):
             error = 'unexpected_parent'
         r['key'] = code
         r['error'] = error
-    # Children have no Bejerman-based identity, so they never participate in
-    # the duplicate-key check: only mothers and standalone contacts do.
-    counts = Counter((r['company'], r['key']) for r in rows if not r['data']['nrosub'])
     for r in rows:
-        if not r['data']['nrosub'] and counts[r['company'], r['key']] > 1:
+        del r['_candidate']
+    # A blank key (child sharing her mother's code) never collides: only
+    # rows with an actual code participate in the duplicate-key check.
+    counts = Counter((r['company'], r['key']) for r in rows if r['key'])
+    for r in rows:
+        if r['key'] and counts[r['company'], r['key']] > 1:
             r['error'] = r['error'] or 'duplicate_key'
     for r in rows:
         r['parent_key'] = ''
