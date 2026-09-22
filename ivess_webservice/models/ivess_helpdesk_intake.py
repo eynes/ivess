@@ -97,4 +97,5 @@ class IvessHelpdeskIntake(models.Model):
             "intake_payload": payload,
             "dispatch_id": dispatch_route.id if dispatch_route else False,
             "dispatch": dispatch,
+            "workshop_request_type": "checklist",
         })
