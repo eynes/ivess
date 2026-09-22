@@ -4,6 +4,7 @@ import csv
 import io
 import logging
 import math
+import os
 import re
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -11,6 +12,7 @@ from datetime import datetime
 from psycopg2 import IntegrityError
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import config
 
 from ..csv_source import COMPANIES, HEADERS, load, normalize, select_rows
 
@@ -64,6 +66,16 @@ class CsvImportRun(models.Model):
     file_counts = fields.Json(readonly=True, default=dict)
     counts = fields.Json(readonly=True, default=dict)
     state = fields.Selection([('running', 'En curso'), ('done', 'Finalizada')], default='running')
+
+    @api.model
+    def _csv_dir(self):
+        """Where the upload wizard writes the CSVs, and where the shell
+        scripts read them from by default (no SFTP/SSH file transfer
+        needed). Scoped by database name to keep multiple DBs on the same
+        server from overwriting each other's files."""
+        path = os.path.join(config['data_dir'], 'csv_import', self.env.cr.dbname)
+        os.makedirs(path, exist_ok=True)
+        return path
 
     @api.model
     def _lookups(self):
@@ -235,7 +247,7 @@ class CsvImportRun(models.Model):
 
     @api.model
     def _run(self, directory, *, expected_db, dry_run=True, batch_size=500,
-             limit=0, run_id=None, per_file_limit=0):
+             limit=0, run_id=None, per_file_limit=0, exclude=frozenset()):
         """Private shell API: owns transaction. Never call from HTTP or a cron.
 
         dry_run executes the actual ORM and rolls everything back, including
@@ -243,6 +255,8 @@ class CsvImportRun(models.Model):
         limit is the maximum number of additional rows, not a dataset prefix.
         per_file_limit fixes the dataset quota for each source before batching;
         0 imports all rows. The quota is part of the resumable fingerprint.
+        exclude: (filename, row) pairs an operator decided to skip upfront
+        (e.g. a known source-data duplicate); part of the resumable fingerprint.
         """
         if not self.env.su and not self.env.user.has_group('base.group_system'):
             raise UserError('Administrator required')
@@ -255,7 +269,7 @@ class CsvImportRun(models.Model):
             raise UserError('Another partner import is running')
         dry_issues = []
         try:
-            rows, summary = select_rows(*load(directory), per_file_limit=per_file_limit)
+            rows, summary = select_rows(*load(directory, exclude=exclude), per_file_limit=per_file_limit)
             lookups = self._lookups()
             run = self.browse(run_id).exists() if run_id else self.create(dict(
                 name=summary['fingerprint'][:16], fingerprint=summary['fingerprint'], total=len(rows)))

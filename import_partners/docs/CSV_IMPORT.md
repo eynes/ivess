@@ -3,6 +3,20 @@
 Este flujo usa `res.partner.csv.import.run` desde **Odoo shell**. No usar el wizard
 Excel anterior: ese wizard inserta por SQL y no implementa este flujo.
 
+## Subir los CSV sin SSH/SFTP
+
+En entornos donde no hay acceso directo por SSH/SFTP al filesystem del servidor
+(por ejemplo odoo.sh sin la clave SSH configurada), el wizard **"Subir CSV de
+importación de partners"** (Contactos → Configuración) permite subir los 3
+archivos desde el navegador. Guarda cada uno con su nombre esperado en
+`res.partner.csv.import.run._csv_dir()` — una carpeta dentro de `data_dir`,
+identificada por el nombre de la base (`<data_dir>/csv_import/<dbname>/`) — y
+corre la validación estructural (`csv_source.load()`, sin tocar la base) para
+confirmar de inmediato que los archivos subidos son legibles y tienen el
+formato esperado. **Solo sube y valida; no ejecuta el import.** La corrida real
+se sigue disparando desde Odoo shell como el resto de esta guía, y por defecto
+usa esa misma carpeta cuando no se pasa `PARTNER_CSV_DIR` explícitamente.
+
 ## Inspección y decisiones
 
 - Doodba: `docker-compose.yml -> devel.yaml`; PostgreSQL 17, Odoo 19.
@@ -177,6 +191,26 @@ proveedores protegidos: no significa 1.000 altas exitosas por archivo.
 por archivo. `PARTNER_IMPORT_BATCH` controla commits (100 en la prueba representativa,
 500 por defecto en `run_csv.py`); cada fila usa ORM y savepoint.
 
+`PARTNER_IMPORT_EXCLUDE` (opcional, `run_csv.py` y `validate_csv.py`) rechaza filas
+puntuales antes del preflight, sin editar el CSV ni el código: lista de `archivo:línea`
+separada por comas, por ejemplo
+`PARTNER_IMPORT_EXCLUDE=page_ctas_madres_hijas_all.csv:697,page_ctas_madres_hijas_all.csv:424`.
+Quedan con `error=excluded_by_operator` y cuentan en `rejected` del resumen; si la fila
+excluida era una madre, sus hijas caen en cascada con `error=mother_excluded_by_operator`
+(distinto de `missing_or_rejected_mother`, reservado a madres realmente ausentes del
+CSV) — permite avisar al cliente exactamente qué contactos se saltearon a propósito,
+sin confundirlos con huérfanas reales. Cambiar el conjunto de exclusión cambia el
+fingerprint: no se puede reanudar una corrida con una lista distinta a la que empezó.
+
+Para armar el aviso al cliente sin correr Odoo, `csv_source.py` acepta `--exclude` y
+además del resumen imprime la lista completa (excluidas directas + hijas en cascada)
+con línea, código de cliente, nombre y motivo:
+
+```bash
+python odoo/custom/src/modules/import_partners/csv_source.py "$PWD/SRC" \
+  --exclude "page_ctas_madres_hijas_all.csv:697,page_ctas_madres_hijas_all.csv:424,page_ctas_madres_hijas_all.csv:1413,page_ctas_madres_hijas_all.csv:1517"
+```
+
 La selección se hace sobre el preflight completo y conserva errores globales y
 números de registro del CSV original. Se recorre el orden original de cada archivo;
 una hija válida reserva también un lugar para su madre, dentro del mismo cupo. Si
@@ -247,8 +281,17 @@ del importador no certifican esos módulos ni equivalencia completa con producci
 Se reemplazó la política anterior de buscar ListaPrecio del CSV por la instrucción
 confirmada de usar la lista predeterminada de cada S.A. El inventario
 `required_pricelists.csv` queda como referencia histórica; no representa catálogos
-pendientes de cargar. La versión de preflight es 10: las ejecuciones anteriores no
+pendientes de cargar. La versión de preflight es 12: las ejecuciones anteriores no
 pueden reanudarse con esta política; iniciar una ejecución nueva.
+
+La versión 11 agregó `PARTNER_IMPORT_EXCLUDE` (ver arriba, sección "Ejecución local")
+para saltear filas puntuales por operador sin tocar el CSV; el conjunto de exclusión
+pasó a formar parte del fingerprint reanudable.
+
+La versión 12 le dio a la cascada de hijas de una madre excluida su propio motivo,
+`mother_excluded_by_operator`, separado de `missing_or_rejected_mother` (reservado a
+madres realmente ausentes del CSV), y agregó `--exclude` al CLI de `csv_source.py`
+para listar excluidas directas + cascada sin correr Odoo.
 
 La versión 6 había relajado la vinculación madre/hija para aceptar una Empresa
 distinta entre ambas (la hija conservaba su propia Empresa). La versión 9 revirtió

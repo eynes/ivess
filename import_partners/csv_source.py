@@ -6,7 +6,7 @@ import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
-VERSION = 10
+VERSION = 12
 COMPANIES = {'El Jumillano S.A.': 1, 'Lufrán S.A.': 8}
 FILES = ('page_clientes_jumillano.csv', 'page_clientes_lufran.csv',
          'page_ctas_madres_hijas_all.csv')
@@ -31,7 +31,20 @@ def normalize(value):
                    if not unicodedata.combining(c))
 
 
-def load(directory):
+def parse_exclude(value):
+    """Parse 'file:row,file:row,...' into a set of (filename, row) pairs,
+    e.g. from the PARTNER_IMPORT_EXCLUDE environment variable."""
+    exclude = set()
+    for token in filter(None, (value or '').split(',')):
+        filename, _, row = token.strip().partition(':')
+        exclude.add((filename, int(row)))
+    return exclude
+
+
+def load(directory, exclude=frozenset()):
+    """exclude: a set of (filename, row) pairs to reject upfront, e.g. known
+    source-data duplicates (same CUIT under two different customer codes)
+    that an operator decided to skip rather than fix in the CSV itself."""
     rows, hashes = [], {}
     for filename in FILES:
         path = Path(directory) / filename
@@ -68,7 +81,9 @@ def load(directory):
             if code in ('', '0'):
                 code = 'SC-' + data['Código de Cliente'] if data['Código de Cliente'] else ''
         error = ''
-        if not r['company'] or (filename == FILES[0] and r['company'] != 1) or (filename == FILES[1] and r['company'] != 8):
+        if (filename, r['row']) in exclude:
+            error = 'excluded_by_operator'
+        elif not r['company'] or (filename == FILES[0] and r['company'] != 1) or (filename == FILES[1] and r['company'] != 8):
             error = 'invalid_company'
         elif not data['Código de Cliente'] or not data['Nombre'] or (not data['nrosub'] and not code):
             error = 'missing_identity_or_name'
@@ -91,7 +106,13 @@ def load(directory):
             # A mother tagged with a different Empresa than her child is not
             # a valid link: verify the company explicitly and reject it as a
             # missing mother rather than silently accepting the mismatch.
-            if len(candidates) != 1 or candidates[0]['error'] or candidates[0]['company'] != r['company']:
+            # A mother excluded by an operator gets her own reason, distinct
+            # from a genuinely missing one, so the cascade can be reported
+            # separately (e.g. to notify the client which contacts were
+            # skipped on purpose, as opposed to broken source data).
+            if len(candidates) == 1 and candidates[0]['error'] == 'excluded_by_operator':
+                r['error'] = r['error'] or 'mother_excluded_by_operator'
+            elif len(candidates) != 1 or candidates[0]['error'] or candidates[0]['company'] != r['company']:
                 r['error'] = r['error'] or 'missing_or_rejected_mother'
             else:
                 r['parent_key'] = candidates[0]['key']
@@ -99,7 +120,8 @@ def load(directory):
                 r['parent_row'] = candidates[0]['row']
     # Mothers and standalone contacts precede all children, even across batches.
     rows.sort(key=lambda r: bool(r['data']['nrosub']))
-    fingerprint = hashlib.sha256(json.dumps([VERSION, hashes], sort_keys=True).encode()).hexdigest()
+    fingerprint = hashlib.sha256(json.dumps(
+        [VERSION, hashes, sorted(exclude)], sort_keys=True).encode()).hexdigest()
     summary = dict(total=len(rows), files=dict(Counter(r['file'] for r in rows)),
                    rejected=dict(Counter(r['error'] for r in rows if r['error'])),
                    fingerprint=fingerprint, hashes=hashes)
@@ -146,9 +168,30 @@ def select_rows(rows, summary, per_file_limit=0):
     return selected, result
 
 
+def excluded_report(rows):
+    """Rows an operator excluded directly, or that lost their mother to an
+    exclusion (cascade): one line per row, ready to paste into a message to
+    the client listing exactly which contacts were skipped and why."""
+    reasons = {'excluded_by_operator': 'excluida a pedido del operador',
+               'mother_excluded_by_operator': 'madre excluida a pedido del operador'}
+    lines = []
+    for r in sorted((r for r in rows if r['error'] in reasons), key=lambda r: (r['file'], r['row'])):
+        lines.append('{file}:{row}\t{code}\t{name}\t{reason}'.format(
+            file=r['file'], row=r['row'], code=r['data']['Código de Cliente'],
+            name=r['data']['Nombre'], reason=reasons[r['error']]))
+    return lines
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('directory')
+    parser.add_argument('--exclude', default='', help="'file:row,file:row,...'")
     args = parser.parse_args()
-    print(json.dumps(load(args.directory)[1], ensure_ascii=False, indent=2))
+    rows, summary = load(args.directory, exclude=parse_exclude(args.exclude))
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    if args.exclude:
+        report = excluded_report(rows)
+        print(f'\n--- {len(report)} filas excluidas (directas + hijas en cascada) ---')
+        print('archivo:línea\tcódigo\tnombre\tmotivo')
+        print('\n'.join(report))

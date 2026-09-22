@@ -12,7 +12,7 @@ assert env.cr.dbname == 'devel_partner_import_test'  # noqa: F821
 service = env['res.partner.csv.import.run']  # noqa: F821
 per_file = int(os.environ.get('PARTNER_IMPORT_PER_FILE', '1000'))
 assert per_file > 0, 'A finite positive per-file quota is required for this test'
-directory = os.environ['PARTNER_CSV_DIR']
+directory = os.environ.get('PARTNER_CSV_DIR') or service._csv_dir()
 selected, source = select_rows(*load(directory), per_file_limit=per_file)
 assert source['files'] == dict.fromkeys(FILES, per_file)
 partners = env['res.partner'].with_context(active_test=False)  # noqa: F821
