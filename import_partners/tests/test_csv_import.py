@@ -132,11 +132,37 @@ class TestCsvImport(TransactionCase):
             self.assertIsNone(child['parent_company'])
             self.assertIsNone(child['parent_row'])
 
-    def test_children_never_carry_a_bejerman_code(self):
-        # Código Bejerman only identifies the mother: every child is left
-        # with an empty code, regardless of what her own CSV row carries in
-        # that column, and never collides with a sibling under the same
-        # (company, key) even though all children now share the empty key.
+    def test_blank_bejerman_fallback_uses_customer_code_everywhere(self):
+        # Any mother/standalone customer (in any of the three files) with a
+        # blank/0 Bejerman uses her own Código de Cliente verbatim, no
+        # prefix. Children never carry a code at all (tested elsewhere).
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[0]:
+                        writer.writerow(self.row('JUMI-BLANK', **{'Código Bejerman': ''})['data'])
+                    elif filename == FILES[1]:
+                        writer.writerow(self.row('LUFRAN-ZERO', Empresa='Lufrán S.A.',
+                                                 **{'Código Bejerman': '0'})['data'])
+                    else:
+                        writer.writerow(self.row('MADRE-BLANK', **{'Código Bejerman': ''})['data'])
+            rows, summary = load(directory)
+            self.assertEqual(summary['rejected'], {})
+            jumi = next(r for r in rows if r['data']['Código de Cliente'] == 'JUMI-BLANK')
+            lufran = next(r for r in rows if r['data']['Código de Cliente'] == 'LUFRAN-ZERO')
+            madre = next(r for r in rows if r['data']['Código de Cliente'] == 'MADRE-BLANK')
+            self.assertEqual(jumi['key'], 'JUMI-BLANK')
+            self.assertEqual(lufran['key'], 'LUFRAN-ZERO')
+            self.assertEqual(madre['key'], 'MADRE-BLANK')
+
+    def test_children_keep_own_bejerman_unless_it_matches_mothers(self):
+        # A hija uses her own Código Bejerman, like anyone else, EXCEPT when
+        # it equals her mother's own resolved code: that collision means the
+        # source only meant to identify the mother, so the hija's code is
+        # blanked instead. A hija's own (non-blank, non-colliding) code still
+        # participates in the duplicate-key check like anyone else's.
         with tempfile.TemporaryDirectory() as directory:
             for filename in FILES:
                 with (Path(directory) / filename).open('w', newline='') as stream:
@@ -144,24 +170,70 @@ class TestCsvImport(TransactionCase):
                     writer.writeheader()
                     if filename == FILES[2]:
                         mother = self.row('MOTHER-BEJ', **{'Código de Cliente': 'MOM-CODE'})
-                        child = self.row('SHARED-BEJ', **{
-                            'Código de Cliente': 'CHILD-CODE', 'nrosub': 'MOM-CODE'})
-                        other_child = self.row('OWN-BEJ', **{
-                            'Código de Cliente': 'OTHER-CHILD-CODE', 'nrosub': 'MOM-CODE'})
+                        same_as_mother = self.row('MOTHER-BEJ', **{
+                            'Código de Cliente': 'SAME-CODE', 'nrosub': 'MOM-CODE'})
+                        own_code = self.row('CHILD-OWN-BEJ', **{
+                            'Código de Cliente': 'OWN-CODE', 'nrosub': 'MOM-CODE'})
+                        blank_fallback = self.row('', **{
+                            'Código de Cliente': 'BLANK-FALLBACK-CODE', 'nrosub': 'MOM-CODE',
+                            'Código Bejerman': ''})
+                        # Compared only against the mother's own resolved
+                        # Bejerman, never her Código de Cliente: a hija whose
+                        # own Bejerman happens to equal the mother's customer
+                        # code (not her Bejerman) keeps it, she is NOT blanked.
+                        same_as_mother_customer_code = self.row('MOM-CODE', **{
+                            'Código de Cliente': 'SAME-AS-MOM-CUSTOMER-CODE', 'nrosub': 'MOM-CODE'})
                         writer.writerow(mother['data'])
-                        writer.writerow(child['data'])
-                        writer.writerow(other_child['data'])
+                        writer.writerow(same_as_mother['data'])
+                        writer.writerow(own_code['data'])
+                        writer.writerow(blank_fallback['data'])
+                        writer.writerow(same_as_mother_customer_code['data'])
             rows, summary = load(directory)
             self.assertNotIn('duplicate_key', summary['rejected'])
             self.assertNotIn('missing_or_rejected_mother', summary['rejected'])
             mother_row = next(r for r in rows if r['data']['Código de Cliente'] == 'MOM-CODE')
-            child_row = next(r for r in rows if r['data']['Código de Cliente'] == 'CHILD-CODE')
-            other_row = next(r for r in rows if r['data']['Código de Cliente'] == 'OTHER-CHILD-CODE')
+            same_row = next(r for r in rows if r['data']['Código de Cliente'] == 'SAME-CODE')
+            own_row = next(r for r in rows if r['data']['Código de Cliente'] == 'OWN-CODE')
+            blank_row = next(r for r in rows if r['data']['Código de Cliente'] == 'BLANK-FALLBACK-CODE')
+            same_customer_code_row = next(
+                r for r in rows if r['data']['Código de Cliente'] == 'SAME-AS-MOM-CUSTOMER-CODE')
             self.assertEqual(mother_row['key'], 'MOTHER-BEJ')
-            self.assertEqual(child_row['key'], '')
-            self.assertEqual(other_row['key'], '')
-            self.assertEqual(child_row['parent_key'], mother_row['key'])
-            self.assertEqual(other_row['parent_key'], mother_row['key'])
+            self.assertEqual(same_row['key'], '')
+            self.assertEqual(own_row['key'], 'CHILD-OWN-BEJ')
+            # Blank Bejerman on a hija falls back to her own customer_code,
+            # same unified rule as anyone else (and it happens to differ
+            # from the mother's own code here, so it is kept, not blanked).
+            self.assertEqual(blank_row['key'], 'BLANK-FALLBACK-CODE')
+            self.assertEqual(same_customer_code_row['key'], 'MOM-CODE')
+            self.assertEqual(same_row['parent_key'], mother_row['key'])
+            self.assertEqual(own_row['parent_key'], mother_row['key'])
+            self.assertEqual(same_customer_code_row['parent_key'], mother_row['key'])
+
+    def test_children_own_bejerman_participates_in_duplicate_check(self):
+        # Two hijas (of different mothers) that happen to carry the same
+        # own Bejerman in the same company collide, exactly like two
+        # mothers would — this used to be silently allowed when hijas
+        # always carried a blank code.
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[2]:
+                        mother_a = self.row('MOM-A-BEJ', **{'Código de Cliente': 'MOM-A'})
+                        mother_b = self.row('MOM-B-BEJ', **{'Código de Cliente': 'MOM-B'})
+                        child_a = self.row('DUP-BEJ', **{
+                            'Código de Cliente': 'CHILD-A', 'nrosub': 'MOM-A'})
+                        child_b = self.row('DUP-BEJ', **{
+                            'Código de Cliente': 'CHILD-B', 'nrosub': 'MOM-B'})
+                        for row in (mother_a, mother_b, child_a, child_b):
+                            writer.writerow(row['data'])
+            rows, summary = load(directory)
+            self.assertEqual(summary['rejected'], {'duplicate_key': 2})
+            child_a_row = next(r for r in rows if r['data']['Código de Cliente'] == 'CHILD-A')
+            child_b_row = next(r for r in rows if r['data']['Código de Cliente'] == 'CHILD-B')
+            self.assertEqual(child_a_row['error'], 'duplicate_key')
+            self.assertEqual(child_b_row['error'], 'duplicate_key')
 
     def test_child_with_empty_key_is_identified_by_customer_code(self):
         lookups = self.service._lookups()
@@ -349,7 +421,7 @@ class TestCsvImport(TransactionCase):
             self.assertEqual(sample['files'], dict.fromkeys(FILES, 2))
             self.assertEqual(sample['rejected'], {'duplicate_key': 2})
             hierarchy = [r for r in selected if r['file'] == FILES[2]]
-            self.assertEqual([r['key'] for r in hierarchy], ['MOTHER', ''])
+            self.assertEqual([r['key'] for r in hierarchy], ['MOTHER', 'CHILD'])
             self.assertEqual([r['row'] for r in hierarchy], [4, 2])
             self.assertNotEqual(sample['fingerprint'], summary['fingerprint'])
             self.assertNotEqual(sample['fingerprint'], select_rows(rows, summary, 3)[1]['fingerprint'])

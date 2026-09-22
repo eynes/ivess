@@ -54,19 +54,21 @@ sobre este archivo. No hay claves repetidas en los otros dos archivos ni
 colisiones entre ellos.
 
 Clave idempotente: `(company_id, codigo_bejerman)` para madres y contactos
-autónomos; Bejerman vacío/NULL/0 usa `SC-<customer_code>`. Confirmado: el
-Código Bejerman del CSV **solo identifica a la madre**; toda hija (cualquier
-fila con `nrosub`) queda con `codigo_bejerman` vacío en Odoo, sin importar qué
-traiga su propia columna Bejerman en el CSV — nunca se le asigna un valor, ni
-siquiera el fallback `SC-`. El constraint de `ivess_partner_custom` no valida
-Bejerman vacío (`if not partner.codigo_bejerman: continue`), así que ninguna
-hija colisiona con otra por eso. Cada hija se identifica y actualiza en
-corridas repetidas por su propio `customer_code` en vez de por Bejerman (ver
-`_apply_row`). Esto eliminó los 572 rechazos `duplicate_key` que existían antes
-en este archivo (una madre podía colisionar con una hija que repetía su
-código), incluida una madre con 101 hijas (MUNICIPALIDAD PARTIDO 3 DE FEBRERO).
-Nunca se usa nombre o CUIT como identificador: muchas hijas comparten CUIT y
-`NOIMPORTADO` no identifica un contacto. Un `customer_code` ya existente con
+autónomos. Bejerman vacío/NULL/0 usa el propio `Código de Cliente` tal cual,
+sin prefijo, en los tres archivos por igual (incluidas las madres de
+`page_ctas_madres_hijas_all.csv`). Confirmado: una hija usa su propio Código
+Bejerman **salvo que coincida con el de su madre ya resuelto** (con o sin
+fallback) — ahí el CSV solo quiso identificar a la madre, no darle una
+identidad propia a la hija, y `codigo_bejerman` queda vacío para esa fila en
+Odoo. El constraint de `ivess_partner_custom` no valida Bejerman vacío (`if
+not partner.codigo_bejerman: continue`), así que esas hijas nunca colisionan
+entre sí; una hija con Bejerman propio (no vacío, no igual al de la madre) sí
+participa del chequeo de duplicados como cualquier otra fila. Cada hija se
+identifica y actualiza en corridas repetidas por su propio `customer_code`,
+nunca por Bejerman (ver `_apply_row`), incluso cuando tiene código propio —
+así la búsqueda no depende de qué termine llevando ese campo. Nunca se usa
+nombre o CUIT como identificador: muchas hijas comparten CUIT y `NOIMPORTADO`
+no identifica un contacto. Un `customer_code` ya existente con
 otro Bejerman se rechaza para revisión; no se cambia su identidad. Partners
 compartidos (company_id vacío) y coincidencias múltiples se rechazan.
 Se incluyen archivados y no se reactivan automáticamente.
@@ -86,7 +88,7 @@ Jumillano S.A.
 |---|---|
 | Nombre | name |
 | Código de Cliente | customer_code |
-| Código Bejerman | codigo_bejerman; fallback SC-. En madres/hijas solo se usa en la madre: toda hija queda vacía, identificada por customer_code |
+| Código Bejerman | codigo_bejerman; vacío/0 usa customer_code sin prefijo. En madres/hijas, la hija usa su propio código salvo que coincida con el de su madre (ahí queda vacío); siempre identificada por customer_code, no por Bejerman |
 | Es Cliente / Es Proveedor | is_customer / is_supplier vía sus inversas |
 | nrosub | parent_id, búsqueda por código cliente madre (cualquier compañía) |
 | Tipo de empresa | company_type: EMPRESA→company, PERSONA→person |
@@ -281,7 +283,7 @@ del importador no certifican esos módulos ni equivalencia completa con producci
 Se reemplazó la política anterior de buscar ListaPrecio del CSV por la instrucción
 confirmada de usar la lista predeterminada de cada S.A. El inventario
 `required_pricelists.csv` queda como referencia histórica; no representa catálogos
-pendientes de cargar. La versión de preflight es 12: las ejecuciones anteriores no
+pendientes de cargar. La versión de preflight es 17: las ejecuciones anteriores no
 pueden reanudarse con esta política; iniciar una ejecución nueva.
 
 La versión 11 agregó `PARTNER_IMPORT_EXCLUDE` (ver arriba, sección "Ejecución local")
@@ -292,6 +294,47 @@ La versión 12 le dio a la cascada de hijas de una madre excluida su propio moti
 `mother_excluded_by_operator`, separado de `missing_or_rejected_mother` (reservado a
 madres realmente ausentes del CSV), y agregó `--exclude` al CLI de `csv_source.py`
 para listar excluidas directas + cascada sin correr Odoo.
+
+La versión 13 cambió el fallback de Bejerman vacío/0 en `page_clientes_jumillano.csv`
+y `page_clientes_lufran.csv`: antes usaban `SC-<customer_code>` igual que las madres
+de madres/hijas, ahora usan el `Código de Cliente` tal cual, sin prefijo.
+
+La versión 14 extendió ese mismo fallback a las madres de `page_ctas_madres_hijas_all.csv`:
+ya no usan `SC-<customer_code>`, ahora usan el `Código de Cliente` tal cual, igual que
+Jumillano y Lufrán. El fallback `SC-` queda eliminado por completo del importador.
+
+La versión 15 revirtió la regla de la versión 8 (hija siempre con Bejerman vacío):
+ahora la hija usa su propio Código Bejerman (o su propio Código de Cliente si viene
+vacío/0, mismo fallback unificado), salvo que coincida con el código ya resuelto de
+su madre — ahí queda vacía, igual que antes. Como una hija puede volver a llevar un
+código propio, el chequeo de `duplicate_key` del preflight pasó a cubrirla también
+(antes solo aplicaba a madres/autónomos, porque las hijas nunca tenían código). La
+identidad para buscar/actualizar en Odoo sigue siendo por `customer_code`, no por
+Bejerman, sin importar qué termine llevando ese campo. Requiere una migración de
+datos ya cargados con la regla anterior: los `codigo_bejerman` que quedaron vacíos
+por la versión 8/14 no se recalculan solos, hay que revisarlos si corresponde.
+
+Contra el CSV real, la versión 15 sola reabrió 33 `duplicate_key` y subió
+`missing_or_rejected_mother` de 5 a 17: 27 de esos duplicados eran hijas cuyo
+Código Bejerman repite el **Código de Cliente de la madre** (no su Bejerman), un
+patrón real de origen (ej. 21 dependencias de una municipalidad, todas con el
+código de cliente de la sede central en su columna Bejerman). Un caso además
+tiró a una familia entera (12 hijas) por colisionar con una hija de otra familia
+sin relación (mismo Bejerman por coincidencia, no por compartir madre).
+
+La versión 16 amplió la comparación de la versión 15: también blanqueaba el
+Bejerman de la hija si coincidía con el **Código de Cliente de la madre**, no
+solo con su Bejerman — cubría el patrón real de arriba, bajando `duplicate_key`
+de 33 a 4 contra el CSV real.
+
+La versión 17 revirtió la versión 16: la comparación vuelve a ser solo contra
+el Bejerman de la madre, no contra su Código de Cliente. Una hija cuyo Bejerman
+coincide con el Código de Cliente de la madre (no su Bejerman) ya **no** se
+blanquea, conserva su propio código. Esto reabre los 33 `duplicate_key`/17
+`missing_or_rejected_mother` del párrafo anterior contra el CSV real (incluido
+el caso de la familia GMRA S.A., que pierde a la madre y sus 12 hijas por una
+colisión de Bejerman con una hija de otra familia sin relación) — quedan
+pendientes de decidir manualmente, no se resuelven solos.
 
 La versión 6 había relajado la vinculación madre/hija para aceptar una Empresa
 distinta entre ambas (la hija conservaba su propia Empresa). La versión 9 revirtió
