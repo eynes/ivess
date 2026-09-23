@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record
+    id="view_account_journal_form_ivess_manual_document_number"
+    model="ir.ui.view"
+  >
+        <field name="name">account.journal.form.ivess.manual.document.number</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.view_account_journal_form" />
+        <field name="arch" type="xml">
+            <field name="is_self_billing" position="after">
+                <field
+          name="ivess_force_manual_document_number"
+          invisible="type != 'sale'"
+        />
+            </field>
+        </field>
+    </record>
+
+</odoo>

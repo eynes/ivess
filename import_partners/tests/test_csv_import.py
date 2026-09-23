@@ -1,0 +1,472 @@
+import base64
+import csv
+import io
+import json
+import os
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+
+from odoo.exceptions import UserError, ValidationError
+
+from odoo.tests import TransactionCase, tagged
+from ..csv_source import FILES, HEADERS, excluded_report, load, parse_exclude
+from ..models.csv_import_run import CONTEXT
+
+
+@tagged('post_install', '-at_install')
+class TestCsvImport(TransactionCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.service = cls.env['res.partner.csv.import.run']
+        cls.partners = cls.env['res.partner'].with_company(cls.env['res.company'].browse(1)).with_context(**CONTEXT)
+
+    def row(self, code='CSV-TEST-001', **overrides):
+        data = dict.fromkeys(HEADERS, '')
+        data.update({'Nombre': 'CSV test partner', 'Código de Cliente': code,
+                     'Código Bejerman': code, 'Empresa': 'El Jumillano S.A.',
+                     'Tipo de empresa': 'EMPRESA', 'País': 'ARGENTINA',
+                     'Es Cliente': 'TRUE', 'Es Proveedor': 'FALSE'})
+        data.update(overrides)
+        return dict(file=FILES[2], row=2, raw=data.copy(), data=data, company=1,
+                    key=code, error='', parent_key='', parent_company=None, parent_row=None)
+
+    def test_create_update_idempotent_and_supplier(self):
+        lookups = self.service._lookups()
+        row = self.row()
+        self.assertEqual(self.service._apply_row(row, lookups)[0], 'created')
+        self.assertEqual(self.service._apply_row(row, lookups)[0], 'unchanged')
+        row['data']['Nombre'] = 'Changed'
+        self.assertEqual(self.service._apply_row(row, lookups)[0], 'updated')
+        record = self.partners.search([('codigo_bejerman', '=', row['key'])])
+        record.write({'supplier_rank': 1, 'email': 'csv-test@example.invalid'})
+        row['data']['Nombre'] = 'Do not overwrite'
+        self.assertEqual(self.service._apply_row(row, lookups)[0], 'supplier_protected')
+        self.assertEqual(record.name, 'Changed')
+
+    def test_company_child_inherits_commercial(self):
+        lookups = self.service._lookups()
+        mother = self.row('CSV-MOTHER', Calle='Mother Street 1')
+        child = self.row('CSV-CHILD', Calle='Child Street 2')
+        child['parent_key'] = mother['key']
+        child['parent_company'] = mother['company']
+        self.service._apply_row(mother, lookups)
+        self.service._apply_row(child, lookups)
+        record = self.partners.search([('codigo_bejerman', '=', child['key'])])
+        self.assertEqual(record.street, 'Child Street 2')
+        self.assertEqual(record.parent_id.street, 'Mother Street 1')
+        self.assertEqual(record.type, 'other')
+        self.assertTrue(record.is_company)
+        self.assertTrue(record.csv_inherit_commercial)
+        self.assertEqual(record.commercial_partner_id, record.parent_id)
+        record.write({'name': 'Still a company'})
+        self.assertEqual(record.commercial_partner_id, record.parent_id)
+
+    def test_bad_relation_and_savepoint(self):
+        row = self.row(**{'Tipo de cliente': 'DOES NOT EXIST CSV TEST'})
+        with self.assertRaisesRegex(ValueError, 'relation_missing'):
+            with self.env.cr.savepoint():
+                self.service._apply_row(row, self.service._lookups())
+        self.assertFalse(self.partners.search([('codigo_bejerman', '=', row['key'])]))
+
+    def test_parse_exclude(self):
+        self.assertEqual(parse_exclude(None), set())
+        self.assertEqual(parse_exclude(''), set())
+        self.assertEqual(
+            parse_exclude('page_ctas_madres_hijas_all.csv:697, page_ctas_madres_hijas_all.csv:424'),
+            {('page_ctas_madres_hijas_all.csv', 697), ('page_ctas_madres_hijas_all.csv', 424)})
+
+    def test_load_excludes_operator_specified_rows(self):
+        # A known source-data duplicate (e.g. same CUIT under two different
+        # customer codes) can be skipped upfront by (file, row) without
+        # editing the CSV or the importer. Her children cascade with their
+        # own distinct reason, separate from a genuinely missing mother, so
+        # they can be reported to the client as "skipped on purpose".
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[2]:
+                        writer.writerow(self.row('EXC-MOTHER')['data'])
+                        writer.writerow(self.row('EXC-KEPT')['data'])
+                        writer.writerow(self.row('EXC-CHILD', nrosub='EXC-MOTHER')['data'])
+            rows, summary = load(directory, exclude={(FILES[2], 2)})
+            self.assertEqual(summary['rejected'],
+                             {'excluded_by_operator': 1, 'mother_excluded_by_operator': 1})
+            excluded = next(r for r in rows if r['data']['Código de Cliente'] == 'EXC-MOTHER')
+            kept = next(r for r in rows if r['data']['Código de Cliente'] == 'EXC-KEPT')
+            child = next(r for r in rows if r['data']['Código de Cliente'] == 'EXC-CHILD')
+            self.assertEqual(excluded['error'], 'excluded_by_operator')
+            self.assertEqual(kept['error'], '')
+            self.assertEqual(child['error'], 'mother_excluded_by_operator')
+            # Changing the exclude set changes the resumable fingerprint.
+            self.assertNotEqual(summary['fingerprint'], load(directory)[1]['fingerprint'])
+
+            report = excluded_report(rows)
+            self.assertEqual(len(report), 2)
+            self.assertIn(f'{FILES[2]}:2\tEXC-MOTHER\tCSV test partner\texcluida a pedido del operador', report)
+            self.assertIn(f'{FILES[2]}:4\tEXC-CHILD\tCSV test partner\tmadre excluida a pedido del operador',
+                          report)
+
+    def test_preflight_rejects_child_across_companies(self):
+        # A mother tagged with a different Empresa than her child in the
+        # source CSV is not a valid link: verified explicitly and rejected
+        # as missing_or_rejected_mother, not silently accepted.
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[2]:
+                        mother = self.row('XCO-MOTHER')
+                        mother['data']['Empresa'] = 'Lufran S.A.'
+                        writer.writerow(mother['data'])
+                        writer.writerow(self.row('XCO-CHILD', nrosub='XCO-MOTHER')['data'])
+            rows, summary = load(directory)
+            self.assertEqual(summary['rejected']['missing_or_rejected_mother'], 1)
+            child = next(r for r in rows if r['data']['Código de Cliente'] == 'XCO-CHILD')
+            self.assertEqual(child['error'], 'missing_or_rejected_mother')
+            self.assertEqual(child['parent_key'], '')
+            self.assertIsNone(child['parent_company'])
+            self.assertIsNone(child['parent_row'])
+
+    def test_blank_bejerman_fallback_uses_customer_code_everywhere(self):
+        # Any mother/standalone customer (in any of the three files) with a
+        # blank/0 Bejerman uses her own Código de Cliente verbatim, no
+        # prefix. Children never carry a code at all (tested elsewhere).
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[0]:
+                        writer.writerow(self.row('JUMI-BLANK', **{'Código Bejerman': ''})['data'])
+                    elif filename == FILES[1]:
+                        writer.writerow(self.row('LUFRAN-ZERO', Empresa='Lufrán S.A.',
+                                                 **{'Código Bejerman': '0'})['data'])
+                    else:
+                        writer.writerow(self.row('MADRE-BLANK', **{'Código Bejerman': ''})['data'])
+            rows, summary = load(directory)
+            self.assertEqual(summary['rejected'], {})
+            jumi = next(r for r in rows if r['data']['Código de Cliente'] == 'JUMI-BLANK')
+            lufran = next(r for r in rows if r['data']['Código de Cliente'] == 'LUFRAN-ZERO')
+            madre = next(r for r in rows if r['data']['Código de Cliente'] == 'MADRE-BLANK')
+            self.assertEqual(jumi['key'], 'JUMI-BLANK')
+            self.assertEqual(lufran['key'], 'LUFRAN-ZERO')
+            self.assertEqual(madre['key'], 'MADRE-BLANK')
+
+    def test_children_keep_own_bejerman_unless_it_matches_mothers(self):
+        # A hija uses her own Código Bejerman, like anyone else, EXCEPT when
+        # it equals her mother's own resolved code: that collision means the
+        # source only meant to identify the mother, so the hija's code is
+        # blanked instead. A hija's own (non-blank, non-colliding) code still
+        # participates in the duplicate-key check like anyone else's.
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[2]:
+                        mother = self.row('MOTHER-BEJ', **{'Código de Cliente': 'MOM-CODE'})
+                        same_as_mother = self.row('MOTHER-BEJ', **{
+                            'Código de Cliente': 'SAME-CODE', 'nrosub': 'MOM-CODE'})
+                        own_code = self.row('CHILD-OWN-BEJ', **{
+                            'Código de Cliente': 'OWN-CODE', 'nrosub': 'MOM-CODE'})
+                        blank_fallback = self.row('', **{
+                            'Código de Cliente': 'BLANK-FALLBACK-CODE', 'nrosub': 'MOM-CODE',
+                            'Código Bejerman': ''})
+                        # Compared only against the mother's own resolved
+                        # Bejerman, never her Código de Cliente: a hija whose
+                        # own Bejerman happens to equal the mother's customer
+                        # code (not her Bejerman) keeps it, she is NOT blanked.
+                        same_as_mother_customer_code = self.row('MOM-CODE', **{
+                            'Código de Cliente': 'SAME-AS-MOM-CUSTOMER-CODE', 'nrosub': 'MOM-CODE'})
+                        writer.writerow(mother['data'])
+                        writer.writerow(same_as_mother['data'])
+                        writer.writerow(own_code['data'])
+                        writer.writerow(blank_fallback['data'])
+                        writer.writerow(same_as_mother_customer_code['data'])
+            rows, summary = load(directory)
+            self.assertNotIn('duplicate_key', summary['rejected'])
+            self.assertNotIn('missing_or_rejected_mother', summary['rejected'])
+            mother_row = next(r for r in rows if r['data']['Código de Cliente'] == 'MOM-CODE')
+            same_row = next(r for r in rows if r['data']['Código de Cliente'] == 'SAME-CODE')
+            own_row = next(r for r in rows if r['data']['Código de Cliente'] == 'OWN-CODE')
+            blank_row = next(r for r in rows if r['data']['Código de Cliente'] == 'BLANK-FALLBACK-CODE')
+            same_customer_code_row = next(
+                r for r in rows if r['data']['Código de Cliente'] == 'SAME-AS-MOM-CUSTOMER-CODE')
+            self.assertEqual(mother_row['key'], 'MOTHER-BEJ')
+            self.assertEqual(same_row['key'], '')
+            self.assertEqual(own_row['key'], 'CHILD-OWN-BEJ')
+            # Blank Bejerman on a hija falls back to her own customer_code,
+            # same unified rule as anyone else (and it happens to differ
+            # from the mother's own code here, so it is kept, not blanked).
+            self.assertEqual(blank_row['key'], 'BLANK-FALLBACK-CODE')
+            self.assertEqual(same_customer_code_row['key'], 'MOM-CODE')
+            self.assertEqual(same_row['parent_key'], mother_row['key'])
+            self.assertEqual(own_row['parent_key'], mother_row['key'])
+            self.assertEqual(same_customer_code_row['parent_key'], mother_row['key'])
+
+    def test_children_own_bejerman_participates_in_duplicate_check(self):
+        # Two hijas (of different mothers) that happen to carry the same
+        # own Bejerman in the same company collide, exactly like two
+        # mothers would — this used to be silently allowed when hijas
+        # always carried a blank code.
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[2]:
+                        mother_a = self.row('MOM-A-BEJ', **{'Código de Cliente': 'MOM-A'})
+                        mother_b = self.row('MOM-B-BEJ', **{'Código de Cliente': 'MOM-B'})
+                        child_a = self.row('DUP-BEJ', **{
+                            'Código de Cliente': 'CHILD-A', 'nrosub': 'MOM-A'})
+                        child_b = self.row('DUP-BEJ', **{
+                            'Código de Cliente': 'CHILD-B', 'nrosub': 'MOM-B'})
+                        for row in (mother_a, mother_b, child_a, child_b):
+                            writer.writerow(row['data'])
+            rows, summary = load(directory)
+            self.assertEqual(summary['rejected'], {'duplicate_key': 2})
+            child_a_row = next(r for r in rows if r['data']['Código de Cliente'] == 'CHILD-A')
+            child_b_row = next(r for r in rows if r['data']['Código de Cliente'] == 'CHILD-B')
+            self.assertEqual(child_a_row['error'], 'duplicate_key')
+            self.assertEqual(child_b_row['error'], 'duplicate_key')
+
+    def test_child_with_empty_key_is_identified_by_customer_code(self):
+        lookups = self.service._lookups()
+        mother = self.row('CSV-BLANK-MOTHER', Calle='Mother Street 1')
+        child = self.row('CSV-BLANK-CHILD', **{'Código Bejerman': ''}, Calle='Child Street 2')
+        child['key'] = ''
+        child['parent_key'] = mother['key']
+        child['parent_company'] = mother['company']
+        self.service._apply_row(mother, lookups)
+        self.assertEqual(self.service._apply_row(child, lookups)[0], 'created')
+        record = self.partners.search([('customer_code', '=', 'CSV-BLANK-CHILD')])
+        self.assertFalse(record.codigo_bejerman)
+        self.assertEqual(record.parent_id.codigo_bejerman, mother['key'])
+        # Idempotent: found again by customer_code, not by the (blank) code.
+        self.assertEqual(self.service._apply_row(child, lookups)[0], 'unchanged')
+        child['data']['Calle'] = 'Child Street 2 updated'
+        self.assertEqual(self.service._apply_row(child, lookups)[0], 'updated')
+        self.assertEqual(record.street, 'Child Street 2 updated')
+
+    def test_duplicates_orphan_and_order(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[2]:
+                        writer.writerow(self.row('CHILD', nrosub='MOTHER')['data'])
+                        writer.writerow(self.row('MOTHER')['data'])
+                        writer.writerow(self.row('DUP')['data'])
+                        writer.writerow(self.row('DUP')['data'])
+                        writer.writerow(self.row('ORPHAN', nrosub='MISSING')['data'])
+            rows, summary = load(directory)
+            self.assertEqual(summary['total'], 5)
+            self.assertEqual(summary['rejected']['duplicate_key'], 2)
+            self.assertEqual(summary['rejected']['missing_or_rejected_mother'], 1)
+            self.assertLess(next(i for i, r in enumerate(rows) if r['data']['Código de Cliente'] == 'MOTHER'),
+                            next(i for i, r in enumerate(rows) if r['data']['Código de Cliente'] == 'CHILD'))
+
+    def test_shared_identity_rejected(self):
+        row = self.row()
+        self.partners.create({'name': 'Shared', 'codigo_bejerman': row['key'], 'company_id': False})
+        with self.assertRaisesRegex(ValueError, 'shared_partner'):
+            self.service._apply_row(row, self.service._lookups())
+
+    def test_no_external_padron(self):
+        # The import-specific method must return before invoking the padron stack.
+        self.assertFalse(self.partners.do_update_from_padron())
+
+    def test_archived_supplier_and_family_are_protected(self):
+        lookups = self.service._lookups()
+        mother = self.row('CSV-PROTECTED-MOTHER')
+        self.service._apply_row(mother, lookups)
+        partner = self.partners.search([('codigo_bejerman', '=', mother['key'])])
+        supplier = self.partners.create({'name': 'Supplier child', 'parent_id': partner.id,
+                                        'company_id': 1, 'is_company': True,
+                                        'type': 'other', 'supplier_rank': 1,
+                                        'email': 'supplier@example.invalid', 'active': False})
+        mother['data']['Nombre'] = 'Must not change'
+        with self.assertRaisesRegex(ValueError, 'supplier_in_commercial_family'):
+            self.service._apply_row(mother, lookups)
+        self.assertEqual(partner.name, 'CSV test partner')
+        row = self.row('CSV-SUPPLIER-ARCHIVED')
+        supplier.write({'codigo_bejerman': row['key']})
+        self.assertEqual(self.service._apply_row(row, lookups)[0], 'supplier_protected')
+
+    def test_company_scoped_identity(self):
+        lookups = self.service._lookups()
+        first = self.row('CSV-MULTICOMPANY')
+        second = self.row('CSV-MULTICOMPANY')
+        second['company'] = 8
+        second['data']['Empresa'] = 'Lufran S.A.'
+        self.service._apply_row(first, lookups)
+        self.service._apply_row(second, lookups)
+        records = self.partners.search([('codigo_bejerman', '=', first['key'])])
+        self.assertEqual(set(records.mapped('company_id').ids), {1, 8})
+        self.assertEqual(len(records), 2)
+
+    def test_confirmed_payment_aliases(self):
+        lookups = self.service._lookups()
+        row = self.row(**{'Términos de pago del cliente': 'CONTADO'})
+        values, _ = self.service._values(row, lookups)
+        self.assertEqual(values['property_payment_term_id'], 1)
+        row['data']['Términos de pago del cliente'] = 'CTA. CORRIENTE'
+        values, _ = self.service._values(row, lookups)
+        self.assertEqual(values['property_payment_term_id'], 25)
+
+    def test_savepoint_rolls_back_a_partially_written_row(self):
+        row = self.row('CSV-ROLLBACK')
+        model = type(self.partners)
+        original = model.create
+        def failing_create(records, values):
+            original(records, values)
+            raise ValidationError('simulated constraint after create')
+        with patch.object(model, 'create', failing_create):
+            with self.assertRaises(ValidationError):
+                with self.env.cr.savepoint():
+                    self.service._apply_row(row, self.service._lookups())
+        self.assertFalse(self.partners.search([('codigo_bejerman', '=', row['key'])]))
+
+    def test_company_default_pricelist_ignores_csv_and_updates_existing(self):
+        lookups = self.service._lookups()
+        for company in (1, 8):
+            row = self.row(f'CSV-DEFAULT-{company}', ListaPrecio='MISSING CSV LIST')
+            row['company'] = company
+            expected = lookups[company, 'default_pricelist']
+            self.service._apply_row(row, lookups)
+            record = self.partners.with_company(self.env['res.company'].browse(company)).search([
+                ('codigo_bejerman', '=', row['key']), ('company_id', '=', company)])
+            self.assertEqual(record.property_product_pricelist.id, expected)
+            self.assertEqual(record.property_product_pricelist.company_id.id, company)
+            alternative = self.env['product.pricelist'].with_company(record.company_id).create({
+                'name': 'Alternative for test', 'company_id': company, 'sequence': 999})
+            record.write({'property_product_pricelist': alternative.id})
+            self.assertEqual(self.service._apply_row(row, lookups)[0], 'updated')
+            self.assertEqual(record.property_product_pricelist.id, expected)
+            self.assertEqual(self.service._apply_row(row, lookups)[0], 'unchanged')
+
+    def test_other_companies_are_not_destinations(self):
+        for company in (5, 9):
+            row = self.row()
+            row['company'] = company
+            with self.assertRaisesRegex(ValueError, 'invalid_destination_company'):
+                self.service._values(row, self.service._lookups())
+
+    def test_company_name_accepts_accent_but_requires_sa(self):
+        from ..csv_source import COMPANIES, normalize
+        def resolve(name):
+            return next((cid for label, cid in COMPANIES.items()
+                         if normalize(label) == normalize(name)), None)
+        self.assertEqual(resolve('Lufrán S.A.'), 8)
+        self.assertEqual(resolve('Lufran S.A.'), 8)
+        self.assertIsNone(resolve('Lufrán'))
+        self.assertIsNone(resolve('El Jumillano'))
+
+    def test_coordinate_precision_does_not_cause_repeated_updates(self):
+        row = self.row('CSV-GEO', **{'Geo latitud': '-34.63540540053784',
+                                    'Geo longitud': '-58.532608636328135'})
+        lookups = self.service._lookups()
+        self.service._apply_row(row, lookups)
+        self.env.flush_all()
+        self.env.invalidate_all()
+        self.assertEqual(self.service._apply_row(row, lookups)[0], 'unchanged')
+
+    def test_invalid_phones_are_preserved_on_create_update_and_replay(self):
+        lookups = self.service._lookups()
+        values = ['1121806628PAULA', '1.13772756615377E+19', '0345154964349 apoder']
+        for index, value in enumerate(values):
+            row = self.row(f'CSV-RAW-PHONE-{index}', **{
+                'Teléfono': value, 'Numero de Celular': value})
+            status, warnings = self.service._apply_row(row, lookups)
+            self.assertEqual(status, 'created')
+            self.assertIn('phone_format_preserved:Teléfono', warnings)
+            self.assertIn('phone_format_preserved:Numero de Celular', warnings)
+            record = self.partners.search([('codigo_bejerman', '=', row['key'])])
+            self.env.flush_all()
+            self.env.invalidate_all()
+            self.assertEqual(record.phone, value)
+            self.assertEqual(record.mobile_number, value)
+            self.assertEqual(self.service._apply_row(row, lookups)[0], 'unchanged')
+            row['data']['Teléfono'] = value + ' texto adicional'
+            self.assertEqual(self.service._apply_row(row, lookups)[0], 'updated')
+            self.assertEqual(record.phone, row['data']['Teléfono'])
+
+    def test_per_file_sample_preserves_global_errors_and_mothers(self):
+        from ..csv_source import select_rows
+        with tempfile.TemporaryDirectory() as directory:
+            for filename in FILES:
+                with (Path(directory) / filename).open('w', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+                    writer.writeheader()
+                    if filename == FILES[2]:
+                        for data in [self.row('CHILD', nrosub='MOTHER')['data'],
+                                     self.row('FILLER')['data'], self.row('MOTHER')['data'],
+                                     self.row('LATER')['data']]:
+                            writer.writerow(data)
+                    else:
+                        for code in ('DUP', 'SECOND', 'THIRD', 'DUP'):
+                            row = self.row(filename + code)['data']
+                            if filename == FILES[1]:
+                                row['Empresa'] = 'Lufrán S.A.'
+                            writer.writerow(row)
+            rows, summary = load(directory)
+            selected, sample = select_rows(rows, summary, 2)
+            self.assertEqual(sample['total'], 6)
+            self.assertEqual(sample['files'], dict.fromkeys(FILES, 2))
+            self.assertEqual(sample['rejected'], {'duplicate_key': 2})
+            hierarchy = [r for r in selected if r['file'] == FILES[2]]
+            self.assertEqual([r['key'] for r in hierarchy], ['MOTHER', 'CHILD'])
+            self.assertEqual([r['row'] for r in hierarchy], [4, 2])
+            self.assertNotEqual(sample['fingerprint'], summary['fingerprint'])
+            self.assertNotEqual(sample['fingerprint'], select_rows(rows, summary, 3)[1]['fingerprint'])
+            self.assertEqual(sample, select_rows(rows, summary, 2)[1])
+            self.assertEqual(select_rows(rows, summary, 0), (rows, summary))
+            with self.assertRaisesRegex(ValueError, 'fewer than'):
+                select_rows(rows, summary, 5)
+
+    def _build_csv_bytes(self, rows_data):
+        stream = io.StringIO(newline='')
+        writer = csv.DictWriter(stream, fieldnames=HEADERS, delimiter=';')
+        writer.writeheader()
+        writer.writerows(rows_data)
+        return stream.getvalue().encode('utf-8-sig')
+
+    def _attachment(self, filename, rows_data):
+        return self.env['ir.attachment'].create(dict(
+            name=filename, datas=base64.b64encode(self._build_csv_bytes(rows_data))))
+
+    def test_upload_wizard_writes_files_and_validates(self):
+        attachments = (
+            self._attachment(FILES[0], [self.row('UP-JUMI')['data']])
+            | self._attachment(FILES[1], [self.row('UP-LUFRAN', Empresa='Lufrán S.A.')['data']])
+            | self._attachment(FILES[2], [self.row('UP-MOTHER')['data']])
+        )
+        wizard = self.env['res.partner.csv.upload.wizard'].create(dict(
+            attachment_ids=[(6, 0, attachments.ids)]))
+        wizard.action_upload()
+        self.assertTrue(wizard.target_dir)
+        self.assertEqual(wizard.target_dir, self.service._csv_dir())
+        for filename in FILES:
+            self.assertTrue(os.path.isfile(os.path.join(wizard.target_dir, filename)))
+        summary = json.loads(wizard.summary)
+        self.assertEqual(summary['files'], dict(zip(FILES, (1, 1, 1))))
+        self.assertEqual(summary['rejected'], {})
+        # The scripts default to the same directory when PARTNER_CSV_DIR is unset.
+        rows, _ = load(self.service._csv_dir())
+        self.assertEqual(len(rows), 3)
+
+    def test_upload_wizard_requires_exact_filenames(self):
+        attachments = (
+            self._attachment(FILES[0], [self.row('UP-JUMI3')['data']])
+            | self._attachment('wrong_name.csv', [self.row('UP-LUFRAN3', Empresa='Lufrán S.A.')['data']])
+        )
+        wizard = self.env['res.partner.csv.upload.wizard'].create(dict(
+            attachment_ids=[(6, 0, attachments.ids)]))
+        with self.assertRaisesRegex(UserError, 'page_clientes_lufran.csv'):
+            wizard.action_upload()

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="view_move_form_ivess_manual_document_number" model="ir.ui.view">
+        <field name="name">account.move.view.form.ivess.manual.document.number</field>
+        <field name="model">account.move</field>
+        <field
+      name="inherit_id"
+      ref="l10n_ar_eynes.account_move_view_form_inherit_l10n_ar_eynes"
+    />
+        <field name="arch" type="xml">
+            <field name="denomination" position="before">
+                <field name="ivess_force_manual_document_number" invisible="1" />
+            </field>
+            <field name="denomination" position="attributes">
+                <attribute
+          name="invisible"
+        >move_type not in ('in_invoice', 'in_refund', 'out_invoice', 'out_refund') or ivess_force_manual_document_number</attribute>
+            </field>
+            <field name="supplier_move_reference" position="after">
+                <field
+          name="internal_number"
+          class="oe_inline"
+          invisible="state != 'draft' or move_type not in ('out_invoice', 'out_refund') or not ivess_force_manual_document_number"
+          required="move_type in ('out_invoice', 'out_refund') and ivess_force_manual_document_number"
+        />
+            </field>
+        </field>
+    </record>
+
+</odoo>
