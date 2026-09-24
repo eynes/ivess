@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="account_view_tax_form_inherit_ivess_sicore_split" model="ir.ui.view">
+        <field name="name">account.tax.view.form.inherit.ivess.sicore.split</field>
+        <field name="model">account.tax</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.account_view_tax_form_inherit_l10n_ar_eynes" />
+        <field name="arch" type="xml">
+            <xpath
+                expr="//field[@name='perception_application_ids']/preceding-sibling::field[@name='apply_custom_code'][1]"
+                position="after"
+            >
+                <field name="sicore_tax_code" />
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
