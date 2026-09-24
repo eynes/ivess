@@ -1,21 +1,63 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <odoo>
 
     <record id="account_invoice_report_view_search_ivess" model="ir.ui.view">
         <field name="name">account.invoice.report.search.ivess</field>
         <field name="model">account.invoice.report</field>
-        <field name="inherit_id" ref="account.view_account_invoice_report_search"/>
+        <field name="inherit_id" ref="account.view_account_invoice_report_search" />
         <field name="arch" type="xml">
+            <xpath expr="//filter[@name='supplier']" position="after">
+                <separator />
+                <filter
+          string="Con IVA Compras"
+          name="filter_has_iva_compras_tax"
+          domain="[('iva_compras_tax_id', '!=', False)]"
+        />
+            </xpath>
             <xpath expr="//field[@name='product_categ_id']" position="after">
-                <field name="area_id"/>
-                <field name="rubro_credito_fiscal_id"/>
+                <field name="area_id" />
+                <field name="rubro_credito_fiscal_id" />
+                <field name="iva_compras_tax_id" />
             </xpath>
             <xpath expr="//filter[@name='category_product']" position="after">
-                <filter string="Rubro" name="group_by_area"
-                        context="{'group_by': 'area_id'}"/>
-                <filter string="Rubro Crédito Fiscal" name="group_by_rubro_credito_fiscal"
-                        context="{'group_by': 'rubro_credito_fiscal_id'}"/>
+                <filter
+          string="Rubro"
+          name="group_by_area"
+          context="{'group_by': 'area_id'}"
+        />
+                <filter
+          string="Rubro Crédito Fiscal"
+          name="group_by_rubro_credito_fiscal"
+          context="{'group_by': 'rubro_credito_fiscal_id'}"
+        />
+                <filter
+          string="IVA Compras"
+          name="group_by_iva_compras_tax"
+          context="{'group_by': 'iva_compras_tax_id'}"
+        />
             </xpath>
+        </field>
+    </record>
+
+    <record id="account_invoice_report_view_pivot_ivess" model="ir.ui.view">
+        <field name="name">account.invoice.report.pivot.ivess</field>
+        <field name="model">account.invoice.report</field>
+        <field name="inherit_id" ref="account.view_account_invoice_report_pivot" />
+        <field name="arch" type="xml">
+            <field name="price_subtotal" type="measure" position="after">
+                <field name="iva_compras_amount" type="measure" />
+            </field>
+        </field>
+    </record>
+
+    <record id="account_invoice_report_view_tree_ivess" model="ir.ui.view">
+        <field name="name">account.invoice.report.view.list.ivess</field>
+        <field name="model">account.invoice.report</field>
+        <field name="inherit_id" ref="account.account_invoice_report_view_tree" />
+        <field name="arch" type="xml">
+            <field name="price_total_currency" position="after">
+                <field name="iva_compras_amount" optional="show" sum="Total" />
+            </field>
         </field>
     </record>
 
