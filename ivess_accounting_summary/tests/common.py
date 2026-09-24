@@ -46,6 +46,7 @@ class IvessAccountingSummaryTestCommon(TransactionCase):
                 "type": "general",
                 "code": "TOPER",
                 "company_id": company.id,
+                "x_is_operational_journal": True,
                 "due_date": "2020-01-01",
             }
         )

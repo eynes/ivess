@@ -6,6 +6,7 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='code']" position="after">
                 <field name="x_is_legal_journal" />
+                <field name="x_is_operational_journal" />
             </xpath>
         </field>
     </record>

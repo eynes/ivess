@@ -14,6 +14,15 @@
                     los diarios marcados como "Diario Legal (Refundición /
                     Cierre)".
                 </p>
+                <field name="renumbered_move_ids" invisible="not renumbered_count">
+                    <list create="false" delete="false">
+                        <field name="x_folio_legal" />
+                        <field name="name" />
+                        <field name="journal_id" />
+                        <field name="date" />
+                        <field name="x_is_summary_entry" />
+                    </list>
+                </field>
                 <footer>
                     <button
             name="action_renumber"
