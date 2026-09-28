@@ -20,6 +20,16 @@ class ResPartner(models.Model):
         " con create_date, que es cuándo se creó el registro en Odoo).",
         copy=False,
     )
+    regimen_facturacion = fields.Selection(
+        selection=[
+            ("contraentrega", "Contraentrega"),
+            ("mensual", "Mensual"),
+        ],
+        string="Régimen de Facturación",
+        help="Define si al cliente se le emite remito o factura y con qué"
+        " frecuencia.",
+        tracking=True,
+    )
     # state_id = fields.Many2one(
     #     required=True,
     # )

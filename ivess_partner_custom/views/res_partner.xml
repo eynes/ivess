@@ -18,6 +18,11 @@
                 <field name="unbilled_balance"/>
                 <field name="final_balance"/>
             </xpath>
+            <xpath expr="//page[@name='sales_purchases']/group[@name='container_row_2']" position="after">
+                <group name="group_facturacion_cobranza" string="Facturación y Cobranza">
+                    <field name="regimen_facturacion"/>
+                </group>
+            </xpath>
         </field>
     </record>
 </odoo>
