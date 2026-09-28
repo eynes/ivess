@@ -3,6 +3,24 @@ from collections import defaultdict
 from odoo import _, api, fields, models, tools
 from odoo.exceptions import UserError, ValidationError
 
+# Campo de la dirección de entrega en la ficha -> campo de dirección del
+# contacto de entrega automático.
+DELIVERY_ADDRESS_FIELDS = {
+    "delivery_street": "street",
+    "delivery_street2": "street2",
+    "delivery_num": "num",
+    "delivery_floor": "floor",
+    "delivery_door": "door",
+    "delivery_apartment": "apartment",
+    "delivery_city": "city",
+    "delivery_city_id": "city_id",
+    "delivery_state_id": "state_id",
+    "delivery_zip": "zip",
+    "delivery_country_id": "country_id",
+}
+# Datos del cliente que el remito imprime del contacto de entrega.
+DELIVERY_CONTACT_FIELDS = ("name", "phone", "email")
+
 
 class ResPartner(models.Model):
     _inherit = "res.partner"
@@ -95,6 +113,16 @@ class ResPartner(models.Model):
     )
     delivery_country_enforce_cities = fields.Boolean(
         related="delivery_country_id.enforce_cities",
+    )
+    delivery_partner_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Contacto de Entrega Automático",
+        copy=False,
+        index="btree_not_null",
+        ondelete="set null",
+        help="Dirección hija de tipo Entrega, archivada, que se mantiene sola"
+        " a partir de la dirección de entrega de la ficha. Es la que usan el"
+        " pedido, el remito y las percepciones.",
     )
     # state_id = fields.Many2one(
     #     required=True,
@@ -252,9 +280,70 @@ class ResPartner(models.Model):
                         % {"madre": madre.display_name, "detalle": detalle}
                     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        partners = super().create(vals_list)
+        if not self.env.context.get("sync_delivery_partner"):
+            partners.filtered(
+                lambda p: p._has_delivery_address()
+            )._sync_delivery_partner()
+        return partners
+
     def write(self, vals):
         self._check_pending_water_containers_before_archiving(vals)
-        return super().write(vals)
+        res = super().write(vals)
+        if not self.env.context.get("sync_delivery_partner"):
+            if vals.keys() & (set(DELIVERY_ADDRESS_FIELDS) | set(DELIVERY_CONTACT_FIELDS)):
+                self.filtered(
+                    lambda p: p.delivery_partner_id or p._has_delivery_address()
+                )._sync_delivery_partner()
+            if vals.keys() & set(DELIVERY_ADDRESS_FIELDS.values()):
+                self._sync_delivery_partner_back()
+        return res
+
+    def address_get(self, adr_pref=None):
+        result = super().address_get(adr_pref)
+        if len(self) == 1 and self.delivery_partner_id and "delivery" in (adr_pref or ()):
+            result["delivery"] = self.delivery_partner_id.id
+        return result
+
+    def _has_delivery_address(self):
+        self.ensure_one()
+        return any(self[field] for field in DELIVERY_ADDRESS_FIELDS)
+
+    def _sync_delivery_partner(self):
+        """Crea o actualiza el contacto de entrega automático a partir de la
+        dirección de entrega de la ficha. Queda archivado para que no se vea
+        como contacto hijo ni lo tomen las hijas al buscar su dirección."""
+        for partner in self.with_context(sync_delivery_partner=True):
+            if not partner._has_delivery_address():
+                if partner.delivery_partner_id:
+                    partner.delivery_partner_id = False
+                continue
+            vals = {
+                target: partner._fields[source].convert_to_write(partner[source], partner)
+                for source, target in DELIVERY_ADDRESS_FIELDS.items()
+            }
+            vals.update({field: partner[field] for field in DELIVERY_CONTACT_FIELDS})
+            if partner.delivery_partner_id:
+                partner.delivery_partner_id.write(vals)
+            else:
+                vals.update(type="delivery", parent_id=partner.id, active=False)
+                partner.delivery_partner_id = partner.create(vals)
+
+    def _sync_delivery_partner_back(self):
+        """Si alguien edita la dirección del contacto de entrega automático
+        (por ejemplo desde el pedido), la lleva a la ficha del cliente."""
+        for shadow in self:
+            owner = shadow.parent_id
+            if not owner or owner.delivery_partner_id != shadow:
+                continue
+            owner.with_context(sync_delivery_partner=True).write(
+                {
+                    source: shadow._fields[target].convert_to_write(shadow[target], shadow)
+                    for source, target in DELIVERY_ADDRESS_FIELDS.items()
+                }
+            )
 
     def _set_multicompany_account_fiscal_position(self, property_account_position_id):
         # l10n_ar_eynes propaga property_account_position_id a las otras
