@@ -115,6 +115,14 @@ class ResPartner(models.Model):
     delivery_country_enforce_cities = fields.Boolean(
         related="delivery_country_id.enforce_cities",
     )
+    direccion_completa = fields.Char(
+        string="Dirección Completa",
+        compute="_compute_direccion_completa",
+        store=True,
+        index="trigram",
+        help="Dirección de facturación, de entrega y observaciones de dirección"
+        " en un solo texto, para buscar por cualquier parte.",
+    )
     delivery_partner_id = fields.Many2one(
         comodel_name="res.partner",
         string="Contacto de Entrega Automático",
@@ -219,6 +227,34 @@ class ResPartner(models.Model):
                 # _origin: un contacto nuevo todavía no tiene id propio al
                 # que apuntar; se completa al guardarlo.
                 partner.pagador_id = partner._origin
+
+    @api.depends(
+        "street", "num", "floor", "door", "apartment", "street2", "city", "zip",
+        "delivery_street", "delivery_num", "delivery_floor", "delivery_door",
+        "delivery_apartment", "delivery_street2", "delivery_city", "delivery_zip",
+        "address_details",
+    )
+    def _compute_direccion_completa(self):
+        for partner in self:
+            facturacion = partner._texto_direccion("")
+            entrega = partner._texto_direccion("delivery_")
+            partes = [facturacion, entrega and _("Entrega: %s") % entrega, partner.address_details]
+            partner.direccion_completa = " | ".join(p for p in partes if p) or False
+
+    def _texto_direccion(self, prefijo):
+        """Calle y número juntos (así "Mitre 500" se encuentra aunque estén
+        en campos separados), después piso, puerta, depto, ciudad y CP."""
+        valor = lambda campo: self[prefijo + campo] or ""
+        texto = " ".join(filter(None, [valor("street"), valor("num")]))
+        for campo, etiqueta in (("floor", _("piso")), ("door", _("puerta")), ("apartment", _("depto"))):
+            if valor(campo):
+                texto += " %s %s" % (etiqueta, valor(campo))
+        for campo in ("street2", "city"):
+            if valor(campo):
+                texto += ", " + valor(campo)
+        if valor("zip"):
+            texto += " (%s)" % valor("zip")
+        return texto.strip(", ")
 
     # La dirección de entrega replica a la actual: mismo corte de calle que
     # base_address_extended hace sobre street y mismos onchanges de país,

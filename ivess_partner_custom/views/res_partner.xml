@@ -115,6 +115,7 @@
         <field name="arch" type="xml">
             <field name="repartos" position="before">
                 <field name="delivery_street" string="Calle de Entrega" optional="hide"/>
+                <field name="direccion_completa" optional="hide"/>
             </field>
         </field>
     </record>
@@ -125,7 +126,7 @@
         <field name="inherit_id" ref="logistic_custom_ivess.view_res_partner_filter_inherit_logistic"/>
         <field name="arch" type="xml">
             <field name="street" position="attributes">
-                <attribute name="filter_domain">['|', '|', '|', '|', '|', '|', '|', '|', ('street', 'ilike', self), ('street2', 'ilike', self), ('num', 'ilike', self), ('city', 'ilike', self), ('zip', 'ilike', self), ('delivery_street', 'ilike', self), ('delivery_num', 'ilike', self), ('delivery_city', 'ilike', self), ('delivery_zip', 'ilike', self)]</attribute>
+                <attribute name="filter_domain">[('direccion_completa', 'ilike', self)]</attribute>
             </field>
         </field>
     </record>
