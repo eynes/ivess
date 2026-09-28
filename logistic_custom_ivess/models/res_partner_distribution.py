@@ -3,6 +3,10 @@ from collections import defaultdict
 
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+from odoo.tools import SQL
+from odoo.tools.misc import formatLang
+
+from .delivery_route import _distancia_km
 
 FREQUENCY_MAPPING = {
     'weekly': 1,
@@ -41,6 +45,55 @@ class PartnerDistributions(models.Model):
         string='Frequency',
     )
     partner_id = fields.Many2one('res.partner', string='Partner')
+    reparto_sugerido = fields.Char(
+        string='Sugerencia por ubicación',
+        compute='_compute_reparto_sugerido',
+    )
+
+    @api.depends('partner_id')
+    def _compute_reparto_sugerido(self):
+        for rec in self:
+            rec.reparto_sugerido = rec._sugerir_reparto() if not rec._origin.id else False
+
+    def _sugerir_reparto(self):
+        """Reparto cuyos clientes (en las plantillas) están más cerca del cliente:
+        promedio de las 3 distancias más cortas. Es solo un texto de ayuda."""
+        self.ensure_one()
+        partner = self.partner_id
+        lat, lon = partner.partner_latitude, partner.partner_longitude
+        if not (lat or lon):
+            return False
+        filas = []
+        for radio in (0.02, 0.1):  # grados: ~2 km y ~10 km
+            self.env.cr.execute(SQL(
+                """
+                SELECT tdr.delivery_number_id, rp.partner_latitude, rp.partner_longitude
+                  FROM delivery_route_line drl
+                  JOIN template_delivery_route tdr ON tdr.id = drl.template_route_id
+                  JOIN res_partner rp ON rp.id = drl.client_id
+                 WHERE drl.route_id IS NULL
+                   AND tdr.delivery_number_id IS NOT NULL
+                   AND rp.active
+                   AND rp.id != %s
+                   AND rp.partner_latitude BETWEEN %s AND %s
+                   AND rp.partner_longitude BETWEEN %s AND %s
+                """,
+                partner._origin.id or 0, lat - radio, lat + radio, lon - radio, lon + radio,
+            ))
+            filas = self.env.cr.fetchall()
+            if filas:
+                break
+        if not filas:
+            return False
+        distancias = defaultdict(list)
+        for numero_id, la, lo in filas:
+            distancias[numero_id].append(_distancia_km((lat, lon), (la, lo)))
+        puntaje = {n: sum(sorted(d)[:3]) / len(sorted(d)[:3]) for n, d in distancias.items()}
+        mejor = min(puntaje, key=puntaje.get)
+        return _('Reparto %(reparto)s: sus clientes más cercanos están a %(km)s km.') % {
+            'reparto': self.env['delivery.route.number'].browse(mejor).display_name,
+            'km': formatLang(self.env, puntaje[mejor], digits=1),
+        }
 
     message_ids = fields.One2many(
         'partner.distribution.message',
