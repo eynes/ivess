@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 
 from odoo import _, api, fields, models, tools
@@ -124,6 +125,17 @@ class ResPartner(models.Model):
         " a partir de la dirección de entrega de la ficha. Es la que usan el"
         " pedido, el remito y las percepciones.",
     )
+    vat_duplicado_ids = fields.Many2many(
+        comodel_name="res.partner",
+        string="Contactos con el Mismo CUIT",
+        compute="_compute_vat_duplicado_ids",
+    )
+    alta_madre_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Colgar como Hija de",
+        compute="_compute_alta_madre_id",
+        readonly=False,
+    )
     # state_id = fields.Many2one(
     #     required=True,
     # )
@@ -211,6 +223,45 @@ class ResPartner(models.Model):
                 street = street + " - " + partner.delivery_street_number2
             partner.delivery_street = street
 
+    @api.depends("vat", "document_type_id", "parent_id")
+    def _compute_vat_duplicado_ids(self):
+        """Contactos que ya tienen el CUIT/CUIL que se está cargando en un
+        alta. Mismo criterio que check_vat_duplicated de l10n_ar_eynes: mismo
+        número y tipo de documento, entre contactos sin madre."""
+        tipos = self.env["res.document.type"]
+        for xmlid in ("l10n_ar_eynes.document_cuit", "l10n_ar_eynes.document_cuil"):
+            tipos |= self.env.ref(xmlid, raise_if_not_found=False) or tipos
+        for partner in self:
+            vat = re.sub(r"\D", "", partner.vat or "")
+            if (
+                partner._origin.id
+                or partner.parent_id
+                or not vat
+                or partner.document_type_id not in tipos
+            ):
+                partner.vat_duplicado_ids = False
+                continue
+            partner.vat_duplicado_ids = self.search(
+                [
+                    ("vat", "=", vat),
+                    ("document_type_id", "=", partner.document_type_id.id),
+                    ("parent_id", "=", False),
+                ]
+            )
+
+    def _compute_alta_madre_id(self):
+        self.alta_madre_id = False
+
+    @api.onchange("alta_madre_id")
+    def _onchange_alta_madre_id(self):
+        # Se cuelga como las hijas que carga la importación de contactos:
+        # tipo "other" para que Odoo no le pise la dirección con la de la madre.
+        if self.alta_madre_id:
+            self.parent_id = self.alta_madre_id
+            self.type = "other"
+            if "csv_inherit_commercial" in self._fields:
+                self.csv_inherit_commercial = True
+
     @api.onchange("delivery_country_id")
     def _onchange_delivery_country_id(self):
         country = self.delivery_country_id
@@ -282,6 +333,14 @@ class ResPartner(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        for vals in vals_list:
+            # "type" no está en la ficha para un usuario común, así que lo que
+            # puso el onchange de alta_madre_id no llega: se aplica acá.
+            madre_id = vals.pop("alta_madre_id", False)
+            if madre_id:
+                vals.update(parent_id=madre_id, type="other")
+                if "csv_inherit_commercial" in self._fields:
+                    vals["csv_inherit_commercial"] = True
         partners = super().create(vals_list)
         if not self.env.context.get("sync_delivery_partner"):
             partners.filtered(

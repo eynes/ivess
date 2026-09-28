@@ -5,6 +5,17 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="before">
+                <div class="alert alert-warning mb-3" role="alert" invisible="not vat_duplicado_ids">
+                    <div>Ya hay contactos con este número de documento:</div>
+                    <field name="vat_duplicado_ids" widget="many2many_tags" readonly="1"/>
+                    <div>Si es otra cuenta del mismo cliente, elegí de cuál colgarla como hija. Si no, guardá normalmente y se crea un contacto nuevo igual.</div>
+                    <field name="alta_madre_id"
+                           placeholder="Colgar como hija de..."
+                           domain="[('id', 'in', vat_duplicado_ids)]"
+                           options="{'no_create': True, 'no_open': True}"/>
+                </div>
+            </xpath>
             <xpath expr="//page[@name='accounting']" position="inside">
                 <group name="group_requiere_comprobante">
                     <field name="requiere_comprobante"/>
