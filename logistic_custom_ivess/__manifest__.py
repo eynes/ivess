@@ -1,6 +1,6 @@
 {
     "name": "Sale Custom Ivess",
-    "version": "19.0.0.0.20",
+    "version": "19.0.0.0.21",
     "description": """
     """,
     "author": "Eynes",
@@ -44,6 +44,7 @@
         "views/visit_status.xml",
         "views/water_container.xml",
         "views/frio_calor_container.xml",
+        "views/water_container_transfer.xml",
         "views/stock_location.xml",
         "views/stock_move.xml",
         "views/purchase_order.xml",
