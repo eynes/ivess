@@ -88,6 +88,11 @@ class ResPartner(models.Model):
         string='Distributions',
         tracking=True
     )
+    repartos = fields.Char(
+        string='Repartos',
+        compute='_compute_repartos',
+        search='_search_repartos',
+    )
     customer_code = fields.Char(
         string="Customer Code",
         readonly=True,
@@ -182,6 +187,14 @@ class ResPartner(models.Model):
         for record in self:
             if record.date_from and record.date_to and record.date_from > record.date_to:
                 raise ValidationError(_("The 'Date From' must be before or equal to 'Date To'."))
+
+    @api.depends('distributions_ids.distribution')
+    def _compute_repartos(self):
+        for rec in self:
+            rec.repartos = ', '.join(sorted(rec.distributions_ids.distribution.mapped('name')))
+
+    def _search_repartos(self, operator, value):
+        return [('distributions_ids.distribution.name', operator, value)]
 
     @api.depends('water_container_ids', 'water_container_ids.is_frio_calor')
     def _compute_qty_containers(self):

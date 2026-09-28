@@ -85,6 +85,28 @@
         </field>
     </record>
 
+    <record id="view_partner_tree_direccion_entrega" model="ir.ui.view">
+        <field name="name">res.partner.list.direccion.entrega</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_tree_inherit_logistic"/>
+        <field name="arch" type="xml">
+            <field name="repartos" position="before">
+                <field name="delivery_street" string="Calle de Entrega" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_res_partner_filter_direccion_entrega" model="ir.ui.view">
+        <field name="name">res.partner.search.direccion.entrega</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_res_partner_filter_inherit_logistic"/>
+        <field name="arch" type="xml">
+            <field name="street" position="attributes">
+                <attribute name="filter_domain">['|', '|', '|', '|', '|', '|', '|', '|', ('street', 'ilike', self), ('street2', 'ilike', self), ('num', 'ilike', self), ('city', 'ilike', self), ('zip', 'ilike', self), ('delivery_street', 'ilike', self), ('delivery_num', 'ilike', self), ('delivery_city', 'ilike', self), ('delivery_zip', 'ilike', self)]</attribute>
+            </field>
+        </field>
+    </record>
+
     <record id="view_res_partner_filter_inherit_ivess_partner_custom" model="ir.ui.view">
         <field name="name">res.partner.search.inherit.ivess.partner.custom</field>
         <field name="model">res.partner</field>

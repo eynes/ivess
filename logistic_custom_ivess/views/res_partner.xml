@@ -66,6 +66,39 @@
         </field>
     </record>
 
+    <record id="view_partner_tree_inherit_logistic" model="ir.ui.view">
+        <field name="name">res.partner.list.inherit.logistic</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <field name="street" position="attributes">
+                <attribute name="optional">show</attribute>
+            </field>
+            <field name="street" position="after">
+                <field name="num" optional="show"/>
+            </field>
+            <field name="city" position="attributes">
+                <attribute name="optional">show</attribute>
+            </field>
+            <field name="city" position="after">
+                <field name="repartos" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_res_partner_filter_inherit_logistic" model="ir.ui.view">
+        <field name="name">res.partner.search.inherit.logistic</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <field name="email" position="before">
+                <field name="street" string="Dirección"
+                       filter_domain="['|', '|', '|', '|', ('street', 'ilike', self), ('street2', 'ilike', self), ('num', 'ilike', self), ('city', 'ilike', self), ('zip', 'ilike', self)]"/>
+                <field name="repartos" string="Reparto"/>
+            </field>
+        </field>
+    </record>
+
     <record id="view_partner_distribution_form" model="ir.ui.view">
         <field name="name">partner.distribution.form</field>
         <field name="model">partner.distribution</field>
