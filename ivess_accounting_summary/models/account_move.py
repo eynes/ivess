@@ -98,6 +98,25 @@ class AccountMove(models.Model):
             if move.x_closed_by_summary_move_id:
                 move.status_in_payment = "x_closed_by_summary"
 
+    @api.depends("line_ids.x_summary_move_id")
+    def _compute_payments_widget_reconciled_info(self):
+        super()._compute_payments_widget_reconciled_info()
+        # El widget "Pagado el ..." se arma con TODA reconciliación contra
+        # la línea de deuda, sin distinguir un cobro/pago real de la
+        # reconciliación técnica contra el neteo del Asistente de Cierre
+        # Mensual. Un comprobante recién cerrado por resumen (nunca cobrado)
+        # no debe aparecer como "Pagado el <fecha del neteo>".
+        for move in self:
+            widget = move.invoice_payments_widget
+            if not widget:
+                continue
+            content = [
+                entry
+                for entry in widget["content"]
+                if not self.browse(entry["move_id"]).x_is_summary_entry
+            ]
+            move.invoice_payments_widget = {**widget, "content": content} if content else False
+
     def _get_view(self, view_id=None, view_type="form", **options):
         arch, view = super()._get_view(view_id=view_id, view_type=view_type, **options)
         if view_type == "form":
@@ -138,4 +157,4 @@ class AccountMove(models.Model):
             folio = f"{index:06d}"
             if move.x_folio_legal != folio:
                 move.x_folio_legal = folio
-        return len(moves)
+        return moves

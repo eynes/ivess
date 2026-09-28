@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="account_journal_view_form_inherit_ivess_sicore_split" model="ir.ui.view">
+        <field name="name">account.journal.view.form.inherit.ivess.sicore.split</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.account_journal_view_form_inherit_l10n_ar_eynes" />
+        <field name="arch" type="xml">
+            <!-- afip_code ya vive dentro de la pestaña "Retentions" (visible solo
+                 para type == 'retentions'); el wizard SICORE tambien lo usa como
+                 fallback para percepciones, asi que lo agregamos tambien en la
+                 pestaña "Perceptions", donde antes no existia. -->
+            <xpath expr="//page[@name='perceptions']/group/field[@name='type_tax_use']" position="after">
+                <field name="afip_code" />
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

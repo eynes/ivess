@@ -20,7 +20,7 @@ class AccountSummaryClosingWizard(models.TransientModel):
         comodel_name="account.journal",
         string="Diarios Operativos a Resumir",
         required=True,
-        domain="[('company_id', '=', company_id), ('x_is_legal_journal', '=', False)]",
+        domain="[('company_id', '=', company_id), ('x_is_operational_journal', '=', True), ('x_is_legal_journal', '=', False)]",
         help=(
             "Diarios de Ventas/Compras/Pagos cuyo detalle transaccional "
             "del período se va a netear y resumir."

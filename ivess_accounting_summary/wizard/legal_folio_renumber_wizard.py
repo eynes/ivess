@@ -12,11 +12,17 @@ class LegalFolioRenumberWizard(models.TransientModel):
         default=lambda self: self.env.company,
     )
     renumbered_count = fields.Integer(string="Asientos Renumerados", readonly=True)
+    renumbered_move_ids = fields.Many2many(
+        comodel_name="account.move",
+        string="Asientos Renumerados",
+        readonly=True,
+    )
 
     def action_renumber(self):
         self.ensure_one()
-        count = self.env["account.move"]._ivess_renumber_legal_folio(self.company_id)
-        self.renumbered_count = count
+        moves = self.env["account.move"]._ivess_renumber_legal_folio(self.company_id)
+        self.renumbered_count = len(moves)
+        self.renumbered_move_ids = [(6, 0, moves.ids)]
         return {
             "type": "ir.actions.act_window",
             "res_model": self._name,
