@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_ivess_visita_fuera_ruta_form" model="ir.ui.view">
+        <field name="name">ivess.visita.fuera.ruta.form</field>
+        <field name="model">ivess.visita.fuera.ruta</field>
+        <field name="arch" type="xml">
+            <form string="Pedir visita fuera de ruta">
+                <group>
+                    <field name="partner_id"/>
+                    <field name="fecha"/>
+                    <field name="reparto_id" options="{'no_create': True}"/>
+                    <field name="route_id"/>
+                </group>
+                <div class="alert alert-warning" role="alert" invisible="route_id or not reparto_id or not fecha">
+                    No hay recorrido de ese reparto para esa fecha.
+                </div>
+                <footer>
+                    <button name="action_confirmar" type="object" string="Agregar al recorrido" class="btn-primary"/>
+                    <button string="Cancelar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ivess_visita_fuera_ruta" model="ir.actions.act_window">
+        <field name="name">Pedir visita fuera de ruta</field>
+        <field name="res_model">ivess.visita.fuera.ruta</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

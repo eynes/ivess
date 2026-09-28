@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Ivess Partner Custom",
-    "version": "19.0.0.0.8",
+    "version": "19.0.0.0.9",
     "description": "",
     "author": "Eynes",
     "category": "Contacts",
@@ -14,6 +14,8 @@
         "logistic_custom_ivess",
     ],
     "data": [
+        "security/ir.model.access.csv",
+        "views/visita_fuera_ruta_views.xml",
         "views/res_partner.xml",
         "views/menu_views.xml",
     ],

@@ -5,6 +5,15 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="%(ivess_partner_custom.action_ivess_visita_fuera_ruta)d"
+                            type="action"
+                            string="Pedir visita fuera de ruta"
+                            context="{'default_partner_id': id}"
+                            invisible="not id"/>
+                </header>
+            </xpath>
             <xpath expr="//div[@name='button_box']" position="before">
                 <div class="alert alert-warning mb-3" role="alert" invisible="not vat_duplicado_ids">
                     <div>Ya hay contactos con este número de documento:</div>
