@@ -12,6 +12,12 @@
                             string="Pedir visita fuera de ruta"
                             context="{'default_partner_id': id}"
                             invisible="not id"/>
+                    <button name="%(ivess_partner_custom.action_ivess_traspaso_saldo)d"
+                            type="action"
+                            string="Traspasar saldo y dar de baja"
+                            context="{'default_origen_id': id}"
+                            invisible="not id or not active"
+                            groups="account.group_account_invoice"/>
                 </header>
             </xpath>
             <xpath expr="//div[@name='button_box']" position="before">
@@ -45,6 +51,9 @@
                     <field name="pagador_id"
                            readonly="pagador_modo != 'especifico'"
                            required="pagador_modo == 'especifico'"/>
+                    <field name="traspaso_destino_id" invisible="not traspaso_destino_id"/>
+                    <field name="traspaso_move_id" invisible="not traspaso_move_id"/>
+                    <field name="traspaso_origen_ids" widget="many2many_tags" invisible="not traspaso_origen_ids"/>
                 </group>
             </xpath>
         </field>

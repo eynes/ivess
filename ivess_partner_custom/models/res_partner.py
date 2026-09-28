@@ -136,6 +136,25 @@ class ResPartner(models.Model):
         compute="_compute_alta_madre_id",
         readonly=False,
     )
+    traspaso_destino_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Saldo Traspasado a",
+        readonly=True,
+        copy=False,
+        index="btree_not_null",
+    )
+    traspaso_move_id = fields.Many2one(
+        comodel_name="account.move",
+        string="Asiento de Traspaso",
+        readonly=True,
+        copy=False,
+    )
+    traspaso_origen_ids = fields.One2many(
+        comodel_name="res.partner",
+        inverse_name="traspaso_destino_id",
+        string="Recibió Saldo de",
+        context={"active_test": False},
+    )
     # state_id = fields.Many2one(
     #     required=True,
     # )
@@ -433,7 +452,12 @@ class ResPartner(models.Model):
             errors = []
             for partner in self:
                 pending = partner.check_water_container()
-                unpaid = partner.get_unpaid_invoice_count()
+                # Tras un traspaso de saldo las facturas siguen impagas (no se
+                # concilian) pero su deuda ya está en la cuenta destino.
+                if self.env.context.get("traspaso_saldo_hecho"):
+                    unpaid = 0
+                else:
+                    unpaid = partner.get_unpaid_invoice_count()
                 if pending > 0:
                     errors.append(
                         _("This customer has %s water containers pending return.")
