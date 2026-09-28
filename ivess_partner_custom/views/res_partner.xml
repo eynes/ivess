@@ -18,6 +18,11 @@
                             context="{'default_origen_id': id}"
                             invisible="not id or not active"
                             groups="account.group_account_invoice"/>
+                    <button name="%(ivess_partner_custom.action_ivess_desvincular_hija)d"
+                            type="action"
+                            string="Desvincular del grupo"
+                            context="{'default_hija_id': id}"
+                            invisible="not id or not parent_id or type != 'other'"/>
                 </header>
             </xpath>
             <xpath expr="//div[@name='button_box']" position="before">

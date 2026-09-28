@@ -1,4 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_ivess_visita_fuera_ruta_user,ivess.visita.fuera.ruta.user,model_ivess_visita_fuera_ruta,base.group_user,1,1,1,1
 access_ivess_baja_madre_user,ivess.baja.madre.user,model_ivess_baja_madre,base.group_user,1,1,1,1
+access_ivess_desvincular_hija_user,ivess.desvincular.hija.user,model_ivess_desvincular_hija,base.group_user,1,1,1,1
 access_ivess_traspaso_saldo_invoice,ivess.traspaso.saldo.invoice,model_ivess_traspaso_saldo,account.group_account_invoice,1,1,1,1
