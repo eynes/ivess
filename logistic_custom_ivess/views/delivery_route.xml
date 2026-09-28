@@ -10,6 +10,9 @@
                     <button name="action_set_closed" type="object" string="Close" invisible="state not in ('in_progress')" class="btn-success" confirm="Esta seguro que desea cerrar la ruta?"/>
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state not in ('closed')" class="btn-secondary"/>
                     <button name="action_create_bis" type="object" string="Crear ruta Bis" class="btn-secondary"/>
+                    <button name="action_ordenar_por_cercania" type="object" string="Ordenar por cercanía" class="btn-secondary"
+                            invisible="not allow_reordering or state == 'closed'"
+                            confirm="Se reordenan las visitas: primero se respetan las franjas horarias y las marcadas como Fijo, y el resto se ordena por cercanía. ¿Continuar?"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,sincronizado,in_progress,closed"/>
                 </header>
                 <sheet>
@@ -52,6 +55,7 @@
                                     <field name="no_purchase_reason_id"  widget="many2one" optional="show" column_invisible="parent.state in ('draft')" readonly="requires_reason == False" required="requires_reason == True"/>
                                     <field name="visit_hour_from" widget="float_time" optional="show"/>
                                     <field name="visit_hour_to" widget="float_time" optional="show"/>
+                                    <field name="orden_fijo" optional="show" column_invisible="parent.allow_reordering == False"/>
                                     <field name="effective_visit_hour" widget="float_time" optional="show"/>
                                     <field name="sale_order_id" optional="show"/>
                                     <field name="stock_picking_id" optional="show"/>
