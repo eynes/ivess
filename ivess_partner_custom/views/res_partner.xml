@@ -30,6 +30,50 @@
         </field>
     </record>
 
+    <record id="view_partner_form_direccion_entrega" model="ir.ui.view">
+        <field name="name">res.partner.form.direccion.entrega</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.address_street_extended_city_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//span[@name='address_name']/field[@name='type_address_label']" position="attributes">
+                <attribute name="invisible">is_company or type == 'contact'</attribute>
+            </xpath>
+            <xpath expr="//span[@name='address_name']/span" position="replace">
+                <span invisible="not is_company and type != 'contact'">Dirección de Facturación</span>
+            </xpath>
+            <xpath expr="//span[@name='address_name']/following-sibling::field[@name='zip'][1]" position="after">
+                <span class="o_form_label o_td_label" name="delivery_address_name">
+                    <b>Dirección de Entrega</b>
+                </span>
+                <div class="o_address_format">
+                    <field name="delivery_street" placeholder="Calle..." class="o_address_street"/>
+                    <field name="delivery_street2" placeholder="Calle 2..." class="o_address_street"/>
+                    <field name="delivery_num" placeholder="Número"/>
+                    <field name="delivery_floor" placeholder="Piso"/>
+                    <field name="delivery_door" placeholder="Puerta"/>
+                    <field name="delivery_apartment" placeholder="Depto."/>
+                </div>
+                <field name="delivery_country_id"
+                       placeholder="País"
+                       options='{"no_open": True, "no_create": True}'/>
+                <field name="delivery_state_id"
+                       placeholder="Provincia"
+                       options="{'no_open': True, 'no_quick_create': True}"
+                       context="{'country_id': delivery_country_id, 'default_country_id': delivery_country_id}"/>
+                <field name="delivery_city"
+                       placeholder="Ciudad"
+                       invisible="delivery_country_enforce_cities and (delivery_city_id or delivery_city in ('', False))"/>
+                <field name="delivery_country_enforce_cities" invisible="1"/>
+                <field name="delivery_city_id"
+                       placeholder="Ciudad"
+                       domain="[('country_id', '=', delivery_country_id), ('state_id', '=', delivery_state_id)]"
+                       invisible="not delivery_country_enforce_cities"
+                       context="{'default_country_id': delivery_country_id, 'default_state_id': delivery_state_id, 'default_zipcode': delivery_zip}"/>
+                <field name="delivery_zip" placeholder="Código Postal"/>
+            </xpath>
+        </field>
+    </record>
+
     <record id="view_res_partner_filter_inherit_ivess_partner_custom" model="ir.ui.view">
         <field name="name">res.partner.search.inherit.ivess.partner.custom</field>
         <field name="model">res.partner</field>

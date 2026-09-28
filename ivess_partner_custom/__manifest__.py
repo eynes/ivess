@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Ivess Partner Custom",
-    "version": "19.0.0.0.4",
+    "version": "19.0.0.0.5",
     "description": "",
     "author": "Eynes",
     "category": "Contacts",
     "depends": [
         "base",
+        "base_address_extended",
         "sale",
         "account",
         "l10n_ar_eynes",

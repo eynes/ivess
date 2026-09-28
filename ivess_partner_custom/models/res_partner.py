@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from odoo import _, api, fields, models
+from odoo import _, api, fields, models, tools
 from odoo.exceptions import UserError, ValidationError
 
 
@@ -53,6 +53,48 @@ class ResPartner(models.Model):
         copy=False,
         index=True,
         help="Contacto que se hace cargo de la deuda de esta cuenta.",
+    )
+    delivery_street = fields.Char(string="Calle de Entrega")
+    delivery_street2 = fields.Char(string="Calle 2 de Entrega")
+    delivery_street_name = fields.Char(
+        string="Nombre de Calle de Entrega",
+        compute="_compute_delivery_street_data",
+        inverse="_inverse_delivery_street_data",
+        store=True,
+    )
+    delivery_street_number = fields.Char(
+        string="Altura de Entrega",
+        compute="_compute_delivery_street_data",
+        inverse="_inverse_delivery_street_data",
+        store=True,
+    )
+    delivery_street_number2 = fields.Char(
+        string="Altura 2 de Entrega",
+        compute="_compute_delivery_street_data",
+        inverse="_inverse_delivery_street_data",
+        store=True,
+    )
+    delivery_num = fields.Char(string="Número de Entrega", size=5)
+    delivery_floor = fields.Char(string="Piso de Entrega", size=3)
+    delivery_door = fields.Char(string="Puerta de Entrega", size=3)
+    delivery_apartment = fields.Char(string="Departamento de Entrega", size=4)
+    delivery_city = fields.Char(string="Ciudad de Entrega")
+    delivery_city_id = fields.Many2one(
+        comodel_name="res.city",
+        string="Ciudad de Entrega (ID)",
+    )
+    delivery_state_id = fields.Many2one(
+        comodel_name="res.country.state",
+        string="Provincia de Entrega",
+        domain="[('country_id', '=?', delivery_country_id)]",
+    )
+    delivery_zip = fields.Char(string="Código Postal de Entrega")
+    delivery_country_id = fields.Many2one(
+        comodel_name="res.country",
+        string="País de Entrega",
+    )
+    delivery_country_enforce_cities = fields.Boolean(
+        related="delivery_country_id.enforce_cities",
     )
     # state_id = fields.Many2one(
     #     required=True,
@@ -118,6 +160,53 @@ class ResPartner(models.Model):
                 # _origin: un contacto nuevo todavía no tiene id propio al
                 # que apuntar; se completa al guardarlo.
                 partner.pagador_id = partner._origin
+
+    # La dirección de entrega replica a la actual: mismo corte de calle que
+    # base_address_extended hace sobre street y mismos onchanges de país,
+    # provincia y ciudad.
+    @api.depends("delivery_street")
+    def _compute_delivery_street_data(self):
+        for partner in self:
+            split = tools.street_split(partner.delivery_street)
+            partner.delivery_street_name = split["street_name"]
+            partner.delivery_street_number = split["street_number"]
+            partner.delivery_street_number2 = split["street_number2"]
+
+    def _inverse_delivery_street_data(self):
+        for partner in self:
+            street = (
+                (partner.delivery_street_name or "")
+                + " "
+                + (partner.delivery_street_number or "")
+            ).strip()
+            if partner.delivery_street_number2:
+                street = street + " - " + partner.delivery_street_number2
+            partner.delivery_street = street
+
+    @api.onchange("delivery_country_id")
+    def _onchange_delivery_country_id(self):
+        country = self.delivery_country_id
+        if country and country != self.delivery_state_id.country_id:
+            self.delivery_state_id = False
+        if country and country != self.delivery_city_id.country_id:
+            self.delivery_city_id = False
+
+    @api.onchange("delivery_state_id")
+    def _onchange_delivery_state_id(self):
+        state_country = self.delivery_state_id.country_id
+        if state_country and self.delivery_country_id != state_country:
+            self.delivery_country_id = state_country
+
+    @api.onchange("delivery_city_id")
+    def _onchange_delivery_city_id(self):
+        if self.delivery_city_id:
+            self.delivery_city = self.delivery_city_id.name
+            self.delivery_zip = self.delivery_city_id.zipcode
+            self.delivery_state_id = self.delivery_city_id.state_id
+        elif self._origin:
+            self.delivery_city = False
+            self.delivery_zip = False
+            self.delivery_state_id = False
 
     @api.constrains("codigo_bejerman")
     def _check_codigo_bejerman(self):
