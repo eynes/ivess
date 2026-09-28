@@ -6,6 +6,7 @@
         <field name="arch" type="xml">
             <list>
                 <field name="partner_id"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
                 <field name="product_id"/>
                 <field name="quantity"/>
                 <field name="lot_id"/>
@@ -23,6 +24,7 @@
                 <sheet>
                     <group>
                         <field name="partner_id" readonly="1"/>
+                        <field name="company_id" groups="base.group_multi_company"/>
                         <field name="product_id"/>
                         <field name="lot_id"/>
                         <field name="assignment_date" readonly="1"/>
