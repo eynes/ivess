@@ -509,9 +509,25 @@ class ResPartner(models.Model):
         )._set_multicompany_account_fiscal_position(property_account_position_id)
 
     def unlink(self):
+        self._check_clientes_no_se_eliminan()
         for partner in self:
             partner._check_pending_water_containers_before_archiving()
         return super().unlink()
+
+    def _check_clientes_no_se_eliminan(self):
+        """Los clientes no se borran: se archivan, para conservar sus vínculos
+        y su historial. Solo un administrador puede eliminarlos."""
+        if self.env.user.has_group("base.group_system"):
+            return
+        clientes = self.filtered("is_customer")
+        if clientes:
+            raise UserError(
+                _(
+                    "No se pueden eliminar clientes: archivalos para conservar sus vínculos"
+                    " y su historial.\n%s"
+                )
+                % "\n".join("- %s" % cliente.display_name for cliente in clientes[:20])
+            )
 
     def _check_pending_water_containers_before_archiving(self, vals=None):
         """Valida si hay envases pendientes al intentar archivar o eliminar."""
