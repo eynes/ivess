@@ -368,6 +368,8 @@ class ResPartner(models.Model):
         return partners
 
     def write(self, vals):
+        if vals.get("active") is False:
+            self._check_madres_sin_hijas_activas()
         self._check_pending_water_containers_before_archiving(vals)
         res = super().write(vals)
         if not self.env.context.get("sync_delivery_partner"):
@@ -378,6 +380,76 @@ class ResPartner(models.Model):
             if vals.keys() & set(DELIVERY_ADDRESS_FIELDS.values()):
                 self._sync_delivery_partner_back()
         return res
+
+    def action_archive(self):
+        # Una madre con hijas activas no se archiva directo: se abre la
+        # elección de la nueva madre (el cliente web ejecuta la acción).
+        if len(self) == 1 and self._hijas_activas():
+            return {
+                "type": "ir.actions.act_window",
+                "name": _("Dar de baja una cuenta madre"),
+                "res_model": "ivess.baja.madre",
+                "view_mode": "form",
+                "target": "new",
+                "context": {"default_madre_id": self.id},
+            }
+        return super().action_archive()
+
+    def _hijas_activas(self):
+        """Cuentas hijas: las que cuelgan de la madre como "other", como las
+        carga import_partners (las personas de contacto no cuentan)."""
+        self.ensure_one()
+        return self.child_ids.filtered(lambda child: child.type == "other")
+
+    def _saldo_a_cobrar(self, company):
+        """Saldo a cobrar registrado a nombre de la cuenta. En una madre incluye
+        lo facturado a sus hijas, que Odoo registra en la cuenta comercial."""
+        self.ensure_one()
+        lines = self.env["account.move.line"].search(
+            [
+                ("partner_id", "=", self.id),
+                ("company_id", "=", company.id),
+                ("account_id.account_type", "=", "asset_receivable"),
+                ("parent_state", "=", "posted"),
+            ]
+        )
+        return sum(lines.mapped("balance"))
+
+    def _check_madres_sin_hijas_activas(self):
+        madres = self.filtered(lambda partner: partner._hijas_activas())
+        if madres:
+            raise UserError(
+                _(
+                    "No se puede dar de baja una cuenta madre con hijas activas sin elegir"
+                    " cuál pasa a ser la nueva madre:\n%s\n\nArchivala desde su ficha, de a"
+                    " una, para elegirla."
+                )
+                % "\n".join(
+                    "- %s: %s"
+                    % (madre.display_name, ", ".join(madre._hijas_activas().mapped("name")))
+                    for madre in madres
+                )
+            )
+
+    def _reasignar_hijas(self, nueva_madre):
+        """La hija elegida queda sin madre y las demás hijas pasan a colgar
+        de ella."""
+        self.ensure_one()
+        hijas = self._hijas_activas()
+        if nueva_madre not in hijas:
+            raise UserError(_("La nueva madre tiene que ser una de las hijas activas."))
+        vals = {"parent_id": False, "type": "contact"}
+        if "csv_inherit_commercial" in self._fields:
+            vals["csv_inherit_commercial"] = False
+        nueva_madre.write(vals)
+        (hijas - nueva_madre).write({"parent_id": nueva_madre.id})
+        self.message_post(
+            body=_("Baja de la cuenta madre: %(nueva)s pasa a ser la nueva madre de %(hijas)s.")
+            % {
+                "nueva": nueva_madre.display_name,
+                "hijas": ", ".join((hijas - nueva_madre).mapped("name")) or _("ninguna otra hija"),
+            }
+        )
 
     def address_get(self, adr_pref=None):
         result = super().address_get(adr_pref)

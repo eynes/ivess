@@ -19,6 +19,11 @@
                     <field name="origen_id"/>
                     <field name="saldo"/>
                     <field name="destino_id" options="{'no_create': True}"/>
+                    <field name="hija_ids" widget="many2many_tags" invisible="not hija_ids"/>
+                    <field name="nueva_madre_id"
+                           invisible="not hija_ids"
+                           required="hija_ids"
+                           options="{'no_create': True, 'no_open': True}"/>
                     <field name="observacion" placeholder="Por qué se da de baja la cuenta y a dónde va su saldo"/>
                     <field name="currency_id" invisible="1"/>
                     <field name="company_id" invisible="1"/>

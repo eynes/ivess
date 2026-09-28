@@ -40,6 +40,21 @@ class IvessTraspasoSaldo(models.TransientModel):
     deuda_en_madre = fields.Boolean(
         compute="_compute_deuda_en_madre",
     )
+    hija_ids = fields.Many2many(
+        comodel_name="res.partner",
+        string="Hijas activas",
+        compute="_compute_hija_ids",
+    )
+    nueva_madre_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Nueva madre",
+        domain="[('id', 'in', hija_ids)]",
+    )
+
+    @api.depends("origen_id")
+    def _compute_hija_ids(self):
+        for wizard in self:
+            wizard.hija_ids = wizard.origen_id._hijas_activas() if wizard.origen_id else False
 
     @api.depends("origen_id")
     def _compute_deuda_en_madre(self):
@@ -58,19 +73,10 @@ class IvessTraspasoSaldo(models.TransientModel):
             wizard.saldo = wizard._saldo_contable()
 
     def _saldo_contable(self):
-        """Saldo a cobrar registrado a nombre de la cuenta (no de su madre)."""
         self.ensure_one()
         if not self.origen_id:
             return 0.0
-        lines = self.env["account.move.line"].search(
-            [
-                ("partner_id", "=", self.origen_id.id),
-                ("company_id", "=", self.company_id.id),
-                ("account_id.account_type", "=", "asset_receivable"),
-                ("parent_state", "=", "posted"),
-            ]
-        )
-        return sum(lines.mapped("balance"))
+        return self.origen_id._saldo_a_cobrar(self.company_id)
 
     def _diario_traspasos(self):
         journal = self.env["account.journal"].search(
@@ -116,6 +122,10 @@ class IvessTraspasoSaldo(models.TransientModel):
                     "cia_origen": self.company_id.name,
                 }
             )
+        if self.hija_ids and not self.nueva_madre_id:
+            raise UserError(
+                _("La cuenta tiene hijas activas: elegí cuál pasa a ser la nueva madre.")
+            )
         saldo = self.saldo
         move = self.env["account.move"]
         if not self.currency_id.is_zero(saldo):
@@ -140,6 +150,8 @@ class IvessTraspasoSaldo(models.TransientModel):
                 "motivo": self.observacion,
             }
         )
+        if self.nueva_madre_id:
+            origen._reasignar_hijas(self.nueva_madre_id)
         # Las facturas no se concilian (siguen impagas), pero su deuda ya está
         # en la cuenta destino: se archiva salteando solo ese control.
         origen.with_context(traspaso_saldo_hecho=True).write({"active": False})
