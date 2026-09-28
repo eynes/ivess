@@ -4,9 +4,6 @@ from odoo import _, api, fields, models
 class AccountMove(models.Model):
     _inherit = "account.move"
 
-    status_in_payment = fields.Selection(
-        selection_add=[("x_closed_by_summary", "Cerrado por Resumen")],
-    )
     x_folio_legal = fields.Char(
         string="Folio Legal",
         readonly=True,
@@ -90,13 +87,28 @@ class AccountMove(models.Model):
     @api.depends("x_closed_by_summary_move_id")
     def _compute_status_in_payment(self):
         super()._compute_status_in_payment()
-        # La vista de lista de facturas usa este campo (no payment_state
-        # directamente) para pintar el badge "Estado". Un comprobante
-        # cerrado por resumen no debe seguir mostrando "Pagado"/"Cobrado":
-        # su estado de pago real ahora se gestiona desde el asiento legal.
+        # El neteo del Asistente de Cierre Mensual reconcilia la línea de
+        # deuda original contra el asiento legal para cerrarla
+        # operativamente (evita que quede duplicada como pendiente en dos
+        # lados). Eso dispara el cómputo nativo de Odoo, que ve
+        # amount_residual=0 y lo marca "Pagado" — aunque nunca se cobró: el
+        # saldo simplemente se trasladó a la cuenta de deuda legal. No se
+        # inventa un estado nuevo: si el comprobante tenía saldo pendiente
+        # al momento del cierre (queda trazado por x_origin_document_id en
+        # el asiento legal), se lo deja como "Sin pagar" (valor nativo), en
+        # vez de "Pagado". Si ya estaba cobrado/pagado de verdad ANTES del
+        # cierre (fue por la cuenta puente, sin línea propia), no se toca:
+        # ese "Pagado" es real.
         for move in self:
-            if move.x_closed_by_summary_move_id:
-                move.status_in_payment = "x_closed_by_summary"
+            if not move.x_closed_by_summary_move_id:
+                continue
+            had_open_debt = bool(
+                move.x_closed_by_summary_move_id.line_ids.filtered(
+                    lambda line: line.x_origin_document_id == move
+                )
+            )
+            if had_open_debt:
+                move.status_in_payment = "not_paid"
 
     @api.depends("line_ids.x_summary_move_id")
     def _compute_payments_widget_reconciled_info(self):
@@ -134,6 +146,22 @@ class AccountMove(models.Model):
                 invisible = node.get("invisible") or "0"
                 if "x_closed_by_summary_move_id" not in invisible:
                     node.set("invisible", f"({invisible}) or x_closed_by_summary_move_id")
+        elif view_type in ("list", "tree") and arch.tag in ("list", "tree"):
+            # Se agrega como columna opcional (oculta por defecto, elegible
+            # desde el selector de columnas) en cualquier lista de
+            # comprobantes: no reemplaza al "Estado" nativo, solo permite
+            # ver de un vistazo cuáles ya fueron absorbidos por un cierre
+            # mensual, sin depender de que el estado de pago lo refleje.
+            if arch.find(".//field[@name='x_closed_by_summary_move_id']") is None:
+                field_node = arch.makeelement(
+                    "field",
+                    {
+                        "name": "x_closed_by_summary_move_id",
+                        "string": "Cerrado por Resumen",
+                        "optional": "hide",
+                    },
+                )
+                arch.append(field_node)
         return arch, view
 
     def _ivess_renumber_legal_folio(self, company):

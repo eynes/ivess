@@ -32,6 +32,20 @@ class AccountSummaryClosingWizard(models.TransientModel):
         required=True,
         domain="[('company_id', '=', company_id), ('x_is_legal_journal', '=', True)]",
     )
+    summary_move_date = fields.Date(
+        string="Fecha del Asiento Resumen",
+        help=(
+            "Fecha contable del asiento resumen en el Diario Legal. Si se "
+            "deja vacío, se usa la fecha Hasta del período."
+        ),
+    )
+    summary_move_ref = fields.Char(
+        string="Referencia del Asiento Resumen",
+        help=(
+            "Referencia/glosa del asiento resumen en el Diario Legal. Si se "
+            "deja vacía, se genera automáticamente a partir del período."
+        ),
+    )
     netting_move_ids = fields.Many2many(
         comodel_name="account.move",
         relation="ivess_summary_wizard_netting_move_rel",
@@ -301,9 +315,9 @@ class AccountSummaryClosingWizard(models.TransientModel):
         summary_move = self.env["account.move"].create(
             {
                 "journal_id": self.legal_journal_id.id,
-                "date": self.date_to,
+                "date": self.summary_move_date or self.date_to,
                 "move_type": "entry",
-                "ref": _("Refundición Mensual %s", period_label),
+                "ref": self.summary_move_ref or _("Refundición Mensual %s", period_label),
                 "x_is_summary_entry": True,
                 "line_ids": legal_line_vals,
             }
