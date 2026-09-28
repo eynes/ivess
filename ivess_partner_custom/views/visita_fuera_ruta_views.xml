@@ -14,6 +14,10 @@
                 <div class="alert alert-warning" role="alert" invisible="route_id or not reparto_id or not fecha">
                     No hay recorrido de ese reparto para esa fecha.
                 </div>
+                <div class="alert alert-warning" role="alert" invisible="not franja_vencida">
+                    <field name="franja_vencida" readonly="1"/>
+                    Evaluá si corresponde sumarlo hoy o pedirlo para otro día.
+                </div>
                 <footer>
                     <button name="action_confirmar" type="object" string="Agregar al recorrido" class="btn-primary"/>
                     <button string="Cancelar" special="cancel" class="btn-secondary"/>

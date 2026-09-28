@@ -29,6 +29,23 @@ class IvessVisitaFueraRuta(models.TransientModel):
         string="Recorrido",
         compute="_compute_route_id",
     )
+    franja_vencida = fields.Char(
+        compute="_compute_franja_vencida",
+    )
+
+    @api.depends("fecha", "partner_id")
+    def _compute_franja_vencida(self):
+        ahora = fields.Datetime.context_timestamp(self, fields.Datetime.now())
+        hora_actual = ahora.hour + ahora.minute / 60.0
+        for wizard in self:
+            hasta = wizard.partner_id.visit_hour_to
+            vencida = wizard.fecha == ahora.date() and hasta and hora_actual > hasta
+            wizard.franja_vencida = (
+                _("La franja horaria del cliente (hasta las %02d:%02d) ya pasó hoy.")
+                % (int(hasta), round((hasta % 1) * 60))
+                if vencida
+                else False
+            )
 
     def _default_reparto_id(self):
         partner = self.env["res.partner"].browse(self.env.context.get("default_partner_id"))
