@@ -21,8 +21,23 @@
             <xpath expr="//page[@name='sales_purchases']/group[@name='container_row_2']" position="after">
                 <group name="group_facturacion_cobranza" string="Facturación y Cobranza">
                     <field name="regimen_facturacion"/>
+                    <field name="pagador_modo"/>
+                    <field name="pagador_id"
+                           readonly="pagador_modo != 'especifico'"
+                           required="pagador_modo == 'especifico'"/>
                 </group>
             </xpath>
+        </field>
+    </record>
+
+    <record id="view_res_partner_filter_inherit_ivess_partner_custom" model="ir.ui.view">
+        <field name="name">res.partner.search.inherit.ivess.partner.custom</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <field name="parent_id" position="after">
+                <field name="pagador_id"/>
+            </field>
         </field>
     </record>
 </odoo>

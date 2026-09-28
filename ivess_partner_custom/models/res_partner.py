@@ -30,6 +30,30 @@ class ResPartner(models.Model):
         " frecuencia.",
         tracking=True,
     )
+    pagador_modo = fields.Selection(
+        selection=[
+            ("madre", "Madre"),
+            ("especifico", "Contacto específico"),
+            ("autopago", "Autopago"),
+        ],
+        string="Tipo de Pagador",
+        default="madre",
+        required=True,
+        tracking=True,
+        help="Madre: paga la cuenta madre, o la propia cuenta si no tiene"
+        " madre. Contacto específico: paga el contacto que se elija a mano."
+        " Autopago: paga la propia cuenta.",
+    )
+    pagador_id = fields.Many2one(
+        comodel_name="res.partner",
+        string="Pagador",
+        compute="_compute_pagador_id",
+        store=True,
+        readonly=False,
+        copy=False,
+        index=True,
+        help="Contacto que se hace cargo de la deuda de esta cuenta.",
+    )
     # state_id = fields.Many2one(
     #     required=True,
     # )
@@ -82,6 +106,18 @@ class ResPartner(models.Model):
 
             partner.unbilled_balance = unbilled
             partner.final_balance = total_orders - payment_totals.get(partner.id, 0.0)
+
+    @api.depends("pagador_modo", "parent_id")
+    def _compute_pagador_id(self):
+        for partner in self:
+            if partner.pagador_modo == "especifico":
+                partner.pagador_id = partner.pagador_id
+            elif partner.pagador_modo == "madre" and partner.parent_id:
+                partner.pagador_id = partner.parent_id
+            else:
+                # _origin: un contacto nuevo todavía no tiene id propio al
+                # que apuntar; se completa al guardarlo.
+                partner.pagador_id = partner._origin
 
     @api.constrains("codigo_bejerman")
     def _check_codigo_bejerman(self):
