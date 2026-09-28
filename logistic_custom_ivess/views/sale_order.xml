@@ -27,15 +27,8 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//header" position="after">
-                <div class="alert alert-warning mb-0" role="alert"
-                     invisible="not cargado_fuera_de_hora or state not in ('draft', 'sent')">
-                    Pedido cargado después de la hora límite de pedidos: normalmente se agenda para el día siguiente.
-                </div>
-            </xpath>
             <xpath expr="//field[@name='source_id']" position="after">
                 <field name="delivery_route_id"/>
-                <field name="cargado_fuera_de_hora" invisible="1"/>
             </xpath>
             <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="before">
                 <field name="free_of_charge" optional="show"/>

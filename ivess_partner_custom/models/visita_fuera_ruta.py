@@ -32,6 +32,27 @@ class IvessVisitaFueraRuta(models.TransientModel):
     franja_vencida = fields.Char(
         compute="_compute_franja_vencida",
     )
+    fuera_de_hora = fields.Char(
+        compute="_compute_fuera_de_hora",
+    )
+
+    @api.depends("fecha")
+    def _compute_fuera_de_hora(self):
+        # Minuta del 24/09/2026: los pedidos cargados después de la hora límite
+        # (15 hs por defecto, Ajustes > Ventas) se avisan, no se bloquean.
+        limite = float(
+            self.env["ir.config_parameter"].sudo().get_param("logistic_custom_ivess.hora_limite_pedidos")
+            or 15.0
+        )
+        ahora = fields.Datetime.context_timestamp(self, fields.Datetime.now())
+        pasada = ahora.hour + ahora.minute / 60.0 > limite
+        for wizard in self:
+            wizard.fuera_de_hora = (
+                _("Ya pasó la hora límite de pedidos (%02d:%02d): normalmente se agenda para el día siguiente.")
+                % (int(limite), round((limite % 1) * 60))
+                if pasada and wizard.fecha == ahora.date()
+                else False
+            )
 
     @api.depends("fecha", "partner_id")
     def _compute_franja_vencida(self):

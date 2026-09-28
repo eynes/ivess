@@ -6,22 +6,9 @@ class SaleOrder(models.Model):
     _inherit = 'sale.order'
 
     delivery_route_id = fields.Many2one(
-        'delivery.route',
+        'delivery.route', 
         string="Ruta"
     )
-    cargado_fuera_de_hora = fields.Boolean(
-        string='Cargado después de la hora límite',
-        compute='_compute_cargado_fuera_de_hora',
-    )
-
-    @api.depends('create_date')
-    def _compute_cargado_fuera_de_hora(self):
-        limite = float(
-            self.env['ir.config_parameter'].sudo().get_param('logistic_custom_ivess.hora_limite_pedidos') or 15.0
-        )
-        for order in self:
-            momento = fields.Datetime.context_timestamp(order, order.create_date or fields.Datetime.now())
-            order.cargado_fuera_de_hora = momento.hour + momento.minute / 60.0 > limite
 
     def write(self, vals):
         previous_routes_by_order = {
