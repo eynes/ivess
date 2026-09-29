@@ -13,6 +13,8 @@
                     <group>
                         <field name="operational_journal_ids" widget="many2many_tags" />
                         <field name="legal_journal_id" />
+                        <field name="summary_move_date" placeholder="Fecha Hasta" />
+                        <field name="summary_move_ref" placeholder="Refundición Mensual &lt;período&gt;" />
                     </group>
                 </group>
                 <group invisible="not summary_move_id" string="Resultado">

@@ -1,3 +1,4 @@
+from odoo import fields
 from odoo.exceptions import UserError
 from odoo.tests import tagged
 
@@ -262,3 +263,76 @@ class TestAccountSummaryClosingWizard(IvessAccountingSummaryTestCommon):
         # Desde la factura: navega de vuelta al asiento legal que la resumió.
         invoice_action = self.invoice_a.action_view_closing_summary_move()
         self.assertEqual(invoice_action["res_id"], summary_move.id)
+
+    def test_summary_move_date_and_ref_are_overridable(self):
+        wizard = self._make_wizard()
+        wizard.summary_move_date = "2024-04-05"
+        wizard.summary_move_ref = "Refundición Marzo - Rúbrica 12345"
+        wizard.action_generate_summary()
+
+        self.assertEqual(wizard.summary_move_id.date, fields.Date.from_string("2024-04-05"))
+        self.assertEqual(wizard.summary_move_id.ref, "Refundición Marzo - Rúbrica 12345")
+
+    def test_summary_move_date_and_ref_default_when_empty(self):
+        wizard = self._make_wizard()
+        wizard.action_generate_summary()
+
+        self.assertEqual(
+            wizard.summary_move_id.date, fields.Date.from_string("2024-03-31")
+        )
+        self.assertIn("2024-03-01", wizard.summary_move_id.ref)
+        self.assertIn("2024-03-31", wizard.summary_move_id.ref)
+
+    def test_status_in_payment_not_paid_for_invoice_with_open_debt_after_closing(self):
+        wizard = self._make_wizard()
+        wizard.action_generate_summary()
+
+        # invoice_a nunca se cobró: aunque el neteo la deja con
+        # amount_residual=0 (reconciliada contra el asiento legal), no debe
+        # figurar "Pagado" — el saldo se trasladó a la deuda legal, no se
+        # cobró de verdad. Se usa el valor nativo "not_paid", no uno nuevo.
+        self.assertEqual(self.invoice_a.status_in_payment, "not_paid")
+        self.assertTrue(
+            wizard.summary_move_id.line_ids.filtered(
+                lambda line: line.x_origin_document_id == self.invoice_a
+            )
+        )
+
+    def test_status_in_payment_stays_paid_when_collected_before_closing(self):
+        collection_move = self.env["account.move"].create(
+            {
+                "journal_id": self.operational_journal.id,
+                "date": "2024-03-28",
+                "move_type": "entry",
+                "line_ids": [
+                    (0, 0, {
+                        "account_id": self.receivable_account.id,
+                        "partner_id": self.partner_b.id,
+                        "debit": 0.0,
+                        "credit": 2000.0,
+                    }),
+                    (0, 0, {
+                        "account_id": self.revenue_account.id,
+                        "debit": 2000.0,
+                        "credit": 0.0,
+                    }),
+                ],
+            }
+        )
+        collection_move.action_post()
+        (self._receivable_line(self.invoice_b) | self._receivable_line(collection_move)).reconcile()
+
+        wizard = self._make_wizard()
+        wizard.action_generate_summary()
+
+        # invoice_b ya estaba cobrada ANTES del cierre (fue por la cuenta
+        # puente, sin línea propia en el asiento legal): su status_in_payment
+        # no debe forzarse a "not_paid" (los fixtures de prueba son
+        # move_type='entry', que no computan payment_state='paid' como una
+        # factura real, pero lo relevante es que el override no lo toque).
+        self.assertFalse(
+            wizard.summary_move_id.line_ids.filtered(
+                lambda line: line.x_origin_document_id == self.invoice_b
+            )
+        )
+        self.assertNotEqual(self.invoice_b.status_in_payment, "not_paid")
