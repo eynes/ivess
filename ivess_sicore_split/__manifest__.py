@@ -14,6 +14,16 @@
           buscar el código por el diario vinculado.
         - El campo "Código de retención AFIP" del diario solo se muestra
           para diarios de tipo Retentions/Perceptions.
+        - Se corrige el layout del archivo (comparado contra el archivo de
+          referencia del cliente):
+          - Importe total, base de cálculo e importe de retención/percepción
+            van alineados a izquierda (antes a derecha).
+          - Número de comprobante y CUIT del retenido/percibido van
+            alineados a izquierda, sin ceros de relleno.
+          - Porcentaje de exclusión y número de certificado propio van en
+            blanco cuando no aplican (antes salían en "0.00" o en ceros).
+          - El archivo local ahora completa 198 caracteres por línea
+            (relleno con espacios), igual que el de exterior.
     """,
     "author": "Eynes",
     "category": "Accounting",
