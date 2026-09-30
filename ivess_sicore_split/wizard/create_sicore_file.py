@@ -34,6 +34,23 @@ class CreateSicoreFiles(models.TransientModel):
         """T16639: separador decimal punto en vez de coma."""
         return f"{value:,.2f}".replace(",", "")
 
+    def _format_base_calculo(self, value):
+        """T16639: 'base_calculo' es distinto al resto de los importes.
+
+        Verificado contra el archivo de referencia real del cliente
+        (360 lineas): monto_comprobante e importe_retencion/percepcion
+        SIEMPRE muestran 2 decimales, incluso en importes enteros
+        (ej. "279400.00"). base_calculo en cambio omite el punto y los
+        centavos cuando el monto es entero (ej. "804130", sin ".00") y
+        solo muestra decimales cuando el monto realmente los tiene (ej.
+        "3507.01") - 138 de 360 lineas reales no tienen punto decimal,
+        exactamente las que dan centavos = 00.
+        """
+        rounded = round(value, 2)
+        if rounded == int(rounded):
+            return str(int(rounded))
+        return self._format_monetary(rounded)
+
     def _get_perception_afip_code(self, perception_tax):
         """T16639: preferir el código cargado directo en la percepción.
 
@@ -148,7 +165,7 @@ class CreateSicoreFiles(models.TransientModel):
                 "codigo_impuesto": codigo_impuesto,
                 "codigo_regimen": reg_code,
                 "codigo_operacion": 2,  # Cod. Percepciones
-                "base_calculo": self._format_monetary(perception.base),
+                "base_calculo": self._format_base_calculo(perception.base),
                 # La percepcion se practica al emitir el comprobante.
                 "fecha_emision_retenc": date_invoice,
                 # T16639: idem retenciones - fijo en "13" contra el
@@ -295,7 +312,7 @@ class CreateSicoreFiles(models.TransientModel):
                 "codigo_impuesto": codigo_impuesto,
                 "codigo_regimen": reg_code,
                 "codigo_operacion": 1,  # Cod. Retenciones
-                "base_calculo": self._format_monetary(base_amount),
+                "base_calculo": self._format_base_calculo(base_amount),
                 "fecha_emision_retenc": date_emited,
                 # T16639: el original traia "01" hardcodeado (HARD: Segun
                 # longport, sin calcular nada por partner/regimen). Contra

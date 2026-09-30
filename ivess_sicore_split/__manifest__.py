@@ -32,6 +32,13 @@
             venta (5 dígitos) + número (8 dígitos) por separado, en vez
             de sacarle los caracteres no numéricos al nombre completo de
             la factura (pisaba el padding del punto de venta).
+          - Número de comprobante de retenciones: se completa a 13
+            dígitos con ceros a la izquierda (antes salía el número
+            crudo de la Orden de Pago, sin padding, ej. "48").
+          - Base de cálculo: a diferencia del resto de los importes, se
+            omite el punto decimal y los centavos cuando el monto es
+            entero (verificado contra 360 líneas reales del cliente:
+            138 sin punto, exactamente las que dan centavos = 00).
     """,
     "author": "Eynes",
     "category": "Accounting",
