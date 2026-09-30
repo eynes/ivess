@@ -621,7 +621,7 @@ class RepairOrder(models.Model):
         for ro in self:
             if ro.search_count([
                 ('lot_id', '=', ro.lot_id.id),
-                ('state', 'not in', ['cancelled', 'done']),
+                ('state', 'not in', ['cancel', 'done']),
             ]) > 1:
                 raise UserError(_(
                     "El producto a reparar '%s' ya tiene una orden de reparación asociada en proceso para el número de serie '%s'.",
