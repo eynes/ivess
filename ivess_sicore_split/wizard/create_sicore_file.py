@@ -81,7 +81,20 @@ class CreateSicoreFiles(models.TransientModel):
                 )
                 continue
 
-            numero_comprobante = re.sub(r"\D", "", invoice.name or "")
+            # T16639: el archivo de referencia del cliente pide el numero
+            # de comprobante como "PV (5) + numero (8)" = 13 digitos, cada
+            # parte con ceros a la izquierda por separado (no alcanza con
+            # sacarle los caracteres no numericos al nombre completo, eso
+            # pisa el padding del punto de venta). El nombre de factura
+            # AR siempre es "PV-NUMERO" (ver account_move.py:1969, usa el
+            # mismo split para 'nroCmp').
+            try:
+                pos_code, seq_number = (invoice.name or "").split("-")
+                numero_comprobante = pos_code.zfill(5) + re.sub(
+                    r"\D", "", seq_number
+                ).zfill(8)
+            except ValueError:
+                numero_comprobante = ""
             if not numero_comprobante:
                 errors.append(_("%s: Invoice number not found.", line_ident))
                 continue
@@ -138,7 +151,10 @@ class CreateSicoreFiles(models.TransientModel):
                 "base_calculo": self._format_monetary(perception.base),
                 # La percepcion se practica al emitir el comprobante.
                 "fecha_emision_retenc": date_invoice,
-                "codigo_condicion": self._get_sicore_condition_code(partner),
+                # T16639: idem retenciones - fijo en "13" contra el
+                # archivo de referencia del cliente, se ignora el mapeo
+                # por partner de sicore.fiscal.position.
+                "codigo_condicion": "13",
                 "sujetos_suspend": "",  # Beneficiarios en el exterior
                 "importe_retencion": self._format_monetary(perception.amount),
                 # Las percepciones no manejan certificado de exclusion.
@@ -210,11 +226,14 @@ class CreateSicoreFiles(models.TransientModel):
                 head_file_errors.append(err)
                 continue
             else:
-                # T16639: no convertir a int - pisa los ceros a la
-                # izquierda del punto de venta (PV 5 + numero 8 = 13
-                # digitos, que el cliente espera intactos y alineados a
-                # izquierda en el campo de 16).
-                internal_number = re.sub(r"\D", "", internal_number)
+                # T16639: la Orden de Pago no tiene PV, es un numero
+                # secuencial simple (ej. "215"), pero igual hay que
+                # completarlo a 13 digitos con ceros a la izquierda (el
+                # campo espera "13 digitos, alineado a izq." segun el
+                # archivo de referencia del cliente) - antes se dejaba
+                # el numero crudo, sin padding (ej. "48" en vez de
+                # "0000000000048").
+                internal_number = re.sub(r"\D", "", internal_number).zfill(13)
 
             date_emited = tax_line.date.strftime("%d/%m/%Y")
 
@@ -278,7 +297,11 @@ class CreateSicoreFiles(models.TransientModel):
                 "codigo_operacion": 1,  # Cod. Retenciones
                 "base_calculo": self._format_monetary(base_amount),
                 "fecha_emision_retenc": date_emited,
-                "codigo_condicion": "01",  # Inscripto (HARD: Segun longport)
+                # T16639: el original traia "01" hardcodeado (HARD: Segun
+                # longport, sin calcular nada por partner/regimen). Contra
+                # el archivo de referencia del cliente corresponde "13"
+                # para retenciones, tanto IVA como Ganancias.
+                "codigo_condicion": "13",
                 "sujetos_suspend": "",  # Beneficiarios en el exterior
                 "importe_retencion": self._format_monetary(ret_aplicada),
                 "porcentaje_exclusion": porcentaje_exclusion_fmt,

@@ -24,6 +24,14 @@
             blanco cuando no aplican (antes salían en "0.00" o en ceros).
           - El archivo local ahora completa 198 caracteres por línea
             (relleno con espacios), igual que el de exterior.
+          - Código de condición del sujeto retenido/percibido: pasa de
+            "01"/mapeo por partner (sin base real para retenciones,
+            heredado del original) a "13" fijo, tanto para retenciones
+            (IVA y Ganancias) como para percepciones.
+          - Número de comprobante de percepciones: se arma como punto de
+            venta (5 dígitos) + número (8 dígitos) por separado, en vez
+            de sacarle los caracteres no numéricos al nombre completo de
+            la factura (pisaba el padding del punto de venta).
     """,
     "author": "Eynes",
     "category": "Accounting",
