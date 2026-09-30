@@ -97,6 +97,28 @@ class AguasFCIntake(models.AbstractModel):
             [("aguas_idreparto", "=", str(idreparto))], limit=1
         )
 
+    def _buscar_ingreso_repetido(
+        self, origin, equipos, src_location, dest_location, picking_type, company
+    ):
+        """Picking ya hecho con el mismo origin, mismo recorrido y exactamente
+        las mismas series: Loop reenvió el mismo ingreso (p. ej. por un corte de
+        conexión). Las correcciones comparten origin pero no el recorrido/series."""
+        pedidas = {(s or "").strip() for s in equipos if (s or "").strip()}
+        candidatos = self.env["stock.picking"].search(
+            [
+                ("origin", "=", origin),
+                ("company_id", "=", company.id),
+                ("picking_type_id", "=", picking_type.id),
+                ("location_id", "=", src_location.id),
+                ("location_dest_id", "=", dest_location.id),
+                ("state", "=", "done"),
+            ]
+        )
+        for picking in candidatos:
+            if {ml.lot_id.name for ml in picking.move_line_ids} == pedidas:
+                return picking
+        return self.env["stock.picking"]
+
     def _crear_ingreso(
         self,
         idreparto,
@@ -108,6 +130,23 @@ class AguasFCIntake(models.AbstractModel):
         product,
         origin,
     ):
+        anterior = self._buscar_ingreso_repetido(
+            origin, equipos, src_location, dest_location, picking_type, company
+        )
+        if anterior:
+            _logger.info(
+                "Aguas FC: ingreso %s ya registrado en %s, no se duplica",
+                origin,
+                anterior.name,
+            )
+            return {
+                "success": True,
+                "ya_registrado": True,
+                "picking_id": anterior.id,
+                "picking_name": anterior.name,
+                "seriales_procesados": len(anterior.move_line_ids),
+            }
+
         lots = []
         for serial in equipos:
             lot = self.env["stock.lot"].search(
