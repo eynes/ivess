@@ -11,7 +11,7 @@ class AguasFCIntake(models.AbstractModel):
     _description = "Procesador de entrada de equipos desde Aguas FC"
 
     @api.model
-    def process_entrada(self, idreparto, equipos, fecha, tecnico, usuario):
+    def process_entrada(self, idreparto, equipos, fecha, tecnico=None, usuario=None):
         self = self.with_user(SUPERUSER_ID)
         src_location = self._localizar_reparto(idreparto)
         if not src_location:
@@ -54,7 +54,7 @@ class AguasFCIntake(models.AbstractModel):
     # no tienen que generar orden de reparación.
     # ------------------------------------------------------------------
     @api.model
-    def process_no_normalizados(self, idreparto, equipos, fecha, tecnico, usuario):
+    def process_no_normalizados(self, idreparto, equipos, fecha, tecnico=None, usuario=None):
         self = self.with_user(SUPERUSER_ID)
         src_location = self._localizar_reparto(idreparto)
         if not src_location:

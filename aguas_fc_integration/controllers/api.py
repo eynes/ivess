@@ -50,7 +50,7 @@ class AguasFCController(http.Controller):
 
         data = kwargs
 
-        required = ["fecha", "idreparto", "tecnico", "usuario", "equipos"]
+        required = ["fecha", "idreparto", "equipos"]
         error = self._check_required(data, required)
         if error:
             return error
@@ -65,8 +65,8 @@ class AguasFCController(http.Controller):
                     idreparto=data["idreparto"],
                     equipos=equipos,
                     fecha=data["fecha"],
-                    tecnico=data["tecnico"],
-                    usuario=data["usuario"],
+                    tecnico=data.get("tecnico"),
+                    usuario=data.get("usuario"),
                 )
             )
         except Exception as e:
@@ -92,7 +92,7 @@ class AguasFCController(http.Controller):
 
         data = kwargs
 
-        required = ["fecha", "idreparto", "tecnico", "usuario", "equipos"]
+        required = ["fecha", "idreparto", "equipos"]
         error = self._check_required(data, required)
         if error:
             return error
@@ -107,8 +107,8 @@ class AguasFCController(http.Controller):
                     idreparto=data["idreparto"],
                     equipos=equipos,
                     fecha=data["fecha"],
-                    tecnico=data["tecnico"],
-                    usuario=data["usuario"],
+                    tecnico=data.get("tecnico"),
+                    usuario=data.get("usuario"),
                 )
             )
         except Exception as e:
