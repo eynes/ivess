@@ -184,6 +184,11 @@ class AguasFCIntake(models.AbstractModel):
             picking_ids_not_to_backorder=picking.ids,
         ).button_validate()
 
+        if picking.state != "done":
+            raise UserError(
+                f"El traslado {picking.name} quedó en estado {picking.state} en lugar de Hecho."
+            )
+
         _logger.info(
             "Aguas FC: picking %s creado y validado. Reparto=%s, seriales=%s",
             picking.name,
@@ -515,6 +520,11 @@ class AguasFCIntake(models.AbstractModel):
             picking_ids_not_to_backorder=picking.ids,
             skip_frio_calor_auto_repair=skip_auto_repair,
         ).button_validate()
+
+        if picking.state != "done":
+            raise UserError(
+                f"El traslado {picking.name} quedó en estado {picking.state} en lugar de Hecho."
+            )
 
         _logger.info(
             "Aguas FC: corrección %s creada y validada. Reparto=%s -> %s, seriales=%s",
