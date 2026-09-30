@@ -266,6 +266,12 @@ class AguasFCIntake(models.AbstractModel):
                 "error": f"No se encontró el ingreso original ({referencia})",
             }
 
+        if picking_id and not self._es_ingreso_loop(picking):
+            return {
+                "success": False,
+                "error": f"El traslado {picking.name} no es un ingreso de Loop al taller",
+            }
+
         company = picking.company_id
         src_location = picking.location_id
         taller_location = company.aguas_fc_taller_location_id
@@ -331,6 +337,18 @@ class AguasFCIntake(models.AbstractModel):
         if advertencias:
             resultado["advertencias"] = advertencias
         return resultado
+
+    @staticmethod
+    def _es_ingreso_loop(picking):
+        """Solo los ingresos de Loop al taller (origin AGUAS-..., no los no
+        normalizados AGUAS-NN-... ni salidas) y del tipo de operación de ingreso
+        configurado en la compañía."""
+        origin = picking.origin or ""
+        return (
+            origin.startswith("AGUAS-")
+            and not origin.startswith("AGUAS-NN-")
+            and picking.picking_type_id == picking.company_id.aguas_fc_picking_type_id
+        )
 
     def _localizar_ingreso(self, picking_id, idreparto, fecha):
         if picking_id:
