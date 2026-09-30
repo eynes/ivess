@@ -300,6 +300,12 @@ class RepairOrder(models.Model):
             ('code', '=', 'internal'),
             ('company_id', 'in', [order.company_id.id, False]),
         ], limit=1)
+        if order.product_location_src_id.warehouse_id:
+            # Mismo almacén que el taller, para no numerar con el prefijo de otro.
+            internal_picking_type = self.env['stock.picking.type'].search([
+                ('code', '=', 'internal'),
+                ('warehouse_id', '=', order.product_location_src_id.warehouse_id.id),
+            ], limit=1) or internal_picking_type
         if not internal_picking_type:
             raise UserError(_("No se encontró un tipo de operación de traslado interno."))
 
@@ -310,7 +316,13 @@ class RepairOrder(models.Model):
                 "Configúrela en la ficha de la empresa."
             ) % order.company_id.name)
 
-        source_location = order.location_id or internal_picking_type.default_location_src_id
+        # El equipo está en el taller (ubicación del producto a reparar), no en
+        # order.location_id, que es el pañol de repuestos.
+        source_location = (
+            order.product_location_src_id
+            or order.location_id
+            or internal_picking_type.default_location_src_id
+        )
         picking = self.env['stock.picking'].create({
             'picking_type_id': internal_picking_type.id,
             'location_id': source_location.id,
@@ -621,7 +633,7 @@ class RepairOrder(models.Model):
         for ro in self:
             if ro.search_count([
                 ('lot_id', '=', ro.lot_id.id),
-                ('state', 'not in', ['cancelled', 'done']),
+                ('state', 'not in', ['cancel', 'done']),
             ]) > 1:
                 raise UserError(_(
                     "El producto a reparar '%s' ya tiene una orden de reparación asociada en proceso para el número de serie '%s'.",

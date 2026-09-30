@@ -11,7 +11,7 @@ class AguasFCIntake(models.AbstractModel):
     _description = "Procesador de entrada de equipos desde Aguas FC"
 
     @api.model
-    def process_entrada(self, idreparto, equipos, fecha, tecnico, usuario):
+    def process_entrada(self, idreparto, equipos, fecha, tecnico=None, usuario=None):
         self = self.with_user(SUPERUSER_ID)
         src_location = self._localizar_reparto(idreparto)
         if not src_location:
@@ -54,7 +54,7 @@ class AguasFCIntake(models.AbstractModel):
     # no tienen que generar orden de reparación.
     # ------------------------------------------------------------------
     @api.model
-    def process_no_normalizados(self, idreparto, equipos, fecha, tecnico, usuario):
+    def process_no_normalizados(self, idreparto, equipos, fecha, tecnico=None, usuario=None):
         self = self.with_user(SUPERUSER_ID)
         src_location = self._localizar_reparto(idreparto)
         if not src_location:
@@ -97,6 +97,28 @@ class AguasFCIntake(models.AbstractModel):
             [("aguas_idreparto", "=", str(idreparto))], limit=1
         )
 
+    def _buscar_ingreso_repetido(
+        self, origin, equipos, src_location, dest_location, picking_type, company
+    ):
+        """Picking ya hecho con el mismo origin, mismo recorrido y exactamente
+        las mismas series: Loop reenvió el mismo ingreso (p. ej. por un corte de
+        conexión). Las correcciones comparten origin pero no el recorrido/series."""
+        pedidas = {(s or "").strip() for s in equipos if (s or "").strip()}
+        candidatos = self.env["stock.picking"].search(
+            [
+                ("origin", "=", origin),
+                ("company_id", "=", company.id),
+                ("picking_type_id", "=", picking_type.id),
+                ("location_id", "=", src_location.id),
+                ("location_dest_id", "=", dest_location.id),
+                ("state", "=", "done"),
+            ]
+        )
+        for picking in candidatos:
+            if {ml.lot_id.name for ml in picking.move_line_ids} == pedidas:
+                return picking
+        return self.env["stock.picking"]
+
     def _crear_ingreso(
         self,
         idreparto,
@@ -108,6 +130,23 @@ class AguasFCIntake(models.AbstractModel):
         product,
         origin,
     ):
+        anterior = self._buscar_ingreso_repetido(
+            origin, equipos, src_location, dest_location, picking_type, company
+        )
+        if anterior:
+            _logger.info(
+                "Aguas FC: ingreso %s ya registrado en %s, no se duplica",
+                origin,
+                anterior.name,
+            )
+            return {
+                "success": True,
+                "ya_registrado": True,
+                "picking_id": anterior.id,
+                "picking_name": anterior.name,
+                "seriales_procesados": len(anterior.move_line_ids),
+            }
+
         lots = []
         for serial in equipos:
             lot = self.env["stock.lot"].search(
@@ -184,6 +223,11 @@ class AguasFCIntake(models.AbstractModel):
             picking_ids_not_to_backorder=picking.ids,
         ).button_validate()
 
+        if picking.state != "done":
+            raise UserError(
+                f"El traslado {picking.name} quedó en estado {picking.state} en lugar de Hecho."
+            )
+
         _logger.info(
             "Aguas FC: picking %s creado y validado. Reparto=%s, seriales=%s",
             picking.name,
@@ -220,6 +264,12 @@ class AguasFCIntake(models.AbstractModel):
             return {
                 "success": False,
                 "error": f"No se encontró el ingreso original ({referencia})",
+            }
+
+        if picking_id and not self._es_ingreso_loop(picking):
+            return {
+                "success": False,
+                "error": f"El traslado {picking.name} no es un ingreso de Loop al taller",
             }
 
         company = picking.company_id
@@ -287,6 +337,18 @@ class AguasFCIntake(models.AbstractModel):
         if advertencias:
             resultado["advertencias"] = advertencias
         return resultado
+
+    @staticmethod
+    def _es_ingreso_loop(picking):
+        """Solo los ingresos de Loop al taller (origin AGUAS-..., no los no
+        normalizados AGUAS-NN-... ni salidas) y del tipo de operación de ingreso
+        configurado en la compañía."""
+        origin = picking.origin or ""
+        return (
+            origin.startswith("AGUAS-")
+            and not origin.startswith("AGUAS-NN-")
+            and picking.picking_type_id == picking.company_id.aguas_fc_picking_type_id
+        )
 
     def _localizar_ingreso(self, picking_id, idreparto, fecha):
         if picking_id:
@@ -515,6 +577,11 @@ class AguasFCIntake(models.AbstractModel):
             picking_ids_not_to_backorder=picking.ids,
             skip_frio_calor_auto_repair=skip_auto_repair,
         ).button_validate()
+
+        if picking.state != "done":
+            raise UserError(
+                f"El traslado {picking.name} quedó en estado {picking.state} en lugar de Hecho."
+            )
 
         _logger.info(
             "Aguas FC: corrección %s creada y validada. Reparto=%s -> %s, seriales=%s",

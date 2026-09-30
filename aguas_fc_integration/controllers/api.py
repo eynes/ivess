@@ -50,7 +50,7 @@ class AguasFCController(http.Controller):
 
         data = kwargs
 
-        required = ["fecha", "idreparto", "tecnico", "usuario", "equipos"]
+        required = ["fecha", "idreparto", "equipos"]
         error = self._check_required(data, required)
         if error:
             return error
@@ -65,11 +65,12 @@ class AguasFCController(http.Controller):
                     idreparto=data["idreparto"],
                     equipos=equipos,
                     fecha=data["fecha"],
-                    tecnico=data["tecnico"],
-                    usuario=data["usuario"],
+                    tecnico=data.get("tecnico"),
+                    usuario=data.get("usuario"),
                 )
             )
         except Exception as e:
+            request.env.cr.rollback()
             _logger.exception("Error en /api/v1/repair/create")
             return {"success": False, "error": str(e)}
 
@@ -91,7 +92,7 @@ class AguasFCController(http.Controller):
 
         data = kwargs
 
-        required = ["fecha", "idreparto", "tecnico", "usuario", "equipos"]
+        required = ["fecha", "idreparto", "equipos"]
         error = self._check_required(data, required)
         if error:
             return error
@@ -106,11 +107,12 @@ class AguasFCController(http.Controller):
                     idreparto=data["idreparto"],
                     equipos=equipos,
                     fecha=data["fecha"],
-                    tecnico=data["tecnico"],
-                    usuario=data["usuario"],
+                    tecnico=data.get("tecnico"),
+                    usuario=data.get("usuario"),
                 )
             )
         except Exception as e:
+            request.env.cr.rollback()
             _logger.exception("Error en /api/v1/equipos/no-normalizados")
             return {"success": False, "error": str(e)}
 
@@ -155,6 +157,7 @@ class AguasFCController(http.Controller):
                 )
             )
         except Exception as e:
+            request.env.cr.rollback()
             _logger.exception("Error en /api/v1/repair/update")
             return {"success": False, "error": str(e)}
 
@@ -183,6 +186,7 @@ class AguasFCController(http.Controller):
                 )
             )
         except Exception as e:
+            request.env.cr.rollback()
             _logger.exception("Error en /api/v1/salida/disponibles")
             return {"success": False, "error": str(e)}
 
@@ -211,6 +215,7 @@ class AguasFCController(http.Controller):
                 )
             )
         except Exception as e:
+            request.env.cr.rollback()
             _logger.exception("Error en /api/v1/salida/validar")
             return {"success": False, "error": str(e)}
 
@@ -245,6 +250,7 @@ class AguasFCController(http.Controller):
                 )
             )
         except Exception as e:
+            request.env.cr.rollback()
             _logger.exception("Error en /api/v1/salida/create")
             return {"success": False, "error": str(e)}
 
@@ -263,5 +269,6 @@ class AguasFCController(http.Controller):
         try:
             return request.env["aguas.fc.outbound"].sudo().get_repartos()
         except Exception as e:
+            request.env.cr.rollback()
             _logger.exception("Error en /api/v1/repartos/listar")
             return {"success": False, "error": str(e)}
