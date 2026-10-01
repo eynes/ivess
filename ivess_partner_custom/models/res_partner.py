@@ -426,6 +426,9 @@ class ResPartner(models.Model):
                 "name": _("Dar de baja una cuenta madre"),
                 "res_model": "ivess.baja.madre",
                 "view_mode": "form",
+                # action_archive llega por call_kw, no por call_button: nadie
+                # completa "views" y el cliente web falla si no viene.
+                "views": [(False, "form")],
                 "target": "new",
                 "context": {"default_madre_id": self.id},
             }
