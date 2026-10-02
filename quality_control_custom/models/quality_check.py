@@ -124,7 +124,7 @@ class QualityCheck(models.Model):
                 for lot in check.lot_ids:
                     if ro_model.search_count([
                         ('lot_id', '=', lot.id),
-                        ('state', 'not in', ['cancelled', 'done']),
+                        ('state', 'not in', ['cancel', 'done']),
                     ]) > 0:
                         raise UserError(_(
                             "El producto a reparar '%s' ya tiene una orden de reparación asociada en proceso para el número de serie '%s'.",

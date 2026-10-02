@@ -14,6 +14,36 @@
           buscar el código por el diario vinculado.
         - El campo "Código de retención AFIP" del diario solo se muestra
           para diarios de tipo Retentions/Perceptions.
+        - Se corrige el layout del archivo (comparado contra el archivo de
+          referencia del cliente):
+          - Importe total, base de cálculo e importe de retención/percepción
+            van alineados a izquierda (antes a derecha).
+          - Número de comprobante y CUIT del retenido/percibido van
+            alineados a izquierda, sin ceros de relleno.
+          - Porcentaje de exclusión y número de certificado propio van en
+            blanco cuando no aplican (antes salían en "0.00" o en ceros).
+          - El archivo local ahora completa 198 caracteres por línea
+            (relleno con espacios), igual que el de exterior.
+          - Código de condición del sujeto retenido/percibido: pasa de
+            "01"/mapeo por partner (sin base real para retenciones,
+            heredado del original) a "13" fijo, tanto para retenciones
+            (IVA y Ganancias) como para percepciones.
+          - Número de comprobante de percepciones: se arma como punto de
+            venta (5 dígitos) + número (8 dígitos) por separado, en vez
+            de sacarle los caracteres no numéricos al nombre completo de
+            la factura (pisaba el padding del punto de venta).
+          - Número de comprobante de retenciones: se completa a 13
+            dígitos con ceros a la izquierda (antes salía el número
+            crudo de la Orden de Pago, sin padding, ej. "48").
+          - Base de cálculo: a diferencia del resto de los importes, se
+            omite el punto decimal y los centavos cuando el monto es
+            entero (verificado contra 360 líneas reales del cliente:
+            138 sin punto, exactamente las que dan centavos = 00).
+          - Fix: "codigo_regimen" rompía con ValueError ("is defined as
+            a integer but the value is not of that type") cuando el
+            fallback caía en concept_id.code, un Char libre no
+            necesariamente numérico (ej. "RG830") - ahora se queda solo
+            con los dígitos, tanto en retenciones como en percepciones.
     """,
     "author": "Eynes",
     "category": "Accounting",

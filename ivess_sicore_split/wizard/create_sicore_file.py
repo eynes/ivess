@@ -8,9 +8,13 @@ from odoo import _, models
 from odoo.exceptions import UserError, ValidationError
 
 from odoo.addons.l10n_ar_eynes.utils.sicore_fixed_width import FixedWidth
-from odoo.addons.l10n_ar_eynes.utils.sicore_fixed_width_dicts import (
-    HEAD_LINES,
+from odoo.addons.l10n_ar_eynes.wizard.create_sicore_file import (
+    PERCEPTION_VOUCHER_CODES,
+)
+
+from ..utils.sicore_fixed_width_dicts import (
     HEAD_LINES_EXTERIOR,
+    HEAD_LINES_LOCAL,
 )
 
 _logger = logging.getLogger(__name__)
@@ -18,17 +22,34 @@ _logger = logging.getLogger(__name__)
 # Mismas etiquetas que create.sicore.files usa para el nombre de archivo,
 # una por cada account.tax.retention_type que se exporta por separado.
 RETENTION_TYPE_LABELS = {
-    'vat': 'IVA',
-    'profit': 'GANANCIAS',
+    "vat": "IVA",
+    "profit": "GANANCIAS",
 }
 
 
 class CreateSicoreFiles(models.TransientModel):
-    _inherit = 'create.sicore.files'
+    _inherit = "create.sicore.files"
 
     def _format_monetary(self, value):
         """T16639: separador decimal punto en vez de coma."""
-        return "{:,.2f}".format(value).replace(",", "")
+        return f"{value:,.2f}".replace(",", "")
+
+    def _format_base_calculo(self, value):
+        """T16639: 'base_calculo' es distinto al resto de los importes.
+
+        Verificado contra el archivo de referencia real del cliente
+        (360 lineas): monto_comprobante e importe_retencion/percepcion
+        SIEMPRE muestran 2 decimales, incluso en importes enteros
+        (ej. "279400.00"). base_calculo en cambio omite el punto y los
+        centavos cuando el monto es entero (ej. "804130", sin ".00") y
+        solo muestra decimales cuando el monto realmente los tiene (ej.
+        "3507.01") - 138 de 360 lineas reales no tienen punto decimal,
+        exactamente las que dan centavos = 00.
+        """
+        rounded = round(value, 2)
+        if rounded == int(rounded):
+            return str(int(rounded))
+        return self._format_monetary(rounded)
 
     def _get_perception_afip_code(self, perception_tax):
         """T16639: preferir el código cargado directo en la percepción.
@@ -41,12 +62,144 @@ class CreateSicoreFiles(models.TransientModel):
             return int(perception_tax.sicore_tax_code)
         return super()._get_perception_afip_code(perception_tax)
 
+    def _get_perception_regs(self, fixed_width, perception_ids):
+        """Copia de create.sicore.files._get_perception_regs (l10n_ar_eynes)
+        con dos fixes de formato pedidos en T16639 (comparando contra el
+        archivo de referencia del cliente):
+
+        - 'numero_comprobante' no se castea a int: eso pisa los ceros a la
+          izquierda del punto de venta.
+        - 'numero_documento_retenido' (CUIT) se pasa sin guiones, para que
+          quede pegado a la izquierda del campo (ver
+          utils.sicore_fixed_width_dicts).
+        - 'porcentaje_exclusion' va en blanco: las percepciones no manejan
+          certificado de exclusion, así que nunca corresponde informar
+          "0.00".
+        """
+        errors = []
+        regs = []
+        afip_code_by_tax = {}
+
+        perception_lines = self.env["perception.tax.line"].browse(perception_ids)
+        for perception in perception_lines:
+            invoice = perception.invoice_id
+            line_ident = "Perception Tax Line #%s of Invoice %s" % (
+                perception.id,
+                invoice.name or invoice.id,
+            )
+            _logger.info(line_ident)
+
+            codigo_comprobante = PERCEPTION_VOUCHER_CODES.get(
+                invoice.voucher_type_id.doc_type
+            )
+            if not codigo_comprobante:
+                errors.append(
+                    _("%s: Voucher type not found on the invoice.", line_ident)
+                )
+                continue
+
+            # T16639: el archivo de referencia del cliente pide el numero
+            # de comprobante como "PV (5) + numero (8)" = 13 digitos, cada
+            # parte con ceros a la izquierda por separado (no alcanza con
+            # sacarle los caracteres no numericos al nombre completo, eso
+            # pisa el padding del punto de venta). El nombre de factura
+            # AR siempre es "PV-NUMERO" (ver account_move.py:1969, usa el
+            # mismo split para 'nroCmp').
+            try:
+                pos_code, seq_number = (invoice.name or "").split("-")
+                numero_comprobante = pos_code.zfill(5) + re.sub(
+                    r"\D", "", seq_number
+                ).zfill(8)
+            except ValueError:
+                numero_comprobante = ""
+            if not numero_comprobante:
+                errors.append(_("%s: Invoice number not found.", line_ident))
+                continue
+
+            partner = perception.partner_id
+            tipo_doc_percibido = partner.document_type_id.afip_code
+            nro_doc_percibido = re.sub(r"\D", "", partner.vat or "")
+            if not tipo_doc_percibido or not nro_doc_percibido:
+                errors.append(
+                    _(
+                        "%(line_ident)s: Document type or VAT not found for "
+                        "partner %(partner_name)s.",
+                        line_ident=line_ident,
+                        partner_name=partner.name,
+                    )
+                )
+                continue
+
+            perception_tax = perception.perception_id
+            if perception_tax.id not in afip_code_by_tax:
+                afip_code_by_tax[perception_tax.id] = self._get_perception_afip_code(
+                    perception_tax
+                )
+            codigo_impuesto = afip_code_by_tax[perception_tax.id]
+            if not codigo_impuesto:
+                errors.append(
+                    _(
+                        "%(line_ident)s: Add field 'AFIP retention code' to "
+                        "the journal of the perception '%(tax_name)s'\n"
+                        "(Accounting->Configuration->Journals)",
+                        line_ident=line_ident,
+                        tax_name=perception_tax.name,
+                    )
+                )
+                continue
+
+            # T16639: concept_id.code es un Char libre (ej. "RG830"), no
+            # necesariamente numerico, a diferencia de reg_code/
+            # tax_app_id.reg_code (Integer) - si cae en ese fallback hay
+            # que quedarse solo con los digitos, sino "codigo_regimen"
+            # (campo integer) rompe la validacion del FixedWidth.
+            reg_code = (
+                perception.reg_code
+                or perception.tax_app_id.reg_code
+                or perception.concept_id.code
+            )
+            reg_code = re.sub(r"\D", "", str(reg_code))[:3] if reg_code else ""
+            reg_code = reg_code or "0"
+
+            date_invoice = invoice.invoice_date.strftime("%d/%m/%Y")
+
+            line = {
+                "codigo_comprobante": codigo_comprobante,
+                "fecha_emision": date_invoice,
+                "numero_comprobante": numero_comprobante,
+                "monto_comprobante": self._format_monetary(invoice.amount_total),
+                "codigo_impuesto": codigo_impuesto,
+                "codigo_regimen": reg_code,
+                "codigo_operacion": 2,  # Cod. Percepciones
+                "base_calculo": self._format_base_calculo(perception.base),
+                # La percepcion se practica al emitir el comprobante.
+                "fecha_emision_retenc": date_invoice,
+                # T16639: idem retenciones - fijo en "13" contra el
+                # archivo de referencia del cliente, se ignora el mapeo
+                # por partner de sicore.fiscal.position.
+                "codigo_condicion": "13",
+                "sujetos_suspend": "",  # Beneficiarios en el exterior
+                "importe_retencion": self._format_monetary(perception.amount),
+                # Las percepciones no manejan certificado de exclusion.
+                "porcentaje_exclusion": "",
+                "fecha_emision_boletin": "",
+                "tipo_documento_retenido": str(tipo_doc_percibido),
+                "numero_documento_retenido": nro_doc_percibido,
+                "numero_certificado_original": "",
+            }
+
+            # Apendeamos el registro
+            fixed_width.update(**line)
+            regs.append(fixed_width.line)
+
+        return errors, regs
+
     def _generate_retention_file(
         self,
         retention_ids,
         exterior=False,
         perception_ids=None,
-        retention_type_label='',
+        retention_type_label="",
     ):
         """Copia de create.sicore.files._generate_retention_file (l10n_ar_eynes)
         con el nombre de archivo separado por tipo de retención (T16639).
@@ -54,13 +207,13 @@ class CreateSicoreFiles(models.TransientModel):
         head_file_errors = []
         head_regs = []
         fixed_width = (
-            FixedWidth(HEAD_LINES)
+            FixedWidth(HEAD_LINES_LOCAL)
             if not exterior
             else FixedWidth(HEAD_LINES_EXTERIOR)
         )
         is_local = not exterior
 
-        tax_lines = self.env['account.payment.order.retention.line'].browse(
+        tax_lines = self.env["account.payment.order.retention.line"].browse(
             retention_ids
         )
 
@@ -75,40 +228,54 @@ class CreateSicoreFiles(models.TransientModel):
             )
 
         for tax_line in filtered_tax_lines:
-            line_ident = 'Retention Tax Line #%s of Voucher #%s (%s)' % (
+            line_ident = "Retention Tax Line #%s of Voucher #%s (%s)" % (
                 tax_line.id,
                 tax_line.payment_order_id,
                 tax_line.payment_order_id.reference,
             )
             _logger.info(line_ident)
             date_voucher = tax_line.payment_order_id.date.strftime(
-                '%d/%m/%Y'
+                "%d/%m/%Y"
             )  # Datetime->String: dd/mm/yyyy
-            tipo_doc_retenido = str(
-                tax_line.partner_id.document_type_id.afip_code
-            )
-            nro_doc_retenido = tax_line.partner_id.vat
+            tipo_doc_retenido = str(tax_line.partner_id.document_type_id.afip_code)
+            # T16639: CUIT sin guiones, para que quede pegado a la
+            # izquierda del campo (11 digitos + espacios de relleno).
+            nro_doc_retenido = re.sub(r"\D", "", tax_line.partner_id.vat or "")
 
             # First search in number then in reference
-            internal_number = tax_line.payment_order_id.number or ''
+            internal_number = tax_line.payment_order_id.number or ""
             if not internal_number:
-                err = '%s: Número de comprobante no encontrado.' % line_ident
+                err = "%s: Número de comprobante no encontrado." % line_ident
                 head_file_errors.append(err)
                 continue
             else:
-                internal_number = int(re.sub(r"\D", "", internal_number))
+                # T16639: la Orden de Pago no tiene PV, es un numero
+                # secuencial simple (ej. "215"), pero igual hay que
+                # completarlo a 13 digitos con ceros a la izquierda (el
+                # campo espera "13 digitos, alineado a izq." segun el
+                # archivo de referencia del cliente) - antes se dejaba
+                # el numero crudo, sin padding (ej. "48" en vez de
+                # "0000000000048").
+                internal_number = re.sub(r"\D", "", internal_number).zfill(13)
 
-            date_emited = tax_line.date.strftime('%d/%m/%Y')
+            date_emited = tax_line.date.strftime("%d/%m/%Y")
 
             exclusion_date_certificate = tax_line.exclusion_date_certificate
             if exclusion_date_certificate:
-                exclusion_date_certificate = (
-                    exclusion_date_certificate.strftime('%d/%m/%Y')
+                exclusion_date_certificate = exclusion_date_certificate.strftime(
+                    "%d/%m/%Y"
                 )
             else:
-                exclusion_date_certificate = ''
+                exclusion_date_certificate = ""
 
             porcentaje_exclusion = tax_line.excluded_percent * 100
+            # T16639: en blanco cuando no aplica exclusion, no "0.00" -
+            # el cliente lo importa como espacios, no como un valor.
+            porcentaje_exclusion_fmt = (
+                self._format_monetary(porcentaje_exclusion)
+                if porcentaje_exclusion
+                else ""
+            )
 
             # Importe del comprobante: como 'codigo_comprobante' es siempre
             # '06' (orden de pago), el importe que corresponde informar es el
@@ -116,21 +283,26 @@ class CreateSicoreFiles(models.TransientModel):
             amount_total = tax_line.payment_order_id.amount
             base_amount = tax_line.base_amount
             ret_aplicada = tax_line.amount  # Importe retenido
-            nro_cert_propio = re.sub('[-]', '', tax_line.certificate_no or '')
+            # T16639: en blanco cuando no hay certificado propio (queda
+            # alineado a izquierda por el campo); si hay uno, se completa
+            # a 14 digitos con ceros a la izquierda (es numerico).
+            nro_cert_propio = re.sub(r"\D", "", tax_line.certificate_no or "")
+            if nro_cert_propio:
+                nro_cert_propio = nro_cert_propio.zfill(14)
+            # T16639: idem percepciones - concept_id.code es un Char
+            # libre, no necesariamente numerico; "codigo_regimen" es un
+            # campo integer y rompe si cae ahi con texto no numerico.
             reg_code = (
                 tax_line.reg_code
                 or tax_line.taxapp_id.reg_code
                 or tax_line.concept_id.code
             )
-            reg_code = str(reg_code)[:3] if reg_code else False
-            if not reg_code:
-                reg_code = 0
-            tax_journal = self.env['account.journal'].search(
-                [('tax_id', '=', tax_line.retention_id.id)]
+            reg_code = re.sub(r"\D", "", str(reg_code))[:3] if reg_code else ""
+            reg_code = reg_code or "0"
+            tax_journal = self.env["account.journal"].search(
+                [("tax_id", "=", tax_line.retention_id.id)]
             )
-            codigo_impuesto = (
-                int(tax_journal.afip_code) if tax_journal.afip_code else 0
-            )
+            codigo_impuesto = int(tax_journal.afip_code) if tax_journal.afip_code else 0
             if not codigo_impuesto:
                 raise UserError(
                     _(
@@ -140,34 +312,36 @@ class CreateSicoreFiles(models.TransientModel):
                     % tax_journal.name
                 )
             line = {
-                'codigo_comprobante': '06',
+                "codigo_comprobante": "06",
                 # 06: Orden de pago; HARD: Todas las ret. salen de una op
-                'fecha_emision': date_voucher,
-                'numero_comprobante': internal_number,
-                'monto_comprobante': self._format_monetary(amount_total),
-                'codigo_impuesto': codigo_impuesto,
-                'codigo_regimen': reg_code,
-                'codigo_operacion': 1,  # Cod. Retenciones
-                'base_calculo': self._format_monetary(base_amount),
-                'fecha_emision_retenc': date_emited,
-                'codigo_condicion': '01',  # Inscripto (HARD: Segun longport)
-                'sujetos_suspend': '',  # Beneficiarios en el exterior
-                'importe_retencion': self._format_monetary(ret_aplicada),
-                'porcentaje_exclusion': self._format_monetary(
-                    porcentaje_exclusion
-                ),
-                'fecha_emision_boletin': (
+                "fecha_emision": date_voucher,
+                "numero_comprobante": internal_number,
+                "monto_comprobante": self._format_monetary(amount_total),
+                "codigo_impuesto": codigo_impuesto,
+                "codigo_regimen": reg_code,
+                "codigo_operacion": 1,  # Cod. Retenciones
+                "base_calculo": self._format_base_calculo(base_amount),
+                "fecha_emision_retenc": date_emited,
+                # T16639: el original traia "01" hardcodeado (HARD: Segun
+                # longport, sin calcular nada por partner/regimen). Contra
+                # el archivo de referencia del cliente corresponde "13"
+                # para retenciones, tanto IVA como Ganancias.
+                "codigo_condicion": "13",
+                "sujetos_suspend": "",  # Beneficiarios en el exterior
+                "importe_retencion": self._format_monetary(ret_aplicada),
+                "porcentaje_exclusion": porcentaje_exclusion_fmt,
+                "fecha_emision_boletin": (
                     date_emited if porcentaje_exclusion != 0 else ""
                 ),  # Solo si hay exclusion
-                'tipo_documento_retenido': tipo_doc_retenido,
-                'numero_documento_retenido': nro_doc_retenido,
-                'numero_certificado_original': nro_cert_propio,
-                'denominacion_ordenante': (
-                    '' if is_local else tax_line.partner_id.name[:30]
+                "tipo_documento_retenido": tipo_doc_retenido,
+                "numero_documento_retenido": nro_doc_retenido,
+                "numero_certificado_original": nro_cert_propio,
+                "denominacion_ordenante": (
+                    "" if is_local else tax_line.partner_id.name[:30]
                 ),
-                'acrecentamiento': '' if is_local else '0',  # Segun longport
-                'cuit_pais_retenido': '' if is_local else '',  # TODO
-                'cuit_ordenante': '' if is_local else '',  # TODO
+                "acrecentamiento": "" if is_local else "0",  # Segun longport
+                "cuit_pais_retenido": "" if is_local else "",  # TODO
+                "cuit_ordenante": "" if is_local else "",  # TODO
             }
 
             # Apendeamos el registro
@@ -191,52 +365,52 @@ class CreateSicoreFiles(models.TransientModel):
         if len(head_regs) < 1:
             return [], False
 
-        head_filename = tempfile.mkstemp(suffix='.sicore')[1]
+        head_filename = tempfile.mkstemp(suffix=".sicore")[1]
         f = codecs.open(head_filename, "w", "latin-1")
 
         for r in head_regs:
             r2 = [a for a in r]
             try:
-                f.write(''.join(r2))
+                f.write("".join(r2))
             except Exception as e:
                 raise e
-            f.write('\r\n')
+            f.write("\r\n")
 
         f.close()
 
-        f = open(head_filename, 'rb')  # rb to export with CRLF line terminators
+        f = open(head_filename, "rb")  # rb to export with CRLF line terminators
 
         # T16639: un nombre base por tipo de retencion (IVA/Ganancias), en
         # vez de un unico archivo mezclando ambos tipos.
         name_base = "SICORE_RET" if is_local else "SICORE_RET_EXT"
         if retention_type_label:
             name_base += "_%s" % retention_type_label
-        name = ('%s_%s_%s.txt') % (
+        name = ("%s_%s_%s.txt") % (
             name_base,
             self.period_start,
-            self.company_id.name.replace(' ', '-'),
+            self.company_id.name.replace(" ", "-"),
         )
-        generated_file_rec = self.env['sicore.generated.files'].create(
+        generated_file_rec = self.env["sicore.generated.files"].create(
             {
-                'code': name,
-                'period_start': self.period_start,
-                'period_end': self.period_end,
-                'presentation_date': self.presentation_date,
-                'company_id': self.company_id.id,
+                "code": name,
+                "period_start": self.period_start,
+                "period_end": self.period_end,
+                "presentation_date": self.presentation_date,
+                "company_id": self.company_id.id,
             }
         )
         data = f.read()
         if isinstance(data, str):
-            data = data.encode('ascii', 'replace')
+            data = data.encode("ascii", "replace")
         data_attach = {
-            'name': name,
-            'datas': binascii.b2a_base64(data),
-            'store_fname': name,
-            'res_model': 'sicore.generated.files',
-            'res_id': generated_file_rec.id,
+            "name": name,
+            "datas": binascii.b2a_base64(data),
+            "store_fname": name,
+            "res_model": "sicore.generated.files",
+            "res_id": generated_file_rec.id,
         }
-        new_attachment = self.env['ir.attachment'].create(data_attach)
-        generated_file_rec.write({'attachment_id': new_attachment.id})
+        new_attachment = self.env["ir.attachment"].create(data_attach)
+        generated_file_rec.write({"attachment_id": new_attachment.id})
         f.close()
 
         return [], True
@@ -248,7 +422,7 @@ class CreateSicoreFiles(models.TransientModel):
         """
         self._validate_before_create()
 
-        errors = ''
+        errors = ""
         cr = self.env.cr
 
         retention_query = (
@@ -265,13 +439,13 @@ class CreateSicoreFiles(models.TransientModel):
         cr.execute(
             retention_query,
             {
-                'date_from': self.period_start,
-                'date_to': self.period_end,
-                'company_id': self.company_id.id,
+                "date_from": self.period_start,
+                "date_to": self.period_end,
+                "company_id": self.company_id.id,
             },
         )
         res = cr.fetchall()
-        retention_ids_by_type = {'vat': [], 'profit': []}
+        retention_ids_by_type = {"vat": [], "profit": []}
         for retention_id, retention_type in res:
             retention_ids_by_type[retention_type].append(retention_id)
 
@@ -297,9 +471,7 @@ class CreateSicoreFiles(models.TransientModel):
         success_labels = []
         for retention_type, label in RETENTION_TYPE_LABELS.items():
             type_retention_ids = retention_ids_by_type[retention_type]
-            type_perception_ids = (
-                perception_ids if retention_type == 'vat' else None
-            )
+            type_perception_ids = perception_ids if retention_type == "vat" else None
             if not type_retention_ids and not type_perception_ids:
                 continue
 
@@ -319,39 +491,37 @@ class CreateSicoreFiles(models.TransientModel):
             if success_local:
                 success_labels.append(label)
             if success_ext:
-                success_labels.append('%s EXT' % label)
+                success_labels.append("%s EXT" % label)
 
         for label, file_errors in errors_by_file.items():
-            errors += _('Retention File Errors (%s)\n================\n') % label
-            errors += '\n'.join(file_errors) + '\n'
+            errors += _("Retention File Errors (%s)\n================\n") % label
+            errors += "\n".join(file_errors) + "\n"
 
         if errors:
-            self.write({'notes': errors})
-            form_id = self.env.ref('l10n_ar_eynes.view_create_sicore_files').id
+            self.write({"notes": errors})
+            form_id = self.env.ref("l10n_ar_eynes.view_create_sicore_files").id
             res = {
-                'name': _('Sicore'),
-                'view_mode': 'form',
-                'views': [
-                    (form_id, 'form'),
+                "name": _("Sicore"),
+                "view_mode": "form",
+                "views": [
+                    (form_id, "form"),
                 ],
-                'res_model': 'create.sicore.files',
-                'res_id': self.id,
-                'view_id': form_id,
-                'type': 'ir.actions.act_window',
-                'target': 'new',
+                "res_model": "create.sicore.files",
+                "res_id": self.id,
+                "view_id": form_id,
+                "type": "ir.actions.act_window",
+                "target": "new",
             }
         elif success_labels:
-            message = _("SICORE Reports created: %s ") % (
-                ', '.join(success_labels)
-            )
+            message = _("SICORE Reports created: %s ") % (", ".join(success_labels))
             notification = {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': message,
-                    'type': 'success',
-                    'sticky': False,
-                    'next': {'type': 'ir.actions.act_window_close'},
+                "type": "ir.actions.client",
+                "tag": "display_notification",
+                "params": {
+                    "title": message,
+                    "type": "success",
+                    "sticky": False,
+                    "next": {"type": "ir.actions.act_window_close"},
                 },
             }
             return notification
@@ -372,19 +542,18 @@ class CreateSicoreFiles(models.TransientModel):
 
         rrhh_code = self.rrhh_ret_profit_code
         if not rrhh_code:
-            raise ValidationError(_('Invalid RRHH Code.'))
+            raise ValidationError(_("Invalid RRHH Code."))
         if not (
-            self._table_exists('hr_payslip')
-            and self._table_exists('hr_payslip_line')
+            self._table_exists("hr_payslip") and self._table_exists("hr_payslip_line")
         ):
             raise UserError(
                 _(
-                    'Export Error\n'
-                    'The RRHH SICORE export requires the Payroll module '
-                    'to be installed in this database.'
+                    "Export Error\n"
+                    "The RRHH SICORE export requires the Payroll module "
+                    "to be installed in this database."
                 )
             )
-        errors = ''
+        errors = ""
 
         q = """
             SELECT pl.id payslip_id, pl.employee_id employee_id,
@@ -396,11 +565,11 @@ class CreateSicoreFiles(models.TransientModel):
             GROUP BY pl.id, pl.employee_id, pl.date_to
         """
         q_params = {
-            'state': tuple(['done']),
-            'code': tuple([self.rrhh_ret_profit_code, 'H349']),
-            'date_from': self.period_start,
-            'date_to': self.period_end,
-            'company_id': self.company_id.id,
+            "state": tuple(["done"]),
+            "code": tuple([self.rrhh_ret_profit_code, "H349"]),
+            "date_from": self.period_start,
+            "date_to": self.period_end,
+            "company_id": self.company_id.id,
         }
         self.env.cr.execute(q, q_params)
         res = self.env.cr.fetchall()
@@ -421,23 +590,23 @@ class CreateSicoreFiles(models.TransientModel):
         retention_errors = self._generate_retention_file_rrhh(res)
 
         if retention_errors:
-            errors += _('Retention File Errors\n================\n')
-            errors += '\n'.join(retention_errors)
+            errors += _("Retention File Errors\n================\n")
+            errors += "\n".join(retention_errors)
 
         if errors:
-            self.write({'notes': errors})
-            form_id = self.env.ref('l10n_ar_eynes.view_create_sicore_files').id
+            self.write({"notes": errors})
+            form_id = self.env.ref("l10n_ar_eynes.view_create_sicore_files").id
             res = {
-                'name': _('Sicore'),
-                'view_mode': 'form',
-                'views': [
-                    (form_id, 'form'),
+                "name": _("Sicore"),
+                "view_mode": "form",
+                "views": [
+                    (form_id, "form"),
                 ],
-                'res_model': 'create.sicore.files',
-                'res_id': self.id,
-                'view_id': form_id,
-                'type': 'ir.actions.act_window',
-                'target': 'new',
+                "res_model": "create.sicore.files",
+                "res_id": self.id,
+                "view_id": form_id,
+                "type": "ir.actions.act_window",
+                "target": "new",
             }
         else:
             res = True
