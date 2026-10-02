@@ -148,12 +148,18 @@ class CreateSicoreFiles(models.TransientModel):
                 )
                 continue
 
+            # T16639: concept_id.code es un Char libre (ej. "RG830"), no
+            # necesariamente numerico, a diferencia de reg_code/
+            # tax_app_id.reg_code (Integer) - si cae en ese fallback hay
+            # que quedarse solo con los digitos, sino "codigo_regimen"
+            # (campo integer) rompe la validacion del FixedWidth.
             reg_code = (
                 perception.reg_code
                 or perception.tax_app_id.reg_code
                 or perception.concept_id.code
             )
-            reg_code = str(reg_code)[:3] if reg_code else 0
+            reg_code = re.sub(r"\D", "", str(reg_code))[:3] if reg_code else ""
+            reg_code = reg_code or "0"
 
             date_invoice = invoice.invoice_date.strftime("%d/%m/%Y")
 
@@ -283,14 +289,16 @@ class CreateSicoreFiles(models.TransientModel):
             nro_cert_propio = re.sub(r"\D", "", tax_line.certificate_no or "")
             if nro_cert_propio:
                 nro_cert_propio = nro_cert_propio.zfill(14)
+            # T16639: idem percepciones - concept_id.code es un Char
+            # libre, no necesariamente numerico; "codigo_regimen" es un
+            # campo integer y rompe si cae ahi con texto no numerico.
             reg_code = (
                 tax_line.reg_code
                 or tax_line.taxapp_id.reg_code
                 or tax_line.concept_id.code
             )
-            reg_code = str(reg_code)[:3] if reg_code else False
-            if not reg_code:
-                reg_code = 0
+            reg_code = re.sub(r"\D", "", str(reg_code))[:3] if reg_code else ""
+            reg_code = reg_code or "0"
             tax_journal = self.env["account.journal"].search(
                 [("tax_id", "=", tax_line.retention_id.id)]
             )

@@ -39,6 +39,11 @@
             omite el punto decimal y los centavos cuando el monto es
             entero (verificado contra 360 líneas reales del cliente:
             138 sin punto, exactamente las que dan centavos = 00).
+          - Fix: "codigo_regimen" rompía con ValueError ("is defined as
+            a integer but the value is not of that type") cuando el
+            fallback caía en concept_id.code, un Char libre no
+            necesariamente numérico (ej. "RG830") - ahora se queda solo
+            con los dígitos, tanto en retenciones como en percepciones.
     """,
     "author": "Eynes",
     "category": "Accounting",
