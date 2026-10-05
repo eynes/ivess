@@ -50,9 +50,11 @@
                                     <field name="visit_status_id" optional="show" column_invisible="parent.state in ('draft')"/>
                                     <field name="requires_reason" optional="hide"/>
                                     <field name="no_purchase_reason_id"  widget="many2one" optional="show" column_invisible="parent.state in ('draft')" readonly="requires_reason == False" required="requires_reason == True"/>
+                                    <field name="visit_date_hour" optional="show"/>
                                     <field name="visit_hour_from" widget="float_time" optional="show"/>
                                     <field name="visit_hour_to" widget="float_time" optional="show"/>
                                     <field name="effective_visit_hour" widget="float_time" optional="show"/>
+                                    <field name="delivery_hour" widget="float_time" optional="show"/>
                                     <field name="sale_order_id" optional="show"/>
                                     <field name="stock_picking_id" optional="show"/>
                                     <field name="frequency" optional="show"/>
@@ -61,6 +63,9 @@
                                     <field name="vacation_date_from" optional="show"/>
                                     <field name="vacation_date_to" optional="show"/>
                                     <field name="message_text" optional="show" readonly="1"/>
+                                    <field name="longitude" optional="show"/>
+                                    <field name="latitude" optional="show"/>
+                                    <field name="meters" optional="show"/>
                                     <field name="parent_delivery_type" force_save="1" column_invisible="1"/>
                                     <field name="allowed_client" column_invisible="1" force_save="1"/>
                                     <field name="route_id" column_invisible="1"/>

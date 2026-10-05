@@ -575,6 +575,29 @@ class DeliveryRouteLine(models.Model):
         compute='_compute_message_text',
     )
 
+    visit_date_hour = fields.Datetime(
+        string="Fecha/Hora Visita",
+        help="Fecha y hora en que se realizo la visita"
+    )
+
+    delivery_hour = fields.Datetime(
+        string="Hora Envio",
+        help="Hora que envia el telefono, por si esta offline.",
+    )
+
+    longitude = fields.Char(
+        string="Longitud",
+    )
+
+    latitude = fields.Char(
+        string="Latitud",
+    )
+
+    meters = fields.Char(
+        string="Metros"
+    )
+
+
     @api.depends('message_ids', 'message_ids.message_text')
     def _compute_message_text(self):
         for rec in self:
