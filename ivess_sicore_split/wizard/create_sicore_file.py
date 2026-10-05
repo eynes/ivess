@@ -174,9 +174,11 @@ class CreateSicoreFiles(models.TransientModel):
                 "base_calculo": self._format_base_calculo(perception.base),
                 # La percepcion se practica al emitir el comprobante.
                 "fecha_emision_retenc": date_invoice,
-                # T16639: idem retenciones - fijo en "13" contra el
-                # archivo de referencia del cliente, se ignora el mapeo
-                # por partner de sicore.fiscal.position.
+                # T16639: fijo en "13" (regimen 602, percepciones de
+                # IVA) contra el archivo de referencia real del cliente.
+                # T16863: esto es especifico de percepciones IVA - las
+                # retenciones NO usan este valor fijo, ver
+                # _generate_retention_file.
                 "codigo_condicion": "13",
                 "sujetos_suspend": "",  # Beneficiarios en el exterior
                 "importe_retencion": self._format_monetary(perception.amount),
@@ -311,6 +313,20 @@ class CreateSicoreFiles(models.TransientModel):
                     )
                     % tax_journal.name
                 )
+            # T16863: AFIP rechaza el archivo de retenciones de Ganancias
+            # ("combinacion regimen 78/94 + operacion 1 + condicion 13
+            # no es valida") - el "13" fijo de T16639 solo corresponde a
+            # percepciones de IVA (regimen 602). Para retenciones de
+            # Ganancias la condicion vuelve a tomarse de la situacion
+            # del proveedor (01 Inscripto / 02 No inscripto, mapeo por
+            # posicion fiscal en sicore.fiscal.position). Retenciones de
+            # IVA no estan mencionadas en T16863, se quedan en "13" fijo
+            # (confirmado en T16639).
+            codigo_condicion = (
+                self._get_sicore_condition_code(tax_line.partner_id)
+                if retention_type_label == "GANANCIAS"
+                else "13"
+            )
             line = {
                 "codigo_comprobante": "06",
                 # 06: Orden de pago; HARD: Todas las ret. salen de una op
@@ -322,11 +338,7 @@ class CreateSicoreFiles(models.TransientModel):
                 "codigo_operacion": 1,  # Cod. Retenciones
                 "base_calculo": self._format_base_calculo(base_amount),
                 "fecha_emision_retenc": date_emited,
-                # T16639: el original traia "01" hardcodeado (HARD: Segun
-                # longport, sin calcular nada por partner/regimen). Contra
-                # el archivo de referencia del cliente corresponde "13"
-                # para retenciones, tanto IVA como Ganancias.
-                "codigo_condicion": "13",
+                "codigo_condicion": codigo_condicion,
                 "sujetos_suspend": "",  # Beneficiarios en el exterior
                 "importe_retencion": self._format_monetary(ret_aplicada),
                 "porcentaje_exclusion": porcentaje_exclusion_fmt,
