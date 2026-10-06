@@ -54,7 +54,7 @@
                                     <field name="visit_hour_from" widget="float_time" optional="show"/>
                                     <field name="visit_hour_to" widget="float_time" optional="show"/>
                                     <field name="effective_visit_hour" widget="float_time" optional="show"/>
-                                    <field name="delivery_hour" widget="float_time" optional="show"/>
+                                    <field name="delivery_date_hour" optional="show"/>
                                     <field name="sale_order_id" optional="show"/>
                                     <field name="stock_picking_id" optional="show"/>
                                     <field name="frequency" optional="show"/>

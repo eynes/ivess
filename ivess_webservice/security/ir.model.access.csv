@@ -32,7 +32,7 @@ access_mrp_bom_bot,mrp.bom.bot,mrp.model_mrp_bom,ivess_webservice.group_ivess_we
 access_ivess_non_productive_container_report_bot,ivess.non.productive.container.report.bot,model_ivess_non_productive_container_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_ivess_roadmap_report_bot,ivess.roadmap.report.bot,model_ivess_roadmap_report,ivess_webservice.group_ivess_webservice_user,1,0,0,0
-access_delivery_route_line_bot,delivery.route.line.bot,logistic_custom_ivess.model_delivery_route_line,ivess_webservice.group_ivess_webservice_user,1,0,0,0
+access_delivery_route_line_bot,delivery.route.line.bot,logistic_custom_ivess.model_delivery_route_line,ivess_webservice.group_ivess_webservice_user,1,1,1,0
 access_client_type_bot,client.type.bot,logistic_custom_ivess.model_client_type,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 access_delivery_route_number_bot,delivery.route.number.bot,logistic_custom_ivess.model_delivery_route_number,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 access_account_payment_term_bot,account.payment.term.bot,account.model_account_payment_term,ivess_webservice.group_ivess_webservice_user,1,0,0,0
