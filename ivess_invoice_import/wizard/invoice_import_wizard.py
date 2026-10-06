@@ -1091,7 +1091,8 @@ class IvessInvoiceImportWizard(models.TransientModel):
 
             # Letra B: el precio unitario del Excel viene con el IVA incluido
             # (consumidor final); se descuenta la alícuota para dejarlo neto,
-            # porque Odoo vuelve a sumar el impuesto de la línea.
+            # porque Odoo vuelve a sumar el impuesto de la línea. Aplica a
+            # todo comprobante de letra B (FC, NC y ND), no solo a facturas.
             if letra == "B" and tasa_iva:
                 precio_unitario = precio_unitario / (1 + tasa_iva / 100.0)
 
