@@ -1,0 +1,106 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* ivess_arciba_no_invoice
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+"Language: es_AR\n"
+
+#. module: ivess_arciba_no_invoice
+#: model:ir.model.fields,field_description:ivess_arciba_no_invoice.field_arciba_generated_files__notes
+msgid "Notes"
+msgstr "Notas"
+
+#. module: ivess_arciba_no_invoice
+#: model:ir.model.fields,help:ivess_arciba_no_invoice.field_arciba_generated_files__notes
+msgid "Warnings found when the file was generated."
+msgstr "Avisos encontrados al generar el archivo."
+
+#. module: ivess_arciba_no_invoice
+#: model_terms:ir.ui.view,arch_db:ivess_arciba_no_invoice.view_arciba_generated_files_form
+msgid "Warnings"
+msgstr "Avisos"
+
+#. module: ivess_arciba_no_invoice
+#. odoo-python
+#: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
+msgid "Perceptions informed"
+msgstr "Percepciones informadas"
+
+#. module: ivess_arciba_no_invoice
+#. odoo-python
+#: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
+msgid "Retentions informed"
+msgstr "Retenciones informadas"
+
+#. module: ivess_arciba_no_invoice
+#. odoo-python
+#: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
+msgid "eARCIBA file generated with warnings"
+msgstr "Archivo eARCIBA generado con avisos"
+
+#. module: ivess_arciba_no_invoice
+#. odoo-python
+#: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
+msgid ""
+"Some records were left out or need review. See the Warnings of the "
+"generated file %(code)s before submitting it to ARCIBA."
+msgstr ""
+"Algunos registros quedaron fuera del archivo o necesitan revisión. Revise "
+"los Avisos del archivo generado %(code)s antes de presentarlo en ARCIBA."
+
+#. module: ivess_arciba_no_invoice
+#. odoo-python
+#: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
+#, python-format
+msgid ""
+"rtl #%(ret_id)s: IIBB Situation cannot be empty (%(ret_name)s) (Partner "
+"%(part_name)s)"
+msgstr ""
+"rtl #%(ret_id)s: La situación de IIBB no puede estar vacía (%(ret_name)s) "
+"(Partner %(part_name)s)"
+
+#. module: ivess_arciba_no_invoice
+#. odoo-python
+#: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
+#, python-format
+msgid ""
+"rtl #%(ret_id)s: Percentage cannot be negative or more than 99.99 "
+"(%(ret_name)s) (OP ID %(op_id)s)"
+msgstr ""
+"rtl #%(ret_id)s: El porcentaje no puede ser negativo ni mayor a 99.99 "
+"(%(ret_name)s) (OP ID %(op_id)s)"
+
+#. module: ivess_arciba_no_invoice
+#. odoo-python
+#: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
+#, python-format
+msgid ""
+"rtl #%(ret_id)s: informed rate %(informed).2f%% does not match the amount "
+"withheld over the informed base (%(real).2f%%); the withholding was "
+"calculated on base %(calc_base).2f, informed base %(base).2f (OP %(op)s, "
+"%(partner)s)"
+msgstr ""
+"rtl #%(ret_id)s: la alícuota informada %(informed).2f%% no coincide con el "
+"importe retenido sobre la base informada (%(real).2f%%); la retención se "
+"calculó sobre la base %(calc_base).2f y se informó la base %(base).2f (OP "
+"%(op)s, %(partner)s)"
+
+#. module: ivess_arciba_no_invoice
+#. odoo-python
+#: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
+#, python-format
+msgid ""
+"rtl #%(ret_id)s: left out of the file, the partner has no rate for the "
+"period (OP %(op)s, %(partner)s)"
+msgstr ""
+"rtl #%(ret_id)s: omitida del archivo, el proveedor no tiene alícuota para "
+"el período (OP %(op)s, %(partner)s)"
