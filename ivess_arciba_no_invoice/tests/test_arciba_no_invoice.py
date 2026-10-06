@@ -69,6 +69,7 @@ class TestArcibaNoInvoice(TransactionCase):
         partner=None,
         retention_amount=70686.0,
         base_amount=None,
+        percent_applied=0.0,
     ):
         order = self.env["account.payment.order"].create(
             {
@@ -112,6 +113,7 @@ class TestArcibaNoInvoice(TransactionCase):
                 "base_amount": base_amount or amount,
                 "amount": 70686.0,
                 "certificate_no": "147",
+                "percent_applied": percent_applied,
             }
         )
         return order, retention_line
@@ -150,8 +152,8 @@ class TestArcibaNoInvoice(TransactionCase):
             }
         )
 
-    def test_retention_without_padron_is_left_out_with_a_warning(self):
-        """Sin padron la retencion se omite como siempre, pero se avisa."""
+    def test_retention_without_padron_uses_general_rate_with_a_warning(self):
+        """Sin padron (T16899) se informa con la alicuota general y se avisa."""
         _order, ok_line = self._create_order_with_retention(base_amount=1570800.0)
         no_padron = self.env["res.partner"].create(
             {
@@ -161,19 +163,21 @@ class TestArcibaNoInvoice(TransactionCase):
             }
         )
         _order2, no_padron_line = self._create_order_with_retention(
-            partner=no_padron, base_amount=1570800.0
+            partner=no_padron, base_amount=1570800.0, percent_applied=4.5
         )
         wizard = self._create_wizard()
 
         status, result = wizard._get_ret_data([ok_line.id, no_padron_line.id])
 
         self.assertIsNone(status)
-        self.assertEqual(len(result), 1)
-        self.assertIn("left out of the file", wizard.notes)
-        self.assertIn("Retentions informed: 1/2", wizard.notes)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[1]["alicuota"].lstrip("0"), "4,50")
+        self.assertIn("no padron rate", wizard.notes)
+        self.assertIn("general rate 4.50%", wizard.notes)
+        self.assertIn("Retentions informed: 2/2", wizard.notes)
 
-    def test_rate_mismatch_is_a_warning_and_content_is_unchanged(self):
-        """Alicuota que no cierra con el importe: avisa, pero informa igual."""
+    def test_informed_amount_differs_from_withheld_is_a_warning(self):
+        """El importe informado (base x alicuota) difiere de lo retenido."""
         _order, retention_line = self._create_order_with_retention()
         wizard = self._create_wizard()
 
@@ -181,13 +185,12 @@ class TestArcibaNoInvoice(TransactionCase):
 
         self.assertIsNone(status)
         self.assertEqual(len(result), 1)
-        # Lo informado es lo de siempre: alicuota del padron y base_amount.
+        # Lo informado lo define l10n_ar_eynes: base_amount x alicuota.
         self.assertEqual(result[0]["alicuota"].lstrip("0"), "4,50")
-        self.assertEqual(result[0]["monto_sujeto_a_ret_per"].lstrip("0"), "2073456,00")
-        # 70.686 sobre 2.073.456 = 3,41%, la retencion se calculo sobre 1.570.800
-        self.assertIn("4.50%", wizard.notes)
-        self.assertIn("3.41%", wizard.notes)
-        self.assertIn("1570800.00", wizard.notes)
+        self.assertEqual(result[0]["ret_per_aplicada"].lstrip("0"), "93305,52")
+        # Se retuvo 70.686, no 93.305,52.
+        self.assertIn("93305.52", wizard.notes)
+        self.assertIn("70686.00", wizard.notes)
 
     def test_consistent_retention_has_no_warnings(self):
         """Con padron y base consistentes no hay avisos."""
@@ -201,3 +204,4 @@ class TestArcibaNoInvoice(TransactionCase):
         self.assertIsNone(status)
         self.assertFalse(wizard.notes)
         self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["ret_per_aplicada"].lstrip("0"), "70686,00")

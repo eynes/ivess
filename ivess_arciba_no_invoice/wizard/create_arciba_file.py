@@ -12,16 +12,18 @@ from decimal import Decimal
 from odoo import _, api, models
 
 from odoo.addons.l10n_ar_eynes.utils.sicore_fixed_width import moneyfmt
+from odoo.addons.l10n_ar_eynes.wizard.create_arciba_file import informed_amount
 
 
 class CreateArcibaFiles(models.TransientModel):
     _inherit = "create.arciba.files"
 
-    # [T16864] Copia de _get_ret_data de l10n_ar_eynes. Lo que se informa en
-    # el TXT no cambia. Cambios (marcados con [T16864]): no se exige factura
-    # imputada a la OP (sin lineas de deuda el total del comprobante es el
-    # importe de la OP), y los problemas dejan de bloquear el archivo: se
-    # devuelven como avisos junto con las lineas validas.
+    # [T16864] Copia de _get_ret_data de l10n_ar_eynes (T16899, 06/10): lo que
+    # se informa en el TXT lo define l10n_ar_eynes y no cambia. Unicos cambios
+    # (marcados con [T16864]): no se exige factura imputada a la OP (sin
+    # lineas de deuda el total del comprobante es el importe de la OP) y los
+    # problemas dejan de bloquear el archivo: se devuelven como avisos junto
+    # con las lineas validas.
     @api.model
     def _collect_ret_data(self, retention_ids):
         """Retentions to export and warnings (non-blocking problems).
@@ -42,7 +44,9 @@ class CreateArcibaFiles(models.TransientModel):
             )  # Datetime->String: dd/mm/yyyy
             # Nro Cert
             nro_cert_propio = ret.certificate_no or "0000000000000000"
-            # Ret / Per applied
+            # Ret / Per applied: importe contabilizado. Mas abajo, una vez
+            # resuelta la alicuota, se reemplaza por base x alicuota, que es lo
+            # que AGIP valida.
             ret_per_applied = ret.amount
             # Ret / Per base
             base_amount = ret.base_amount
@@ -50,15 +54,19 @@ class CreateArcibaFiles(models.TransientModel):
             # **-------**  Datos desde la Orden de Pago: **--------**
             op = ret.payment_order_id
             partner = op.partner_id
-            # Alicuota
+            # Alicuota: ultimo padron vigente al periodo, no solo el del mes
+            # exacto, para no perder retenciones cuando el padron no se
+            # actualizo.
             percentage = (
                 self.env["res.partner.retention"]
                 .search(
                     [
                         ("retention_id", "=", ret.retention_id.id),
                         ("partner_id", "=", partner.id),
-                        ("period", "=", self.period_start),
-                    ]
+                        ("period", "<=", self.period_start),
+                    ],
+                    order="period desc",
+                    limit=1,
                 )
                 .percent
             )
@@ -73,7 +81,48 @@ class CreateArcibaFiles(models.TransientModel):
                     )
                 )
                 continue
-            elif percentage != 0.0:
+            else:
+                if not percentage:
+                    # Se aplicó alícuota general:
+                    percentage = ret.applied_aliquot
+                    # [T16864] Solo aviso: sin padron se informa con la
+                    # alicuota general de la aplicacion de retencion.
+                    errors.append(
+                        _(
+                            "rtl #%(ret_id)s: no padron rate for the period, "
+                            "informed with the general rate %(rate).2f%% "
+                            "(OP %(op)s, %(partner)s)",
+                            ret_id=ret.id,
+                            rate=percentage,
+                            op=op.number,
+                            partner=partner.display_name,
+                        )
+                    )
+
+                # El importe informado tiene que ser exactamente
+                # base x alicuota. El calculo de la retencion se hace en float
+                # y pierde el medio centavo, asi que ret.amount puede venir un
+                # centavo abajo de lo que AGIP recalcula.
+                ret_per_applied = informed_amount(base_amount, percentage)
+                # [T16864] Solo aviso: el importe informado es base x
+                # alicuota y puede diferir de lo realmente retenido.
+                if abs(ret_per_applied - Decimal(str(ret.amount))) > Decimal("0.01"):
+                    errors.append(
+                        _(
+                            "rtl #%(ret_id)s: informed amount %(informed).2f "
+                            "differs from the amount withheld %(withheld).2f "
+                            "(base %(base).2f x rate %(rate).2f%%) "
+                            "(OP %(op)s, %(partner)s)",
+                            ret_id=ret.id,
+                            informed=ret_per_applied,
+                            withheld=ret.amount,
+                            base=base_amount,
+                            rate=percentage,
+                            op=op.number,
+                            partner=partner.display_name,
+                        )
+                    )
+
                 # Type of document partner
                 nro_doc_retenido = (
                     partner.vat.replace("-", "") if partner.vat else "00000000000"
@@ -144,29 +193,6 @@ class CreateArcibaFiles(models.TransientModel):
                 inv_iva_amount = 0.0
                 # # Monto de otros conceptos:
                 amount_others = op_amount_total - inv_iva_amount - base_amount
-                # [T16864] Solo aviso: no cambia lo que se informa.
-                effective_percentage = (
-                    round(ret_per_applied / base_amount * 100, 2)
-                    if base_amount
-                    else 0.0
-                )
-                if abs(effective_percentage - percentage) > 0.05:
-                    errors.append(
-                        _(
-                            "rtl #%(ret_id)s: informed rate %(informed).2f%% "
-                            "does not match the amount withheld over the "
-                            "informed base (%(real).2f%%); the withholding was "
-                            "calculated on base %(calc_base).2f, informed "
-                            "base %(base).2f (OP %(op)s, %(partner)s)",
-                            ret_id=ret.id,
-                            informed=percentage,
-                            real=effective_percentage,
-                            calc_base=ret.base,
-                            base=base_amount,
-                            op=op.number,
-                            partner=partner.display_name,
-                        )
-                    )
 
                 line = {
                     "type": 1,  # Retention
@@ -210,19 +236,6 @@ class CreateArcibaFiles(models.TransientModel):
                     "fecha_aceptacion": "",  # Para comprobantes mipyme
                 }
                 res.append(line)
-            else:
-                # [T16864] Solo aviso: sin alicuota en el padron la
-                # retencion se omite del archivo (igual que antes), pero
-                # ahora se notifica.
-                errors.append(
-                    _(
-                        "rtl #%(ret_id)s: left out of the file, the partner "
-                        "has no rate for the period (OP %(op)s, %(partner)s)",
-                        ret_id=ret.id,
-                        op=op.number,
-                        partner=partner.display_name,
-                    )
-                )
         return res, errors
 
     @api.model

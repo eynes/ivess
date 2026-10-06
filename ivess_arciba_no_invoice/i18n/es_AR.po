@@ -84,23 +84,21 @@ msgstr ""
 #: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
 #, python-format
 msgid ""
-"rtl #%(ret_id)s: informed rate %(informed).2f%% does not match the amount "
-"withheld over the informed base (%(real).2f%%); the withholding was "
-"calculated on base %(calc_base).2f, informed base %(base).2f (OP %(op)s, "
-"%(partner)s)"
+"rtl #%(ret_id)s: no padron rate for the period, informed with the general "
+"rate %(rate).2f%% (OP %(op)s, %(partner)s)"
 msgstr ""
-"rtl #%(ret_id)s: la alícuota informada %(informed).2f%% no coincide con el "
-"importe retenido sobre la base informada (%(real).2f%%); la retención se "
-"calculó sobre la base %(calc_base).2f y se informó la base %(base).2f (OP "
-"%(op)s, %(partner)s)"
+"rtl #%(ret_id)s: sin alícuota de padrón para el período, informada con la "
+"alícuota general %(rate).2f%% (OP %(op)s, %(partner)s)"
 
 #. module: ivess_arciba_no_invoice
 #. odoo-python
 #: code:addons/ivess_arciba_no_invoice/wizard/create_arciba_file.py:0
 #, python-format
 msgid ""
-"rtl #%(ret_id)s: left out of the file, the partner has no rate for the "
-"period (OP %(op)s, %(partner)s)"
+"rtl #%(ret_id)s: informed amount %(informed).2f differs from the amount "
+"withheld %(withheld).2f (base %(base).2f x rate %(rate).2f%%) (OP %(op)s, "
+"%(partner)s)"
 msgstr ""
-"rtl #%(ret_id)s: omitida del archivo, el proveedor no tiene alícuota para "
-"el período (OP %(op)s, %(partner)s)"
+"rtl #%(ret_id)s: el importe informado %(informed).2f difiere del importe "
+"retenido %(withheld).2f (base %(base).2f x alícuota %(rate).2f%%) (OP "
+"%(op)s, %(partner)s)"
