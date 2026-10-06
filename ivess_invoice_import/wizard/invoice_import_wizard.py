@@ -843,7 +843,9 @@ class IvessInvoiceImportWizard(models.TransientModel):
                     % existing.id
                 )
 
-        detail_vals, detail_errors = self._resolve_detail_lines(group["lines"], cache)
+        detail_vals, detail_errors = self._resolve_detail_lines(
+            group["lines"], cache, group["letra"]
+        )
         errors.extend(detail_errors)
 
         return {
@@ -1056,7 +1058,7 @@ class IvessInvoiceImportWizard(models.TransientModel):
         )
         return candidates[0] if len(candidates) == 1 else None, len(candidates)
 
-    def _resolve_detail_lines(self, lines, cache):
+    def _resolve_detail_lines(self, lines, cache, letra=None):
         detail_vals = []
         errors = []
 
@@ -1086,6 +1088,12 @@ class IvessInvoiceImportWizard(models.TransientModel):
             except (TypeError, ValueError):
                 tasa_iva = 0.0
                 line_errors.append(_("Tasa de IVA inválida: '%s'.") % line["tasa_iva"])
+
+            # Letra B: el precio unitario del Excel viene con el IVA incluido
+            # (consumidor final); se descuenta la alícuota para dejarlo neto,
+            # porque Odoo vuelve a sumar el impuesto de la línea.
+            if letra == "B" and tasa_iva:
+                precio_unitario = precio_unitario / (1 + tasa_iva / 100.0)
 
             try:
                 tasa_iva_no_inscripto = self._to_float(line["tasa_iva_no_inscripto"])

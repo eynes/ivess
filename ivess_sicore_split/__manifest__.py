@@ -24,10 +24,9 @@
             blanco cuando no aplican (antes salían en "0.00" o en ceros).
           - El archivo local ahora completa 198 caracteres por línea
             (relleno con espacios), igual que el de exterior.
-          - Código de condición del sujeto retenido/percibido: pasa de
-            "01"/mapeo por partner (sin base real para retenciones,
-            heredado del original) a "13" fijo, tanto para retenciones
-            (IVA y Ganancias) como para percepciones.
+          - Código de condición del sujeto percibido (percepciones de
+            IVA, régimen 602): "13" fijo, verificado contra el archivo
+            real del cliente.
           - Número de comprobante de percepciones: se arma como punto de
             venta (5 dígitos) + número (8 dígitos) por separado, en vez
             de sacarle los caracteres no numéricos al nombre completo de
@@ -44,6 +43,19 @@
             fallback caía en concept_id.code, un Char libre no
             necesariamente numérico (ej. "RG830") - ahora se queda solo
             con los dígitos, tanto en retenciones como en percepciones.
+
+        T16863.
+
+        - Fix: AFIP rechazaba el archivo de retenciones de Ganancias
+          ("combinación régimen 78/94 + operación 1 + condición 13 no
+          es válida" - 78/94 son régimenes de Ganancias/RG 830). El
+          "13" fijo de T16639 solo corresponde a percepciones de IVA
+          (régimen 602) - en retenciones de Ganancias la condición
+          vuelve a tomarse de la situación del proveedor vía el mapeo
+          de posición fiscal en sicore.fiscal.position (método original
+          de l10n_ar_eynes, default "01" Inscripto si no está mapeada).
+          Percepciones de IVA y retenciones de IVA se mantienen en
+          "13" fijo (sin cambios, no mencionadas en esta tarea).
     """,
     "author": "Eynes",
     "category": "Accounting",
