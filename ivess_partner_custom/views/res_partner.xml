@@ -136,6 +136,18 @@
         </field>
     </record>
 
+    <!-- Clientes por Reparto: la misma búsqueda de dirección que en Contactos -->
+    <record id="view_partner_distribution_reparto_search_direccion" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.search.direccion</field>
+        <field name="model">partner.distribution</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_distribution_reparto_search"/>
+        <field name="arch" type="xml">
+            <field name="partner_street" position="attributes">
+                <attribute name="filter_domain">[('partner_id.direccion_completa', 'ilike', self)]</attribute>
+            </field>
+        </field>
+    </record>
+
     <record id="view_res_partner_filter_inherit_ivess_partner_custom" model="ir.ui.view">
         <field name="name">res.partner.search.inherit.ivess.partner.custom</field>
         <field name="model">res.partner</field>

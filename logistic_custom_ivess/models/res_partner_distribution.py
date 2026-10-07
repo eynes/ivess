@@ -7,6 +7,7 @@ from odoo.tools import SQL
 from odoo.tools.misc import formatLang
 
 from .delivery_route import _distancia_km
+from .visit_schedule_mixin import WEEKDAY_MAPPING
 
 FREQUENCY_MAPPING = {
     'weekly': 1,
@@ -35,6 +36,26 @@ class PartnerDistributions(models.Model):
         related='distribution.day',
         string='Visit Day',
     )
+    # Para la lista "Clientes por Reparto": reparto y día almacenados (se
+    # agrupa por ellos) y la dirección del cliente como columnas.
+    reparto_id = fields.Many2one(
+        'delivery.route.number',
+        string='Reparto',
+        related='distribution.delivery_number_id',
+        store=True,
+        index=True,
+    )
+    # Mismo dato que visit_day, con claves 1 a 7 para que al ordenar o
+    # agrupar salga lunes, martes... y no por orden alfabético en inglés.
+    dia_visita = fields.Selection(
+        selection=[(str(WEEKDAY_MAPPING[dia] + 1), etiqueta) for dia, etiqueta in DAY_LABELS_ES.items()],
+        string='Día de Visita',
+        compute='_compute_dia_visita',
+        store=True,
+    )
+    partner_street = fields.Char(related='partner_id.street', string='Calle')
+    partner_num = fields.Char(related='partner_id.num', string='Número')
+    partner_city = fields.Char(related='partner_id.city', string='Ciudad')
     frequency = fields.Selection(
         selection=[
             ('weekly', 'Weekly'),
@@ -53,6 +74,12 @@ class PartnerDistributions(models.Model):
         string='Días más cercanos',
         compute='_compute_dias_sugeridos',
     )
+
+    @api.depends('distribution.day')
+    def _compute_dia_visita(self):
+        for rec in self:
+            dia = rec.distribution.day
+            rec.dia_visita = str(WEEKDAY_MAPPING[dia] + 1) if dia else False
 
     @api.depends('partner_id')
     def _compute_reparto_sugerido(self):
