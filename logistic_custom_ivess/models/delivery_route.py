@@ -950,7 +950,7 @@ class DeliveryRouteLine(models.Model):
                 ('state', '!=', 'cancel'),
                 ('partner_id', 'in', visitas.client_id.ids),
                 ('date', 'in', list(set(visitas.mapped('delivery_date')))),
-            ]):
+            ], order='id'):
                 recibos_por_visita[recibo.partner_id.id, recibo.date] |= recibo
         for visita in visitas:
             visita.cobranza_ids = recibos_por_visita[visita.client_id.id, visita.delivery_date]
