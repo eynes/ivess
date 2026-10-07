@@ -1,4 +1,5 @@
 from odoo import _, api, fields, models
+from odoo.addons.logistic_custom_ivess.models.visit_schedule_mixin import WEEKDAY_MAPPING
 from odoo.exceptions import UserError
 from odoo.tools.misc import format_date
 
@@ -73,8 +74,27 @@ class IvessVisitaFueraRuta(models.TransientModel):
 
     def _default_reparto_id(self):
         partner = self.env["res.partner"].browse(self.env.context.get("default_partner_id"))
-        repartos = partner.distributions_ids.distribution.delivery_number_id
-        return repartos if len(repartos) == 1 else False
+        return self._proponer_reparto(partner, fields.Date.context_today(self))
+
+    def _proponer_reparto(self, partner, fecha):
+        """Reparto habitual del cliente. Si tiene más de uno, el que le toca el
+        día de la semana de la fecha o, si ese día no le toca ninguno, el de
+        su día de visita siguiente."""
+        plantillas = partner.distributions_ids.distribution.filtered("delivery_number_id")
+        repartos = plantillas.delivery_number_id
+        if len(repartos) <= 1 or not fecha:
+            return repartos[:1]
+        # No hay empates: un cliente no puede tener dos plantillas el mismo día.
+        return min(
+            plantillas,
+            key=lambda plantilla: (WEEKDAY_MAPPING[plantilla.day] - fecha.weekday()) % 7,
+        ).delivery_number_id
+
+    @api.onchange("fecha")
+    def _onchange_fecha_proponer_reparto(self):
+        # Un reparto ajeno al cliente se eligió a propósito: no se pisa.
+        if not self.reparto_id or self.reparto_id in self._repartos_habituales():
+            self.reparto_id = self._proponer_reparto(self.partner_id, self.fecha)
 
     def _repartos_habituales(self):
         self.ensure_one()
