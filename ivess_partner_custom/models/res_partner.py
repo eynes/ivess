@@ -361,31 +361,6 @@ class ResPartner(models.Model):
                     % partner.codigo_bejerman
                 )
 
-    @api.constrains("regimen_facturacion", "parent_id")
-    def _check_regimen_facturacion_grupo(self):
-        etiquetas = dict(self._fields["regimen_facturacion"].selection)
-        # sudo: el resultado no puede depender de qué compañías ve el usuario.
-        for partner in self.sudo():
-            madres = partner.parent_id | partner.filtered("child_ids")
-            for madre in madres:
-                grupo = (madre | madre.child_ids).filtered("regimen_facturacion")
-                if len(set(grupo.mapped("regimen_facturacion"))) > 1:
-                    detalle = "\n".join(
-                        "- %s: %s"
-                        % (
-                            cuenta.name or cuenta.display_name,
-                            etiquetas[cuenta.regimen_facturacion],
-                        )
-                        for cuenta in grupo
-                    )
-                    raise ValidationError(
-                        _(
-                            "Todas las cuentas del grupo de «%(madre)s» tienen que tener"
-                            " el mismo régimen de facturación. Así quedarían:\n%(detalle)s"
-                        )
-                        % {"madre": madre.display_name, "detalle": detalle}
-                    )
-
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:

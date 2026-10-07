@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Ivess Partner Custom",
-    "version": "19.0.0.0.17",
+    "version": "19.0.0.0.18",
     "description": "",
     "author": "Eynes",
     "category": "Contacts",
