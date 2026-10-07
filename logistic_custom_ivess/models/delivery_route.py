@@ -3,6 +3,7 @@ from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 import logging
 import math
+from collections import defaultdict
 from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
@@ -546,7 +547,8 @@ class DeliveryRouteLine(models.Model):
     client_id = fields.Many2one(
         'res.partner',
         string='Client',
-        required=True
+        required=True,
+        index=True,
     )
     customer_code = fields.Char(
         related="client_id.customer_code",
@@ -614,6 +616,24 @@ class DeliveryRouteLine(models.Model):
     stock_picking_id = fields.Many2one(
         'stock.picking',
         string='Remito Relacionado',
+    )
+    delivery_date = fields.Date(
+        string='Fecha de Visita',
+        related='route_id.delivery_date',
+        store=True,
+    )
+    sale_amount_total = fields.Monetary(
+        string='Importe del Pedido',
+        related='sale_order_id.amount_total',
+        currency_field='sale_currency_id',
+    )
+    sale_currency_id = fields.Many2one(
+        related='sale_order_id.currency_id',
+    )
+    cobranza_ids = fields.Many2many(
+        'account.payment.order',
+        string='Cobranzas',
+        compute='_compute_cobranza_ids',
     )
     origin = fields.Char(
         string='Origen',
@@ -915,6 +935,42 @@ class DeliveryRouteLine(models.Model):
                 rec.requires_reason = rec.visit_status_id.requires_reason
             else:
                 rec.requires_reason = False
+
+    @api.depends('client_id', 'delivery_date')
+    def _compute_cobranza_ids(self):
+        # Minuta del 01/10/2026: la visita no guarda vínculo con el cobro, así
+        # que se muestran los recibos del cliente con la fecha de la visita.
+        Recibo = self.env['account.payment.order']
+        visitas = self.filtered(lambda l: l.client_id and l.delivery_date)
+        (self - visitas).cobranza_ids = False
+        recibos_por_visita = defaultdict(lambda: Recibo)
+        if visitas:
+            for recibo in Recibo.search([
+                ('type', '=', 'receipt'),
+                ('state', '!=', 'cancel'),
+                ('partner_id', 'in', visitas.client_id.ids),
+                ('date', 'in', list(set(visitas.mapped('delivery_date')))),
+            ]):
+                recibos_por_visita[recibo.partner_id.id, recibo.date] |= recibo
+        for visita in visitas:
+            visita.cobranza_ids = recibos_por_visita[visita.client_id.id, visita.delivery_date]
+
+    def action_ver_cobranzas(self):
+        self.ensure_one()
+        recibos = self.cobranza_ids
+        action = self.env['ir.actions.act_window']._for_xml_id(
+            'l10n_ar_eynes.account_customer_payment_order_action')
+        action.update(
+            name=_('Cobranzas'),
+            domain=[('id', 'in', recibos.ids)],
+            context={'default_type': 'receipt', 'default_disable_retentions': True, 'create': False},
+        )
+        if len(recibos) == 1:
+            action.update(
+                res_id=recibos.id,
+                views=[(view_id, tipo) for view_id, tipo in action['views'] if tipo == 'form'],
+            )
+        return action
 
     def _valid_field_parameter(self, field, name):
         return name == 'tracking' or super()._valid_field_parameter(field, name)

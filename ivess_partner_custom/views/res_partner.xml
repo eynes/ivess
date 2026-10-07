@@ -12,6 +12,11 @@
                             string="Pedir visita fuera de ruta"
                             context="{'default_partner_id': id}"
                             invisible="not id"/>
+                    <button name="%(logistic_custom_ivess.action_delivery_route_line_visitas)d"
+                            type="action"
+                            string="Ver visitas"
+                            invisible="not id"
+                            groups="sales_team.group_sale_salesman_all_leads"/>
                     <button name="%(ivess_partner_custom.action_ivess_traspaso_saldo)d"
                             type="action"
                             string="Traspasar saldo y dar de baja"
