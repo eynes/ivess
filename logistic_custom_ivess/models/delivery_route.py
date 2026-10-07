@@ -642,6 +642,12 @@ class DeliveryRouteLine(models.Model):
         string='Fijo',
         help='El ordenamiento por cercanía no mueve esta visita de su lugar.',
     )
+    forzar_rastrillo = fields.Boolean(
+        string='Forzar Rastrillo',
+        copy=False,
+        help='Agrega al cliente al rastrillo de este recorrido aunque no sea'
+        ' cliente importante ni tenga un motivo de no compra de rastrillo.',
+    )
     is_vacation = fields.Boolean(
         string='Vacaciones',
         compute='_compute_is_vacation',
@@ -801,7 +807,7 @@ class DeliveryRouteLine(models.Model):
                 if new_reason and new_reason.id not in partner.category_id.ids:
                     partner.category_id = [(4, new_reason.id)]
 
-        if 'no_purchase_reason_id' in vals:
+        if 'no_purchase_reason_id' in vals or vals.get('forzar_rastrillo'):
             self._handle_rake_line_creation()
 
         if 'client_id' in vals or 'template_route_id' in vals:
@@ -832,12 +838,14 @@ class DeliveryRouteLine(models.Model):
         if self.env.context.get('_creating_rake_line'):
             return
         for rec in self:
-            if (
-                not rec.no_purchase_reason_id
-                or not rec.no_purchase_reason_id.is_rake
-                or not rec.client_id.is_important_client
-                or rec.origin == 'rastrillo'
-            ):
+            if rec.origin == 'rastrillo':
+                continue
+            # Automático: cliente importante con un motivo de no compra de
+            # rastrillo. Forzado (minuta del 01/10/2026): cualquier visita de
+            # un recorrido marcada con "Forzar Rastrillo".
+            automatico = rec.no_purchase_reason_id.is_rake and rec.client_id.is_important_client
+            forzado = rec.forzar_rastrillo and rec.route_id
+            if not (automatico or forzado):
                 continue
             existing = self.search([
                 ('route_id', '=', rec.route_id.id),

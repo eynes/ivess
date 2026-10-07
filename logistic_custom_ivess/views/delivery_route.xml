@@ -56,6 +56,7 @@
                                     <field name="visit_hour_from" widget="float_time" optional="show"/>
                                     <field name="visit_hour_to" widget="float_time" optional="show"/>
                                     <field name="orden_fijo" optional="show" column_invisible="parent.allow_reordering == False"/>
+                                    <field name="forzar_rastrillo" optional="show" readonly="origin == 'rastrillo'"/>
                                     <field name="effective_visit_hour" widget="float_time" optional="show"/>
                                     <field name="sale_order_id" optional="show"/>
                                     <field name="stock_picking_id" optional="show"/>
