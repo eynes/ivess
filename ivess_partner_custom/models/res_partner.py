@@ -163,6 +163,17 @@ class ResPartner(models.Model):
         string="Recibió Saldo de",
         context={"active_test": False},
     )
+    deuda_ventas = fields.Monetary(
+        string="Deuda por Ventas",
+        compute="_compute_deuda_por_tipo",
+        help="Saldo a cobrar de la cuenta que no corresponde a frío/calor.",
+    )
+    deuda_frio_calor = fields.Monetary(
+        string="Deuda por Frío/Calor",
+        compute="_compute_deuda_por_tipo",
+        help="Parte del saldo a cobrar que viene de productos marcados"
+        ' "Es Frío/Calor".',
+    )
     # state_id = fields.Many2one(
     #     required=True,
     # )
@@ -428,6 +439,38 @@ class ResPartner(models.Model):
             ]
         )
         return sum(lines.mapped("balance"))
+
+    def _compute_deuda_por_tipo(self):
+        """Minuta del 01/10/2026 (control de gestión): separa lo que debe la
+        cuenta entre frío/calor y el resto de las ventas. El saldo pendiente
+        de cada factura se reparte según el peso de sus renglones de
+        productos "Es Frío/Calor". Lo que no sale de una factura (saldo
+        inicial, traspasos, anticipos) cuenta como ventas."""
+        # sudo: la ficha la abren usuarios sin acceso a la contabilidad, igual
+        # que con los demás saldos que ya muestra. Por eso se filtra la compañía.
+        pendientes = self.env["account.move.line"].sudo().search(
+            [
+                ("partner_id", "in", self.ids),
+                ("company_id", "in", self.env.companies.ids),
+                ("account_id.account_type", "=", "asset_receivable"),
+                ("parent_state", "=", "posted"),
+                ("reconciled", "=", False),
+            ]
+        )
+        total = defaultdict(float)
+        frio_calor = defaultdict(float)
+        for line in pendientes:
+            total[line.partner_id.id] += line.amount_residual
+            if not line.move_id.is_invoice():
+                continue
+            renglones = line.move_id.invoice_line_ids.filtered(lambda l: l.display_type == "product")
+            importe = sum(renglones.mapped("price_total"))
+            if importe:
+                parte = sum(renglones.filtered(lambda l: l.product_id.is_frio_calor).mapped("price_total"))
+                frio_calor[line.partner_id.id] += line.amount_residual * parte / importe
+        for partner in self:
+            partner.deuda_frio_calor = frio_calor[partner.id]
+            partner.deuda_ventas = total[partner.id] - frio_calor[partner.id]
 
     def _check_madres_sin_hijas_activas(self):
         madres = self.filtered(lambda partner: partner._hijas_activas())

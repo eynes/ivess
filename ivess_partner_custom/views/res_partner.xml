@@ -64,6 +64,8 @@
                     <field name="traspaso_destino_id" invisible="not traspaso_destino_id"/>
                     <field name="traspaso_move_id" invisible="not traspaso_move_id"/>
                     <field name="traspaso_origen_ids" widget="many2many_tags" invisible="not traspaso_origen_ids"/>
+                    <field name="deuda_ventas"/>
+                    <field name="deuda_frio_calor"/>
                 </group>
             </xpath>
         </field>
@@ -121,6 +123,11 @@
             <field name="repartos" position="before">
                 <field name="delivery_street" string="Calle de Entrega" optional="hide"/>
                 <field name="direccion_completa" optional="hide"/>
+            </field>
+            <field name="repartos" position="after">
+                <field name="currency_id" column_invisible="1"/>
+                <field name="deuda_ventas" optional="hide"/>
+                <field name="deuda_frio_calor" optional="hide"/>
             </field>
         </field>
     </record>
