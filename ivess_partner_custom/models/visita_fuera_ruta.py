@@ -35,6 +35,9 @@ class IvessVisitaFueraRuta(models.TransientModel):
     fuera_de_hora = fields.Char(
         compute="_compute_fuera_de_hora",
     )
+    reparto_distinto = fields.Char(
+        compute="_compute_reparto_distinto",
+    )
 
     @api.depends("fecha")
     def _compute_fuera_de_hora(self):
@@ -73,6 +76,26 @@ class IvessVisitaFueraRuta(models.TransientModel):
         repartos = partner.distributions_ids.distribution.delivery_number_id
         return repartos if len(repartos) == 1 else False
 
+    def _repartos_habituales(self):
+        self.ensure_one()
+        return self.partner_id.distributions_ids.distribution.delivery_number_id
+
+    @api.depends("partner_id", "reparto_id")
+    def _compute_reparto_distinto(self):
+        # Minuta del 01/10/2026: mandar la visita por un reparto que no es el
+        # del cliente pide una aceptación aparte y queda en su historial.
+        for wizard in self:
+            habituales = wizard._repartos_habituales()
+            if not wizard.reparto_id or not habituales or wizard.reparto_id in habituales:
+                wizard.reparto_distinto = False
+                continue
+            nombres = ", ".join(habituales.sorted("number").mapped("display_name"))
+            wizard.reparto_distinto = (
+                _("El reparto habitual del cliente es el %(habituales)s y elegiste el %(elegido)s.")
+                if len(habituales) == 1
+                else _("Los repartos habituales del cliente son %(habituales)s y elegiste el %(elegido)s.")
+            ) % {"habituales": nombres, "elegido": wizard.reparto_id.display_name}
+
     @api.depends("fecha", "reparto_id")
     def _compute_route_id(self):
         for wizard in self:
@@ -103,6 +126,10 @@ class IvessVisitaFueraRuta(models.TransientModel):
                 _("%(cliente)s ya está en el recorrido %(recorrido)s.")
                 % {"cliente": self.partner_id.display_name, "recorrido": route.display_name}
             )
+        if self.reparto_distinto and not self.env.context.get("reparto_distinto_aceptado"):
+            raise UserError(
+                _("%s Hay que aceptar el cambio de reparto para agregar la visita.") % self.reparto_distinto
+            )
         self.env["delivery.route.line"].create(
             {
                 "route_id": route.id,
@@ -111,6 +138,21 @@ class IvessVisitaFueraRuta(models.TransientModel):
                 "sequence": max(route.delivery_route_line_ids.mapped("sequence"), default=0) + 1,
             }
         )
+        if self.reparto_distinto:
+            self.partner_id.message_post(
+                body=_(
+                    "Visita fuera de ruta del %(fecha)s asignada al reparto %(elegido)s,"
+                    " que no es su reparto habitual (%(habituales)s). Recorrido: %(recorrido)s."
+                )
+                % {
+                    "fecha": format_date(self.env, self.fecha),
+                    "elegido": self.reparto_id.display_name,
+                    "habituales": ", ".join(
+                        self._repartos_habituales().sorted("number").mapped("display_name")
+                    ),
+                    "recorrido": route.display_name,
+                }
+            )
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
