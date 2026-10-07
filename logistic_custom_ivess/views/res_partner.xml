@@ -107,6 +107,7 @@
                 <sheet>
                     <group>
                         <field name="reparto_sugerido" invisible="not reparto_sugerido" readonly="1" class="text-muted"/>
+                        <field name="dias_sugeridos" invisible="not dias_sugeridos" readonly="1" class="text-muted"/>
                         <field name="distribution"/>
                         <field name="visit_day"/>
                         <field name="frequency" required="1"/>
