@@ -55,8 +55,8 @@
                                     <field name="visit_hour_to" widget="float_time" optional="show"/>
                                     <field name="effective_visit_hour" widget="float_time" optional="show"/>
                                     <field name="delivery_date_hour" optional="show"/>
-                                    <field name="sale_order_id" optional="show"/>
-                                    <field name="stock_picking_id" optional="show"/>
+                                    <field name="sale_order_id" widget="many2one_link" optional="show"/>
+                                    <field name="stock_picking_id" widget="many2one_link" optional="show"/>
                                     <field name="frequency" optional="show"/>
                                     <field name="origin" optional="show"/>
                                     <field name="is_vacation" optional="show" readonly="1"/>
@@ -66,6 +66,7 @@
                                     <field name="longitude" optional="show"/>
                                     <field name="latitude" optional="show"/>
                                     <field name="meters" optional="show"/>
+                                    <field name="app_user" optional="show"/>
                                     <field name="parent_delivery_type" force_save="1" column_invisible="1"/>
                                     <field name="allowed_client" column_invisible="1" force_save="1"/>
                                     <field name="route_id" column_invisible="1"/>

@@ -4,5 +4,11 @@
         <record id="group_ivess_webservice_user" model="res.groups">
             <field name="name">Ivess Webservice User</field>
         </record>
-    </data>    
+    </data>
+
+    <!-- Fuera del noupdate para que se aplique tambien en bases ya instaladas.
+         Crear sale.order exige el grupo de vendedor: hay campos con restriccion
+         de grupo (p.ej. quotation.document) que no se resuelven con ACLs. -->
+    <function model="res.groups" name="write"
+              eval="[[ref('group_ivess_webservice_user')], {'implied_ids': [(4, ref('sales_team.group_sale_salesman'))]}]"/>
 </odoo>

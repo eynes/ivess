@@ -580,9 +580,9 @@ class DeliveryRouteLine(models.Model):
         help="Fecha y hora en que se realizo la visita"
     )
 
-    delivery_hour = fields.Datetime(
-        string="Hora Envio",
-        help="Hora que envia el telefono, por si esta offline.",
+    delivery_date_hour = fields.Datetime(
+        string="Fecha/Hora Envio",
+        help="Fecha y hora que envia el telefono, por si esta offline.",
     )
 
     longitude = fields.Char(
@@ -594,7 +594,13 @@ class DeliveryRouteLine(models.Model):
     )
 
     meters = fields.Char(
-        string="Metros"
+        string="Metros",
+        help="Se establece como -1 en caso de no haber podido ser calculado."
+    )
+
+    app_user = fields.Char(
+        string="Usuario App",
+        help="Usuario de la app que creo/actualizo esta linea."
     )
 
 
