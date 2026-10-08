@@ -336,3 +336,21 @@ class TestAccountSummaryClosingWizard(IvessAccountingSummaryTestCommon):
             )
         )
         self.assertNotEqual(self.invoice_b.status_in_payment, "not_paid")
+
+    def test_button_draft_blocked_on_summarized_move(self):
+        self._make_wizard().action_generate_summary()
+        self.assertTrue(self.invoice_a.x_closed_by_summary_move_id)
+
+        with self.assertRaises(UserError) as error:
+            self.invoice_a.button_draft()
+        self.assertIn("resumido", str(error.exception))
+        self.assertEqual(self.invoice_a.state, "posted")
+
+        # En un lote, uno solo resumido bloquea todo: nada pasa a borrador.
+        with self.assertRaises(UserError):
+            (self.invoice_a | self.invoice_b).button_draft()
+        self.assertEqual(self.invoice_b.state, "posted")
+
+    def test_button_draft_allowed_on_unsummarized_move(self):
+        self.invoice_a.button_draft()
+        self.assertEqual(self.invoice_a.state, "draft")
