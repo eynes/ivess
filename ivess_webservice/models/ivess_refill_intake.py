@@ -91,5 +91,6 @@ class IvessRefillIntake(models.Model):
 
     def _build_ticket_name(self, refill_type, dispatch, to_dispatch):
         if refill_type == "factory":
-            return f"Recarga fabrica - Reparto {dispatch}"
-        return f"Recarga en calle - Reparto {dispatch} -> {to_dispatch}"
+            return self._intake_build_ticket_name(dispatch, "Recarga en fábrica")
+        route = f"{str(dispatch).strip()} → {str(to_dispatch).strip()}"
+        return self._intake_build_ticket_name(route, "Recarga en calle")
