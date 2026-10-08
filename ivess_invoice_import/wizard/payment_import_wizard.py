@@ -112,7 +112,10 @@ class IvessPaymentImportWizard(models.TransientModel):
     _name = "ivess.payment.import.wizard"
     _description = "Importador de cobros de clientes desde archivo Excel"
 
-    file = fields.Binary(string="Archivo (.xlsx)", required=True)
+    # Código de "medio de pago" que identifica efectivo/caja en el Excel.
+    _CASH_MEDIO_PAGO = "1"
+
+    file =fields.Binary(string="Archivo (.xlsx)", required=True)
     filename = fields.Char(string="Nombre de archivo")
     state = fields.Selection(
         [
@@ -257,7 +260,15 @@ class IvessPaymentImportWizard(models.TransientModel):
 
     @staticmethod
     def _to_float(value):
-        return float(str(value).strip())
+        # Los importes de "aguas" vienen como texto con ceros a la izquierda
+        # y coma decimal (ej. "000000028016,00"): si hay coma, es el
+        # separador decimal y los puntos son de miles.
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip()
+        if "," in text:
+            text = text.replace(".", "").replace(",", ".")
+        return float(text)
 
     @staticmethod
     def _to_date(value):
@@ -375,15 +386,32 @@ class IvessPaymentImportWizard(models.TransientModel):
         for mapping in self.env["ivess.payment.import.payment.method.code"].search(
             [("company_id", "=", self.env.company.id)]
         ):
+            # Si es caja no lleva banco ni sucursal: se ignoran aunque el
+            # mapeo los tenga cargados (el onchange del diario los
+            # autocompletaba desde la cuenta bancaria).
+            is_cash = mapping.medio_pago == self._CASH_MEDIO_PAGO
             key = (
                 mapping.medio_pago,
                 mapping.caja,
-                mapping.cod_bco,
-                mapping.sucursal_bco,
+                "" if is_cash else self._norm_bank_code(mapping.cod_bco),
+                "" if is_cash else mapping.sucursal_bco,
             )
             payment_mode_by_key.setdefault(key, mapping.journal_id)
 
-        receipt_journal, receipt_journal_candidates = self._find_receipt_journal()
+        receipt_journal_by_pos = self._find_receipt_journals_by_pos(groups)
+
+        cod_clientes = {g["cod_cliente"] for g in groups if g.get("cod_cliente")}
+        partner_by_bejerman = {}
+        if cod_clientes:
+            for partner in self.env["res.partner"].search(
+                [("codigo_bejerman", "in", list(cod_clientes))]
+            ):
+                partner_by_bejerman[partner.codigo_bejerman] = (
+                    partner_by_bejerman.get(
+                        partner.codigo_bejerman, self.env["res.partner"]
+                    )
+                    | partner
+                )
 
         # detail_results se calcula una sola vez por grupo (resuelve todas
         # las líneas de aplicación contra los caches de arriba) y se
@@ -398,16 +426,21 @@ class IvessPaymentImportWizard(models.TransientModel):
                 group["lines"], invoice_by_ref, payment_mode_by_key
             )
 
+        partner_results = {}
+        for index, group in enumerate(groups):
+            if group.get("error"):
+                continue
+            partner_results[index] = self._resolve_partner(
+                group, detail_results[index][2], partner_by_bejerman
+            )
+
         dedup_keys = set()
         for index, group in enumerate(groups):
             if group.get("error") or group["comprobante_anulado"]:
                 continue
-            _detail_vals, _detail_errors, matched_partners, _applied_total = (
-                detail_results[index]
-            )
-            if len(matched_partners) != 1:
+            partner = partner_results[index][0]
+            if not partner:
                 continue
-            partner = next(iter(matched_partners))
             ref = IvessInvoiceImportWizard._comprobante_ref(
                 group["letra"], group["pto_vta"], group["num_compr"]
             )
@@ -430,9 +463,9 @@ class IvessPaymentImportWizard(models.TransientModel):
                 )
 
         return {
-            "receipt_journal": receipt_journal,
-            "receipt_journal_candidates": receipt_journal_candidates,
+            "receipt_journal_by_pos": receipt_journal_by_pos,
             "detail_results": detail_results,
+            "partner_results": partner_results,
             "orders_by_key": orders_by_key,
         }
 
@@ -480,50 +513,35 @@ class IvessPaymentImportWizard(models.TransientModel):
             group["letra"], group["pto_vta"], group["num_compr"]
         )
 
-        journal = cache["receipt_journal"]
-        journal_candidates = cache["receipt_journal_candidates"]
+        journal, journal_candidates = cache["receipt_journal_by_pos"][group["pto_vta"]]
         if not journal:
             if journal_candidates:
                 errors.append(
                     _(
-                        "Hay %s diarios de tipo 'Recibo de Cobranza' en la"
-                        " compañía; debe haber uno solo para poder"
-                        " determinarlo automáticamente."
+                        "El punto de venta '%(pos)s' coincide con %(count)s"
+                        " diarios de tipo 'Recibo de Cobranza'; debe coincidir"
+                        " con uno solo."
                     )
-                    % journal_candidates
+                    % {"pos": group["pto_vta"], "count": journal_candidates}
                 )
             else:
                 errors.append(
                     _(
-                        "No se encontró ningún diario de tipo 'Recibo de"
-                        " Cobranza' (account.journal type='receipt') en la"
-                        " compañía."
+                        "No se encontró un diario de tipo 'Recibo de Cobranza'"
+                        " (account.journal type='receipt') para el punto de"
+                        " venta '%s'."
                     )
+                    % group["pto_vta"]
                 )
 
-        detail_vals, detail_errors, matched_partners, applied_total = cache[
+        detail_vals, detail_errors, _matched_partners, applied_total = cache[
             "detail_results"
         ][index]
         errors.extend(detail_errors)
 
-        partner = False
-        if not matched_partners:
-            errors.append(
-                _(
-                    "No se pudo determinar el cliente: ninguna factura"
-                    " aplicada pudo resolverse."
-                )
-            )
-        elif len(matched_partners) > 1:
-            errors.append(
-                _(
-                    "El recibo aplica a facturas de más de un cliente"
-                    " distinto (%s); no se puede determinar un único cliente."
-                )
-                % ", ".join(sorted(p.display_name for p in matched_partners))
-            )
-        else:
-            partner = list(matched_partners)[0]
+        partner, partner_error = cache["partner_results"][index]
+        if partner_error:
+            errors.append(partner_error)
 
         if not errors and abs(applied_total - importe_total) > 0.01:
             errors.append(
@@ -566,24 +584,23 @@ class IvessPaymentImportWizard(models.TransientModel):
             "detail_line_ids": detail_vals,
         }
 
-    def _find_receipt_journal(self):
+    def _find_receipt_journals_by_pos(self, groups):
         """Resuelve el diario de Recibo de Cobranza (account.journal con
-        type='receipt') de la compañía activa.
+        type='receipt') de la compañía activa para cada punto de venta
+        distinto del archivo (columna "pto de vta" del recibo).
 
-        A diferencia del diario de ventas de facturas (que sí tiene un
-        diario Odoo distinto por letra + punto de venta AFIP, ver
-        IvessInvoiceImportWizard._find_journal), un recibo de cobranza no
-        es un comprobante autorizado por AFIP: no hay múltiples diarios
-        'receipt' por letra/punto de venta para desambiguar (de hecho
-        account.journal.denomination ni siquiera tiene un valor que
-        represente la letra "X" que usa "aguas" para sus recibos, y el
-        código del diario no tiene por qué tener dígitos de punto de
-        venta). En la práctica hay un único diario 'receipt' por compañía,
-        así que se usa ese directamente. Se resuelve una sola vez por
-        previsualización (no depende de datos de la fila), ver
-        _build_preview_cache.
+        Puede haber más de un diario 'receipt' (uno por punto de venta de
+        cobranza): se matchea el punto de venta contra los dígitos del
+        código del diario o, si no coincide, contra los dígitos de su
+        nombre (mismo criterio que IvessInvoiceImportWizard._find_journal,
+        sin filtrar por letra: account.journal.denomination no tiene un
+        valor que represente la "X" de los recibos de "aguas"). Si ningún
+        diario coincide pero la compañía tiene un único diario 'receipt',
+        se usa ese (comportamiento anterior a la selección por punto de
+        venta). Se resuelve una sola vez por punto de venta distinto.
 
-        :return: tupla (diario o None, cantidad de diarios candidatos).
+        :return: dict pto_vta -> (diario o None, cantidad de diarios
+            candidatos).
         """
         journals = self.env["account.journal"].search(
             [
@@ -591,7 +608,102 @@ class IvessPaymentImportWizard(models.TransientModel):
                 ("company_id", "=", self.env.company.id),
             ]
         )
-        return (journals[0] if len(journals) == 1 else None), len(journals)
+        digits_to_int = IvessInvoiceImportWizard._digits_to_int
+        result = {}
+        for pto_vta in {g["pto_vta"] for g in groups if not g.get("error")}:
+            pos_number = digits_to_int(pto_vta)
+            matches = journals.browse()
+            if pos_number is not None:
+                matches = journals.filtered(
+                    lambda j, pos=pos_number: digits_to_int(j.code) == pos
+                    or digits_to_int(j.name) == pos
+                )
+            if not matches and len(journals) == 1:
+                matches = journals
+            result[pto_vta] = (matches[0] if len(matches) == 1 else None, len(matches))
+        return result
+
+    def _resolve_partner(self, group, matched_partners, partner_by_bejerman):
+        """Resuelve el cliente del recibo.
+
+        Si alguna línea aplica a una factura, el cliente sale de esas
+        facturas (deben ser de un único cliente). Si el recibo no trae
+        facturas asociadas (recibo a cuenta), sale de la columna "cod
+        cliente" contra res.partner.codigo_bejerman.
+
+        :return: tupla (cliente o False, mensaje de error o None).
+        """
+        has_invoice_lines = any(
+            not self._is_on_account_line(line) for line in group["lines"]
+        )
+        if has_invoice_lines:
+            if not matched_partners:
+                return False, _(
+                    "No se pudo determinar el cliente: ninguna factura"
+                    " aplicada pudo resolverse."
+                )
+            if len(matched_partners) > 1:
+                return False, _(
+                    "El recibo aplica a facturas de más de un cliente"
+                    " distinto (%s); no se puede determinar un único cliente."
+                ) % ", ".join(sorted(p.display_name for p in matched_partners))
+            return list(matched_partners)[0], None
+
+        candidates = partner_by_bejerman.get(
+            group["cod_cliente"], self.env["res.partner"]
+        )
+        if len(candidates) == 1:
+            return candidates, None
+        if candidates:
+            return False, _(
+                "El código de cliente '%s' coincide con %s clientes distintos."
+            ) % (group["cod_cliente"], len(candidates))
+        return False, _("No se encontró un cliente con código Bejerman '%s'.") % (
+            group["cod_cliente"]
+        )
+
+    @staticmethod
+    def _is_on_account_line(line):
+        """Línea de recibo sin factura asociada (pago a cuenta)."""
+        return not any(
+            line.get(f)
+            for f in (
+                "tipo_compr_asoc",
+                "letra_asoc",
+                "pto_venta_asoc",
+                "numero_compr_asoc",
+            )
+        )
+
+    @staticmethod
+    def _norm_bank_code(value):
+        """Código de banco sin ceros a la izquierda: el archivo trae '017' y
+        el mapeo puede tener '17' (o al revés)."""
+        return (value or "").strip().lstrip("0")
+
+    @staticmethod
+    def _lookup_payment_mode(payment_mode_by_key, line):
+        """Busca el diario mapeado para (medio de pago, caja, cod bco,
+        sucursal). Si es caja (medio '1') no lleva banco ni sucursal. Para
+        el resto, si no hay mapeo exacto se relaja primero la sucursal y
+        después el código de banco (un mismo mapeo sirve para todos los
+        bancos, ej. cheques de bancos distintos)."""
+        medio_pago = line["medio_pago"]
+        caja = line["caja"]
+        if medio_pago == IvessPaymentImportWizard._CASH_MEDIO_PAGO:
+            return payment_mode_by_key.get((medio_pago, caja, "", ""))
+        cod_bco = IvessPaymentImportWizard._norm_bank_code(line["cod_bco"])
+        for cod_bco_try, sucursal_bco in (
+            (cod_bco, line["sucursal_bco"]),
+            (cod_bco, ""),
+            ("", ""),
+        ):
+            mode = payment_mode_by_key.get(
+                (medio_pago, caja, cod_bco_try, sucursal_bco)
+            )
+            if mode:
+                return mode
+        return None
 
     def _resolve_detail_lines(self, lines, invoice_by_ref, payment_mode_by_key):
         detail_vals = []
@@ -600,20 +712,43 @@ class IvessPaymentImportWizard(models.TransientModel):
         applied_total = 0.0
 
         if not lines:
-            errors.append(_("El recibo no tiene líneas de aplicación a facturas."))
+            errors.append(_("El recibo no tiene líneas."))
             return detail_vals, errors, matched_partners, applied_total
 
         for line in lines:
             line_errors = []
+            on_account = self._is_on_account_line(line)
 
-            try:
-                importe = self._to_float(line["importe"])
-            except (TypeError, ValueError):
-                importe = 0.0
-                line_errors.append(_("Importe inválido: '%s'.") % line["importe"])
+            if on_account:
+                # Recibo sin factura asociada (pago a cuenta): no hay
+                # columna "importe" aplicado, el monto es el del movimiento
+                # (en moneda local).
+                amount_cell = (
+                    line["importe_movimiento_moneda_local"]
+                    if line["importe_movimiento_moneda_local"] is not None
+                    else line["importe_movimiento"]
+                )
+                try:
+                    importe = self._to_float(amount_cell)
+                    if importe <= 0:
+                        raise ValueError
+                    applied_total += importe
+                except (TypeError, ValueError):
+                    importe = 0.0
+                    line_errors.append(
+                        _("El recibo no informa un importe del movimiento válido.")
+                    )
+            else:
+                try:
+                    importe = self._to_float(line["importe"])
+                except (TypeError, ValueError):
+                    importe = 0.0
+                    line_errors.append(_("Importe inválido: '%s'.") % line["importe"])
 
             invoice = self.env["account.move"]
-            if line["tipo_compr_asoc"] != "FC":
+            if on_account:
+                pass
+            elif line["tipo_compr_asoc"] != "FC":
                 line_errors.append(
                     _("tipo de comprobante asociado '%s' no soportado (solo 'FC').")
                     % line["tipo_compr_asoc"]
@@ -654,15 +789,10 @@ class IvessPaymentImportWizard(models.TransientModel):
 
             payment_mode = None
             if line["medio_pago"]:
-                payment_mode = payment_mode_by_key.get(
-                    (
-                        line["medio_pago"],
-                        line["caja"],
-                        line["cod_bco"],
-                        line["sucursal_bco"],
-                    )
-                )
-            if not payment_mode:
+                payment_mode = self._lookup_payment_mode(payment_mode_by_key, line)
+            if not line["medio_pago"]:
+                line_errors.append(_("El recibo no informa medio de pago."))
+            elif not payment_mode:
                 line_errors.append(
                     _(
                         "No hay un diario mapeado para el medio de pago '%s'"
@@ -807,7 +937,18 @@ class IvessPaymentImportWizard(models.TransientModel):
         order.payment_mode_line_ids = [
             (0, 0, vals) for vals in self._prepare_payment_mode_line_vals(result_line)
         ]
-        order.proforma_voucher()
+        result = order.proforma_voucher()
+        # proforma_voucher no lanza ante un error al generar el asiento:
+        # lo captura, deja el recibo en borrador y devuelve un popup.
+        if order.state != "posted":
+            message = (
+                result.get("context", {}).get("message")
+                if isinstance(result, dict)
+                else None
+            )
+            raise UserError(
+                message or _("No se pudo validar el recibo de cobranza.")
+            )
         return order
 
     @staticmethod
@@ -842,6 +983,10 @@ class IvessPaymentImportWizard(models.TransientModel):
         income_vals = []
         for detail in result_line.detail_line_ids:
             invoice = detail.invoice_id
+            if not invoice:
+                # Línea de recibo a cuenta (sin factura): solo aporta su
+                # medio de pago, no hay nada que aplicar.
+                continue
             move_line = invoice.line_ids.filtered(
                 lambda aml: aml.account_id.account_type == "asset_receivable"
                 and not aml.reconciled
