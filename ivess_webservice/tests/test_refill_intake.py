@@ -57,3 +57,26 @@ class TestRefillIntake(IntakeTestCommon):
         )
         self.assertIn("error", result)
         self.assertIn("refill", result["error"])
+
+    def test_factory_ticket_name_has_unified_format(self):
+        result = self.env["ivess.refill.intake"].create_ticket(
+            refill_type="factory",
+            dispatch=str(self.dispatch_number.number),
+            vehicle_location="Av. Mitre 1200, Avellaneda",
+            request="20 bidones 20L",
+        )
+        self.assertEqual(
+            result["ticket_name"], f"Rep. {self.dispatch_number.number} · Recarga en fábrica"
+        )
+
+    def test_street_ticket_name_shows_origin_and_destination(self):
+        result = self.env["ivess.refill.intake"].create_ticket(
+            refill_type="street",
+            dispatch=str(self.dispatch_number.number),
+            to_dispatch=str(self.dispatch_number_2.number),
+            request="Entregado: 15 bidones 20L",
+        )
+        self.assertEqual(
+            result["ticket_name"],
+            f"Rep. {self.dispatch_number.number} → {self.dispatch_number_2.number} · Recarga en calle",
+        )

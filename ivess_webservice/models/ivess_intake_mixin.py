@@ -11,6 +11,8 @@ ATTACHMENT_ALLOWED_MIMETYPES = {
     "image/heic",
     "application/pdf",
 }
+TICKET_NAME_SEPARATOR = " · "
+TICKET_NAME_DETAIL_MAX_LENGTH = 60
 _PATENTE_STRIP_RE = re.compile(r"[\s\-.]")
 
 
@@ -85,6 +87,23 @@ class IvessIntakeMixin(models.AbstractModel):
             "already_registered": True,
             "warnings": [],
         }
+
+    # -- Título del ticket (T16928) ----------------------------------------
+    def _intake_build_ticket_name(self, dispatch, ticket_type, detail="", patente=""):
+        """Arma el título unificado: Rep. <dispatch> · <tipo> · <detalle> · <patente>.
+
+        El reparto se toma crudo, tal como llega en el servicio (sin buscarlo en
+        delivery.route.number). Se omiten las partes vacías y el detalle se
+        corta a 60 caracteres.
+        """
+        dispatch = str(dispatch or "").strip()
+        parts = [
+            f"Rep. {dispatch}" if dispatch else "",
+            ticket_type,
+            str(detail or "").strip()[:TICKET_NAME_DETAIL_MAX_LENGTH],
+            str(patente or "").strip(),
+        ]
+        return TICKET_NAME_SEPARATOR.join(part for part in parts if part)
 
     # -- Equipo helpdesk ---------------------------------------------------
     def _intake_get_team(self, team_type):

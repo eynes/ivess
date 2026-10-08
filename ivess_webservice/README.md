@@ -22,6 +22,13 @@ misma respuesta OK: `{"success": true, "ticket_id": ..., "ticket_name": ...,
 `external_id` (si ya existe un ticket con ese id, no crean nada y devuelven
 `already_registered: true`).
 
+El título del ticket (`name`) se arma igual en todos los servicios, incluido
+el chequeo del chofer: `Rep. <dispatch> · <tipo> · <detalle> · <patente>`, con
+el reparto tal como llega en el servicio (no se busca en
+`delivery.route.number`), las partes vacías omitidas y el detalle cortado a 60
+caracteres. Ej.: `Rep. 45 · Novedad · pierde aceite · AB123CD`,
+`Rep. 45 → 60 · Recarga en calle`.
+
 ### `ivess.workshop.news.intake` — Novedades Taller
 
 `POST /json/2/ivess.workshop.news.intake/create_ticket`
