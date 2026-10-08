@@ -15,14 +15,8 @@ class IrHttp(models.AbstractModel):
             info.update(switcher)
             locked = switcher["company_locked_ids"]
             if locked:
-                # el cliente solo debe conocer las empresas forzadas
-                companies = info["user_companies"]
-                companies["allowed_companies"] = {
-                    cid: dict(
-                        vals, child_ids=[c for c in vals["child_ids"] if c in locked]
-                    )
-                    for cid, vals in companies["allowed_companies"].items()
-                    if cid in locked
-                }
-                companies["current_company"] = locked[0]
+                # No se recorta `allowed_companies`: otros módulos (hr_timesheet,
+                # etc.) lo indexan por cada empresa del usuario. El alcance lo
+                # fuerzan `company_locked_ids` (cliente) y el servidor.
+                info["user_companies"]["current_company"] = locked[0]
         return info

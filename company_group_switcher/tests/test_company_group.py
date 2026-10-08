@@ -101,6 +101,56 @@ class TestCompanyGroup(TransactionCase):
         env = self._env(self.locked_user, [other.id])
         self.assertEqual(set(env.companies.ids), set(self.group.company_ids.ids))
 
+    # --- Endurecimiento: contexto crudo (código que no usa env.companies) ----
+    def test_raw_context_key_is_clamped_for_locked_user(self):
+        """Wizards que leen env.context['allowed_company_ids'] ven solo el alcance."""
+        locked_ids = list(self.locked_user._get_locked_company_ids())
+        env = self._env(self.locked_user, [self.c3.id])
+        self.assertEqual(env.context["allowed_company_ids"], locked_ids)
+        # patrón usado por los wizards de l10n_ar_eynes
+        seen = self.env["res.company"].browse(
+            env.context.get("allowed_company_ids", [])
+        )
+        self.assertEqual(set(seen.ids), set(self.group.company_ids.ids))
+        self.assertNotIn(self.c3, seen)
+
+    def test_raw_context_key_dropped_ids_outside_scope(self):
+        inside = self.group.company_ids[0]
+        env = self._env(self.locked_user, [inside.id, self.c3.id])
+        self.assertEqual(env.context["allowed_company_ids"], [inside.id])
+
+    def test_raw_context_key_injected_when_missing(self):
+        env = self._env(self.locked_user)
+        self.assertEqual(
+            env.context["allowed_company_ids"],
+            list(self.locked_user._get_locked_company_ids()),
+        )
+
+    def test_with_company_inside_scope_is_respected(self):
+        """with_company(B) dentro del grupo sigue funcionando (no se pisa)."""
+        locked_ids = list(self.locked_user._get_locked_company_ids())
+        other = self.env["res.company"].browse(locked_ids[-1])
+        env = self._env(self.locked_user)
+        env = env(context=dict(env.context, allowed_company_ids=[other.id]))
+        self.assertEqual(env.company, other)
+        self.assertEqual(env.companies, other)
+
+    def test_with_company_outside_scope_is_clamped_unless_sudo_first(self):
+        outside = self.c3.id
+        locked_ids = list(self.locked_user._get_locked_company_ids())
+        env = self._env(self.locked_user)
+        # no-sudo: se recorta al alcance
+        clamped = env(context=dict(env.context, allowed_company_ids=[outside]))
+        self.assertEqual(clamped.context["allowed_company_ids"], locked_ids)
+        # sudo primero y recién después la empresa externa: se respeta
+        sudo = env(su=True)
+        sudo = sudo(context=dict(sudo.context, allowed_company_ids=[outside]))
+        self.assertEqual(sudo.companies, self.c3)
+
+    def test_raw_context_untouched_for_free_user(self):
+        env = self._env(self.free_user, [self.c3.id])
+        self.assertEqual(env.context["allowed_company_ids"], [self.c3.id])
+
     def test_free_user_still_validated_by_core(self):
         other = self.env["res.company"].create({"name": "CGS ajena 2"})
         env = self._env(self.partial_user, [other.id])
@@ -125,7 +175,11 @@ class TestCompanyGroup(TransactionCase):
 
     def test_sudo_env_not_affected(self):
         """Operaciones inter-company en sudo mantienen el comportamiento nativo."""
-        env = self._env(self.locked_user, [self.c3.id])(su=True)
+        env = self.env(
+            user=self.locked_user,
+            context={"allowed_company_ids": [self.c3.id]},
+            su=True,
+        )
         self.assertEqual(env.companies, self.c3)
 
     def test_permission_toggle_clears_cache(self):
