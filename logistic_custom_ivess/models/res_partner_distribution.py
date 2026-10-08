@@ -3,6 +3,11 @@ from collections import defaultdict
 
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+from odoo.tools import SQL
+from odoo.tools.misc import formatLang
+
+from .delivery_route import _distancia_km
+from .visit_schedule_mixin import WEEKDAY_MAPPING
 
 FREQUENCY_MAPPING = {
     'weekly': 1,
@@ -31,6 +36,26 @@ class PartnerDistributions(models.Model):
         related='distribution.day',
         string='Visit Day',
     )
+    # Para la lista "Clientes por Reparto": reparto y día almacenados (se
+    # agrupa por ellos) y la dirección del cliente como columnas.
+    reparto_id = fields.Many2one(
+        'delivery.route.number',
+        string='Reparto',
+        related='distribution.delivery_number_id',
+        store=True,
+        index=True,
+    )
+    # Mismo dato que visit_day, con claves 1 a 7 para que al ordenar o
+    # agrupar salga lunes, martes... y no por orden alfabético en inglés.
+    dia_visita = fields.Selection(
+        selection=[(str(WEEKDAY_MAPPING[dia] + 1), etiqueta) for dia, etiqueta in DAY_LABELS_ES.items()],
+        string='Día de Visita',
+        compute='_compute_dia_visita',
+        store=True,
+    )
+    partner_street = fields.Char(related='partner_id.street', string='Calle')
+    partner_num = fields.Char(related='partner_id.num', string='Número')
+    partner_city = fields.Char(related='partner_id.city', string='Ciudad')
     frequency = fields.Selection(
         selection=[
             ('weekly', 'Weekly'),
@@ -41,6 +66,121 @@ class PartnerDistributions(models.Model):
         string='Frequency',
     )
     partner_id = fields.Many2one('res.partner', string='Partner')
+    reparto_sugerido = fields.Char(
+        string='Sugerencia por ubicación',
+        compute='_compute_reparto_sugerido',
+    )
+    dias_sugeridos = fields.Char(
+        string='Días más cercanos',
+        compute='_compute_dias_sugeridos',
+    )
+
+    @api.depends('distribution.day')
+    def _compute_dia_visita(self):
+        for rec in self:
+            dia = rec.distribution.day
+            rec.dia_visita = str(WEEKDAY_MAPPING[dia] + 1) if dia else False
+
+    @api.depends('partner_id')
+    def _compute_reparto_sugerido(self):
+        for rec in self:
+            rec.reparto_sugerido = rec._sugerir_reparto() if not rec._origin.id else False
+
+    @api.depends('partner_id', 'distribution')
+    def _compute_dias_sugeridos(self):
+        for rec in self:
+            rec.dias_sugeridos = rec._sugerir_dias()
+
+    def _sugerir_dias(self):
+        """Minuta del 01/10/2026 (cambio de día): los 3 días del mismo reparto
+        cuyos clientes están más cerca del cliente, sin contar los días en que
+        ya lo visitan. Misma medida que _sugerir_reparto: promedio de las 3
+        distancias más cortas. Es solo un texto de ayuda."""
+        self.ensure_one()
+        partner = self.partner_id
+        reparto = self.distribution.delivery_number_id
+        lat, lon = partner.partner_latitude, partner.partner_longitude
+        if not reparto or not (lat or lon):
+            return False
+        partner_id = partner._origin.id or 0
+        self.env.cr.execute(SQL(
+            """
+            SELECT tdr.id, rp.partner_latitude, rp.partner_longitude
+              FROM delivery_route_line drl
+              JOIN template_delivery_route tdr ON tdr.id = drl.template_route_id
+              JOIN res_partner rp ON rp.id = drl.client_id
+             WHERE drl.route_id IS NULL
+               AND tdr.delivery_number_id = %s
+               AND rp.active
+               AND rp.id != %s
+               AND (rp.partner_latitude != 0 OR rp.partner_longitude != 0)
+               AND tdr.day NOT IN (
+                       SELECT actual.day
+                         FROM partner_distribution pd
+                         JOIN template_delivery_route actual ON actual.id = pd.distribution
+                        WHERE pd.partner_id = %s)
+            """,
+            reparto.id, partner_id, partner_id,
+        ))
+        distancias = defaultdict(list)
+        for plantilla_id, la, lo in self.env.cr.fetchall():
+            distancias[plantilla_id].append(_distancia_km((lat, lon), (la, lo)))
+        if not distancias:
+            return False
+        puntaje = {p: sum(sorted(d)[:3]) / len(d[:3]) for p, d in distancias.items()}
+        plantillas = self.env['template.delivery.route'].browse(sorted(puntaje, key=puntaje.get)[:3])
+        return _('En el reparto %(reparto)s: %(dias)s.') % {
+            'reparto': reparto.display_name,
+            'dias': ', '.join(
+                '%s %s (%s km)' % (
+                    plantilla.name,
+                    DAY_LABELS_ES.get(plantilla.day, plantilla.day).lower(),
+                    formatLang(self.env, puntaje[plantilla.id], digits=1),
+                )
+                for plantilla in plantillas
+            ),
+        }
+
+    def _sugerir_reparto(self):
+        """Reparto cuyos clientes (en las plantillas) están más cerca del cliente:
+        promedio de las 3 distancias más cortas. Es solo un texto de ayuda."""
+        self.ensure_one()
+        partner = self.partner_id
+        lat, lon = partner.partner_latitude, partner.partner_longitude
+        if not (lat or lon):
+            return False
+        filas = []
+        for radio in (0.02, 0.1):  # grados: ~2 km y ~10 km
+            self.env.cr.execute(SQL(
+                """
+                SELECT DISTINCT tdr.delivery_number_id, rp.id, rp.partner_latitude, rp.partner_longitude
+                  FROM delivery_route_line drl
+                  JOIN template_delivery_route tdr ON tdr.id = drl.template_route_id
+                  JOIN res_partner rp ON rp.id = drl.client_id
+                 WHERE drl.route_id IS NULL
+                   AND tdr.delivery_number_id IS NOT NULL
+                   AND rp.active
+                   AND rp.id != %s
+                   AND rp.partner_latitude BETWEEN %s AND %s
+                   AND rp.partner_longitude BETWEEN %s AND %s
+                """,
+                partner._origin.id or 0, lat - radio, lat + radio, lon - radio, lon + radio,
+            ))
+            filas = self.env.cr.fetchall()
+            if filas:
+                break
+        if not filas:
+            return False
+        distancias = defaultdict(list)
+        # DISTINCT: un cliente con varios días de visita cuenta una sola vez.
+        for numero_id, _cliente_id, la, lo in filas:
+            distancias[numero_id].append(_distancia_km((lat, lon), (la, lo)))
+        puntaje = {n: sum(sorted(d)[:3]) / len(sorted(d)[:3]) for n, d in distancias.items()}
+        mejor = min(puntaje, key=puntaje.get)
+        return _('Reparto %(reparto)s: sus clientes más cercanos están a %(km)s km.') % {
+            'reparto': self.env['delivery.route.number'].browse(mejor).display_name,
+            'km': formatLang(self.env, puntaje[mejor], digits=1),
+        }
 
     message_ids = fields.One2many(
         'partner.distribution.message',

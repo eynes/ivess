@@ -72,6 +72,13 @@ class WaterContainer(models.Model):
         string='Envase Improductivo',
         default=False,
     )
+    company_id = fields.Many2one(
+        'res.company',
+        string='Compañía',
+        compute='_compute_company_id',
+        store=True,
+        index=True,
+    )
     count_outgoing_pickings = fields.Integer(
         string='Entregas',
         compute='_compute_picking_counts',
@@ -100,6 +107,17 @@ class WaterContainer(models.Model):
                 if m.picking_id.picking_type_code == 'incoming'
             )
             rec.quantity = qty_out - qty_in
+
+    @api.depends('product_id.company_id', 'frio_calor_picking_id.company_id', 'stock_move_ids.company_id')
+    def _compute_company_id(self):
+        # La del producto; si el producto es compartido, la de la entrega
+        # (o devolución) que dio origen al envase.
+        for rec in self:
+            rec.company_id = (
+                rec.product_id.company_id
+                or rec.frio_calor_picking_id.company_id
+                or rec.stock_move_ids.sorted('id')[:1].company_id
+            )
 
     @api.depends(
         'stock_move_ids',

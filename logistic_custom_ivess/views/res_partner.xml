@@ -66,6 +66,39 @@
         </field>
     </record>
 
+    <record id="view_partner_tree_inherit_logistic" model="ir.ui.view">
+        <field name="name">res.partner.list.inherit.logistic</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <field name="street" position="attributes">
+                <attribute name="optional">show</attribute>
+            </field>
+            <field name="street" position="after">
+                <field name="num" optional="show"/>
+            </field>
+            <field name="city" position="attributes">
+                <attribute name="optional">show</attribute>
+            </field>
+            <field name="city" position="after">
+                <field name="repartos" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_res_partner_filter_inherit_logistic" model="ir.ui.view">
+        <field name="name">res.partner.search.inherit.logistic</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <field name="email" position="before">
+                <field name="street" string="Dirección"
+                       filter_domain="['|', '|', '|', '|', ('street', 'ilike', self), ('street2', 'ilike', self), ('num', 'ilike', self), ('city', 'ilike', self), ('zip', 'ilike', self)]"/>
+                <field name="repartos" string="Reparto"/>
+            </field>
+        </field>
+    </record>
+
     <record id="view_partner_distribution_form" model="ir.ui.view">
         <field name="name">partner.distribution.form</field>
         <field name="model">partner.distribution</field>
@@ -73,6 +106,8 @@
             <form>
                 <sheet>
                     <group>
+                        <field name="reparto_sugerido" invisible="not reparto_sugerido" readonly="1" class="text-muted"/>
+                        <field name="dias_sugeridos" invisible="not dias_sugeridos" readonly="1" class="text-muted"/>
                         <field name="distribution"/>
                         <field name="visit_day"/>
                         <field name="frequency" required="1"/>
@@ -88,6 +123,54 @@
                 </sheet>
             </form>
         </field>
+    </record>
+
+    <!-- Clientes por Reparto: una fila por cliente y día de visita, para
+         buscar una dirección y ver qué repartos y días pasan por ahí. -->
+    <record id="view_partner_distribution_reparto_list" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.list</field>
+        <field name="model">partner.distribution</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <list string="Clientes por Reparto" create="0" edit="0" delete="0" default_order="reparto_id, dia_visita, partner_id">
+                <field name="partner_id" string="Cliente" widget="many2one"/>
+                <field name="partner_street"/>
+                <field name="partner_num"/>
+                <field name="partner_city"/>
+                <field name="reparto_id"/>
+                <field name="dia_visita"/>
+                <field name="distribution" string="Distribución" optional="hide"/>
+                <field name="frequency" string="Frecuencia"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_partner_distribution_reparto_search" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.search</field>
+        <field name="model">partner.distribution</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <search string="Clientes por Reparto">
+                <field name="partner_street" string="Dirección"
+                       filter_domain="['|', '|', '|', '|', ('partner_id.street', 'ilike', self), ('partner_id.street2', 'ilike', self), ('partner_id.num', 'ilike', self), ('partner_id.city', 'ilike', self), ('partner_id.zip', 'ilike', self)]"/>
+                <field name="partner_id" string="Cliente"/>
+                <field name="reparto_id"/>
+                <field name="distribution" string="Distribución"/>
+                <group>
+                    <filter name="group_reparto" string="Reparto" context="{'group_by': 'reparto_id'}"/>
+                    <filter name="group_dia" string="Día de Visita" context="{'group_by': 'dia_visita'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_partner_distribution_reparto" model="ir.actions.act_window">
+        <field name="name">Clientes por Reparto</field>
+        <field name="res_model">partner.distribution</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_partner_distribution_reparto_list"/>
+        <field name="search_view_id" ref="view_partner_distribution_reparto_search"/>
+        <field name="domain">[('distribution', '!=', False), ('partner_id.active', '=', True)]</field>
     </record>
 
 </odoo>

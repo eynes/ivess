@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_ivess_traspaso_saldo_form" model="ir.ui.view">
+        <field name="name">ivess.traspaso.saldo.form</field>
+        <field name="model">ivess.traspaso.saldo</field>
+        <field name="arch" type="xml">
+            <form string="Traspasar saldo y dar de baja">
+                <div class="alert alert-info" role="alert">
+                    El saldo contable de esta cuenta pasa a la cuenta destino con un asiento en el
+                    diario "Traspasos de Saldo", y después la cuenta se archiva.
+                    Las facturas impagas de esta cuenta <b>no se concilian</b>: siguen figurando
+                    como impagas en los reportes de cobranza, aunque su saldo quede en cero.
+                </div>
+                <div class="alert alert-warning" role="alert" invisible="not deuda_en_madre">
+                    Esta cuenta es hija: su deuda se registra en la cuenta madre. Acá solo se
+                    traspasa lo que esté a nombre de esta cuenta.
+                </div>
+                <group>
+                    <field name="origen_id"/>
+                    <field name="saldo"/>
+                    <field name="destino_id" options="{'no_create': True}"/>
+                    <field name="hija_ids" widget="many2many_tags" invisible="not hija_ids"/>
+                    <field name="nueva_madre_id"
+                           invisible="not hija_ids"
+                           required="hija_ids"
+                           options="{'no_create': True, 'no_open': True}"/>
+                    <field name="observacion" placeholder="Por qué se da de baja la cuenta y a dónde va su saldo"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
+                    <field name="deuda_en_madre" invisible="1"/>
+                </group>
+                <footer>
+                    <button name="action_confirmar"
+                            type="object"
+                            string="Traspasar y dar de baja"
+                            class="btn-primary"
+                            confirm="Se genera el asiento de traspaso y la cuenta se archiva. ¿Continuar?"/>
+                    <button string="Cancelar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ivess_traspaso_saldo" model="ir.actions.act_window">
+        <field name="name">Traspasar saldo y dar de baja</field>
+        <field name="res_model">ivess.traspaso.saldo</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

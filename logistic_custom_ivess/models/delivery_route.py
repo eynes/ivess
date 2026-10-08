@@ -2,9 +2,18 @@ from markupsafe import Markup
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 import logging
+import math
+from collections import defaultdict
 from datetime import timedelta
 
 _logger = logging.getLogger(__name__)
+
+
+def _distancia_km(a, b):
+    """Distancia en línea recta (haversine) entre dos (latitud, longitud)."""
+    lat1, lon1, lat2, lon2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    return 2 * 6371 * math.asin(math.sqrt(h))
 
 class DeliveryRoute(models.Model):
     _name = 'delivery.route'
@@ -422,6 +431,80 @@ class DeliveryRoute(models.Model):
             'context': {'default_route_id': self.id},
         }
 
+    def action_ordenar_por_cercania(self):
+        """Reordena las visitas (sequence) por cercanía, a pedido.
+
+        - Las visitas marcadas "Fijo" y las de clientes sin coordenadas no se
+          mueven: conservan su posición.
+        - Las visitas con franja horaria van en el orden de su franja (la franja
+          manda sobre la cercanía, minuta del 24/09/2026).
+        - Las visitas sin franja se ubican entre ellas donde menos desvío
+          agregan y, dentro de cada tramo, por cercanía desde el anterior.
+        No es un optimizador de ruteo: no considera capacidad ni tiempos.
+        """
+        for route in self:
+            if not route.allow_reordering:
+                raise UserError(_('El reparto de este recorrido no permite reordenar las visitas.'))
+            if route.state == 'closed':
+                raise UserError(_('El recorrido está cerrado.'))
+            lines = route.delivery_route_line_ids.sorted(lambda l: (l.sequence, l.id))
+            if len(lines) < 2:
+                continue
+            ubicacion = {
+                line.id: (line.client_id.partner_latitude, line.client_id.partner_longitude)
+                for line in lines
+                if line.client_id.partner_latitude or line.client_id.partner_longitude
+            }
+            quietas = lines.filtered(lambda l: l.orden_fijo or l.id not in ubicacion)
+            movibles = lines - quietas
+            con_franja = movibles.filtered(lambda l: l.visit_hour_from or l.visit_hour_to).sorted(
+                lambda l: (l.visit_hour_from, l.visit_hour_to or 24.0, l.sequence)
+            )
+            sin_franja = movibles - con_franja
+
+            planta = self.env.company.partner_id
+            if planta.partner_latitude or planta.partner_longitude:
+                inicio = (planta.partner_latitude, planta.partner_longitude)
+            else:
+                inicio = ubicacion[movibles[:1].id] if movibles else None
+
+            # Tramos: inicio -> 1ª con franja -> ... -> última con franja -> (fin abierto).
+            puntos = [inicio] + [ubicacion[l.id] for l in con_franja]
+            tramos = [[] for _ in puntos]
+            for line in sin_franja:
+                p = ubicacion[line.id]
+
+                def desvio(i):
+                    a = puntos[i]
+                    if i + 1 < len(puntos):
+                        b = puntos[i + 1]
+                        return _distancia_km(a, p) + _distancia_km(p, b) - _distancia_km(a, b)
+                    return _distancia_km(a, p)
+
+                tramos[min(range(len(puntos)), key=desvio)].append(line)
+
+            orden = []
+            for i, tramo in enumerate(tramos):
+                actual = puntos[i]
+                pendientes = list(tramo)
+                while pendientes:
+                    siguiente = min(pendientes, key=lambda l: _distancia_km(actual, ubicacion[l.id]))
+                    orden.append(siguiente)
+                    pendientes.remove(siguiente)
+                    actual = ubicacion[siguiente.id]
+                if i < len(con_franja):
+                    orden.append(con_franja[i])
+
+            # Las quietas conservan su lugar; el resto ocupa los demás lugares en orden.
+            posiciones_libres = [pos for pos, line in enumerate(lines) if line not in quietas]
+            final = list(lines)
+            for pos, line in zip(posiciones_libres, orden):
+                final[pos] = line
+            for pos, line in enumerate(final, start=1):
+                if line.sequence != pos:
+                    line.sequence = pos
+            route.message_post(body=_('Visitas ordenadas por cercanía (%s fijas o sin ubicación no se movieron).') % len(quietas))
+
     @api.model
     def cron_generate_routes_from_templates(self):
         """Crea rutas automáticamente para cada plantilla activa usando el wizard."""
@@ -464,7 +547,8 @@ class DeliveryRouteLine(models.Model):
     client_id = fields.Many2one(
         'res.partner',
         string='Client',
-        required=True
+        required=True,
+        index=True,
     )
     customer_code = fields.Char(
         related="client_id.customer_code",
@@ -533,8 +617,36 @@ class DeliveryRouteLine(models.Model):
         'stock.picking',
         string='Remito Relacionado',
     )
+    delivery_date = fields.Date(
+        string='Fecha de Visita',
+        related='route_id.delivery_date',
+        store=True,
+    )
+    sale_amount_total = fields.Monetary(
+        string='Importe del Pedido',
+        related='sale_order_id.amount_total',
+        currency_field='sale_currency_id',
+    )
+    sale_currency_id = fields.Many2one(
+        related='sale_order_id.currency_id',
+    )
+    cobranza_ids = fields.Many2many(
+        'account.payment.order',
+        string='Cobranzas',
+        compute='_compute_cobranza_ids',
+    )
     origin = fields.Char(
         string='Origen',
+    )
+    orden_fijo = fields.Boolean(
+        string='Fijo',
+        help='El ordenamiento por cercanía no mueve esta visita de su lugar.',
+    )
+    forzar_rastrillo = fields.Boolean(
+        string='Forzar Rastrillo',
+        copy=False,
+        help='Agrega al cliente al rastrillo de este recorrido aunque no sea'
+        ' cliente importante ni tenga un motivo de no compra de rastrillo.',
     )
     is_vacation = fields.Boolean(
         string='Vacaciones',
@@ -695,7 +807,7 @@ class DeliveryRouteLine(models.Model):
                 if new_reason and new_reason.id not in partner.category_id.ids:
                     partner.category_id = [(4, new_reason.id)]
 
-        if 'no_purchase_reason_id' in vals:
+        if 'no_purchase_reason_id' in vals or vals.get('forzar_rastrillo'):
             self._handle_rake_line_creation()
 
         if 'client_id' in vals or 'template_route_id' in vals:
@@ -726,12 +838,14 @@ class DeliveryRouteLine(models.Model):
         if self.env.context.get('_creating_rake_line'):
             return
         for rec in self:
-            if (
-                not rec.no_purchase_reason_id
-                or not rec.no_purchase_reason_id.is_rake
-                or not rec.client_id.is_important_client
-                or rec.origin == 'rastrillo'
-            ):
+            if rec.origin == 'rastrillo':
+                continue
+            # Automático: cliente importante con un motivo de no compra de
+            # rastrillo. Forzado (minuta del 01/10/2026): cualquier visita de
+            # un recorrido marcada con "Forzar Rastrillo".
+            automatico = rec.no_purchase_reason_id.is_rake and rec.client_id.is_important_client
+            forzado = rec.forzar_rastrillo and rec.route_id
+            if not (automatico or forzado):
                 continue
             existing = self.search([
                 ('route_id', '=', rec.route_id.id),
@@ -829,6 +943,42 @@ class DeliveryRouteLine(models.Model):
                 rec.requires_reason = rec.visit_status_id.requires_reason
             else:
                 rec.requires_reason = False
+
+    @api.depends('client_id', 'delivery_date')
+    def _compute_cobranza_ids(self):
+        # Minuta del 01/10/2026: la visita no guarda vínculo con el cobro, así
+        # que se muestran los recibos del cliente con la fecha de la visita.
+        Recibo = self.env['account.payment.order']
+        visitas = self.filtered(lambda l: l.client_id and l.delivery_date)
+        (self - visitas).cobranza_ids = False
+        recibos_por_visita = defaultdict(lambda: Recibo)
+        if visitas:
+            for recibo in Recibo.search([
+                ('type', '=', 'receipt'),
+                ('state', '!=', 'cancel'),
+                ('partner_id', 'in', visitas.client_id.ids),
+                ('date', 'in', list(set(visitas.mapped('delivery_date')))),
+            ], order='id'):
+                recibos_por_visita[recibo.partner_id.id, recibo.date] |= recibo
+        for visita in visitas:
+            visita.cobranza_ids = recibos_por_visita[visita.client_id.id, visita.delivery_date]
+
+    def action_ver_cobranzas(self):
+        self.ensure_one()
+        recibos = self.cobranza_ids
+        action = self.env['ir.actions.act_window']._for_xml_id(
+            'l10n_ar_eynes.account_customer_payment_order_action')
+        action.update(
+            name=_('Cobranzas'),
+            domain=[('id', 'in', recibos.ids)],
+            context={'default_type': 'receipt', 'default_disable_retentions': True, 'create': False},
+        )
+        if len(recibos) == 1:
+            action.update(
+                res_id=recibos.id,
+                views=[(view_id, tipo) for view_id, tipo in action['views'] if tipo == 'form'],
+            )
+        return action
 
     def _valid_field_parameter(self, field, name):
         return name == 'tracking' or super()._valid_field_parameter(field, name)
