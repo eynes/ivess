@@ -10,6 +10,12 @@
             sequence="10"
             action="action_delivery_route" />
 
+      <menuitem id="menu_partner_distribution_reparto"
+            name="Clientes por Reparto"
+            parent="menu_delivery_route_root"
+            sequence="20"
+            action="action_partner_distribution_reparto" />
+
       <!--<menuitem id="menu_fleet_truck_root"
             name="Fleet Trucks"
             parent="sale.menu_sale_config"

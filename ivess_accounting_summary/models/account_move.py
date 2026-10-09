@@ -1,4 +1,5 @@
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class AccountMove(models.Model):
@@ -64,6 +65,30 @@ class AccountMove(models.Model):
             ("x_closed_by_summary_move_id", "=", self.id),
             ("line_ids.x_summary_move_id", "=", self.id),
         ]
+
+    def _ivess_is_summarized(self):
+        """True si el comprobante ya fue absorbido por un Cierre Mensual."""
+        self.ensure_one()
+        return bool(
+            self.x_closed_by_summary_move_id
+            or self.line_ids.filtered("x_summary_move_id")
+        )
+
+    def button_draft(self):
+        # Volver a borrador un comprobante ya resumido dejaría el neteo
+        # operativo y el asiento legal apuntando a un comprobante editable,
+        # con la deuda duplicada o perdida entre ambos diarios.
+        summarized = self.filtered(lambda move: move._ivess_is_summarized())
+        if summarized:
+            raise UserError(
+                _(
+                    "No se puede volver a borrador: el asiento se encuentra "
+                    "resumido por un Cierre Mensual (Contabilidad "
+                    "Resumida).\n\nAsientos: %s",
+                    ", ".join(summarized.mapped("display_name")),
+                )
+            )
+        return super().button_draft()
 
     def action_view_summarized_moves(self):
         self.ensure_one()

@@ -81,7 +81,9 @@ class IvessAccidentIntake(models.Model):
         third_party_plate = self._intake_normalize_patente(kwargs["third_party_patente"])
 
         vals = {
-            "name": f"Siniestro - {patente} - {accident_date.strftime('%d/%m/%Y')}",
+            "name": self._intake_build_ticket_name(
+                kwargs["dispatch"], "Siniestro", accident_date.strftime("%d/%m/%Y"), patente
+            ),
             "team_id": team.id,
             "ticket_source": "other",
             "partner_phone": kwargs.get("partner_phone", ""),

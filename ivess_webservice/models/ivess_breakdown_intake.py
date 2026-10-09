@@ -58,7 +58,9 @@ class IvessBreakdownIntake(models.Model):
         dispatch_route = self._intake_resolve_dispatch(values["dispatch"])
 
         vals = {
-            "name": f"Auxilio - {values['breakdown_reason']} - {values['patente']}",
+            "name": self._intake_build_ticket_name(
+                values["dispatch"], "Auxilio", values["breakdown_reason"], values["patente"]
+            ),
             "team_id": team.id,
             "ticket_source": "other",
             "partner_phone": kwargs.get("partner_phone", ""),

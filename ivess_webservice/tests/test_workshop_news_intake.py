@@ -95,3 +95,26 @@ class TestWorkshopNewsIntake(IntakeTestCommon):
         ticket = self.env["helpdesk.ticket"].browse(result["ticket_id"])
         self.assertNotIn("<script>", ticket.intake_payload)
         self.assertIn("&lt;script&gt;", ticket.intake_payload)
+
+    def test_ticket_name_has_unified_format(self):
+        payload = self._base_payload(observations="pierde aceite")
+        result = self.env["ivess.workshop.news.intake"].create_ticket(**payload)
+        self.assertEqual(
+            result["ticket_name"],
+            f"Rep. {self.dispatch_number.number} · Novedad · pierde aceite · {self.plate}",
+        )
+
+    def test_ticket_name_detail_is_cut_to_60_characters(self):
+        payload = self._base_payload(observations="x" * 100)
+        result = self.env["ivess.workshop.news.intake"].create_ticket(**payload)
+        self.assertEqual(
+            result["ticket_name"],
+            f"Rep. {self.dispatch_number.number} · Novedad · {'x' * 60} · {self.plate}",
+        )
+
+    def test_ticket_name_uses_raw_dispatch_even_if_route_does_not_exist(self):
+        payload = self._base_payload(dispatch="987654", observations="pierde aceite")
+        result = self.env["ivess.workshop.news.intake"].create_ticket(**payload)
+        self.assertEqual(
+            result["ticket_name"], f"Rep. 987654 · Novedad · pierde aceite · {self.plate}"
+        )
