@@ -69,7 +69,7 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
                 JOIN delivery_route_number drn ON drn.id = dr.delivery_number_id
             )
         """.format(table=self._table))
-    
+
     @api.model
     def get_delivery_and_assigned_route_report(self, **kwargs):
         allowed_params = {"distribution"}
@@ -95,11 +95,13 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
         if not delivery:
             return {"error": "No existe un reparto con el código '%s'." % distribution}
 
-        templates = self.env['template.delivery.route'].search([('delivery_number_id', '=', delivery.id)])
+        route = delivery._get_target_route()
+        if not route:
+            return {"error": "No hay un recorrido vigente para la distribución '%s'." % distribution}
 
-        records = self.search([('template_delivery_route_id', 'in', templates.ids)])
+        records = self.search([('route_id', '=', route.id)])
         if not records:
-            return {"error": "No hay rutas/clientes asignados para la distribución '%s'." % distribution}
+            return {"error": "No hay clientes asignados al recorrido vigente de la distribución '%s'." % distribution}
 
         delivery_number_fields = [
             'delivery_number_id',
@@ -136,27 +138,35 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             'logistic_custom_ivess.minutos_x_convertir_factura', default=0.0
         ))
 
-        unwrap_fields = {'delivery_number_id', 'route_id', 'partner_id'}
+        # campos m2o que queremos devolver como solo el id
+        unwrap_fields = {'delivery_number_id', 'route_id', 'partner_id', 'template_delivery_route_id'}
 
-        routes_by_id = {}
-        result = []
+        def _value(rec, field):
+            value = rec[field]
+            if field in unwrap_fields:
+                return value[0] if value else False
+            return value
+
+        # Reparto y recorrido son iguales en todas las filas: se leen de la primera
+        route_and_distribution_fields = raw_records[0]
+
+        result = {}
+        for field in delivery_number_fields:
+            result[field] = _value(route_and_distribution_fields, field)
+
+        result['minutos_x_convertir_factura'] = minutos_x_convertir_factura
+
+        for field in route_fields:
+            result[field] = _value(route_and_distribution_fields, field)
+
+        # Una entrada por cada delivery.route.line del recorrido
+        clients = []
         for rec in raw_records:
-            route_id = rec['route_id'][0] if rec['route_id'] else False
-            if route_id not in routes_by_id:
-                route_data = {'minutos_x_convertir_factura': minutos_x_convertir_factura}
-                for field in delivery_number_fields + route_fields:
-                    value = rec[field]
-                    if field in unwrap_fields:
-                        value = value[0] if value else False
-                    route_data[field] = value
-                route_data['clients'] = []
-                routes_by_id[route_id] = route_data
-                result.append(route_data)
+            client = {}
+            for field in client_fields:
+                client[field] = _value(rec, field)
+            clients.append(client)
 
-            routes_by_id[route_id]['clients'].append({
-                field: (rec[field][0] if rec[field] else False) if field in unwrap_fields else rec[field]
-                for field in client_fields
-            })
-
+        result['clients'] = clients
         return result
 
