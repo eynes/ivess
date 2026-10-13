@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="journal_ledger_wizard_form_ivess" model="ir.ui.view">
+        <field name="name">journal.ledger.report.wizard.form.ivess</field>
+        <field name="model">journal.ledger.report.wizard</field>
+        <field name="inherit_id" ref="account_financial_report.journal_ledger_wizard" />
+        <field name="arch" type="xml">
+            <field name="with_auto_sequence" position="after">
+                <field name="hide_partner" />
+                <field name="only_summary_entries" />
+            </field>
+        </field>
+    </record>
+</odoo>
