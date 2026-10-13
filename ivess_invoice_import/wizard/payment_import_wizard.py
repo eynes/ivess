@@ -3,8 +3,15 @@ import csv
 import io
 from datetime import datetime
 
-from odoo import _, fields, models
+import logging
+import threading
+
+import psycopg2
+
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.modules.registry import Registry
+from odoo.service.server import cron_database_list
 
 from .invoice_import_wizard import IvessInvoiceImportWizard
 
@@ -12,6 +19,7 @@ try:
     import openpyxl
 except ImportError:  # pragma: no cover
     openpyxl = None
+_logger = logging.getLogger(__name__)
 
 # La hoja "cobranzas" del formato "aguas" repite el header "letra" (y varias
 # columnas más) en dos posiciones distintas (la del recibo y la de la
@@ -121,10 +129,23 @@ class IvessPaymentImportWizard(models.TransientModel):
         [
             ("upload", "Subir archivo"),
             ("preview", "Previsualización"),
+            ("processing", "Procesando"),
+            ("interrupted", "Interrumpida"),
             ("done", "Resultado"),
         ],
         default="upload",
     )
+    progress_total = fields.Integer(string="Recibos a procesar", readonly=True)
+    progress_done = fields.Integer(string="Recibos procesados", readonly=True)
+    last_heartbeat = fields.Datetime(
+        string="Última señal de vida",
+        readonly=True,
+        help="Última vez que el proceso en segundo plano informó su avance.",
+    )
+    is_stalled = fields.Boolean(
+        string="Sin señal de vida", compute="_compute_is_stalled"
+    )
+    process_error = fields.Text(string="Error del proceso", readonly=True)
     result_line_ids = fields.One2many(
         "ivess.payment.import.result.line",
         "wizard_id",
@@ -234,13 +255,29 @@ class IvessPaymentImportWizard(models.TransientModel):
         return buffer.getvalue().encode("utf-8-sig")
 
     def _reopen(self):
-        return {
+        action = {
             "type": "ir.actions.act_window",
             "res_model": self._name,
             "res_id": self.id,
             "view_mode": "form",
             "target": "new",
         }
+        if self.state == "processing":
+            # Vista liviana, sin la lista de recibos: la barra de progreso
+            # la recarga cada pocos segundos.
+            view = self.env.ref(
+                "ivess_invoice_import.view_ivess_payment_import_wizard_progress"
+            )
+            action["views"] = [(view.id, "form")]
+        return action
+
+    def action_reopen(self):
+        """Lo llama la barra de progreso cuando la carga terminó o se
+        interrumpió, para volver a la vista completa."""
+        self.ensure_one()
+        if self.is_stalled:
+            self.state = "interrupted"
+        return self._reopen()
 
     # ------------------------------------------------------------------
     # Lectura y parseo del Excel
@@ -390,11 +427,13 @@ class IvessPaymentImportWizard(models.TransientModel):
             # mapeo los tenga cargados (el onchange del diario los
             # autocompletaba desde la cuenta bancaria).
             is_cash = mapping.medio_pago == self._CASH_MEDIO_PAGO
+            # Los campos Char vacíos se guardan como NULL (False): se
+            # normalizan a '' para que la clave coincida con la del archivo.
             key = (
                 mapping.medio_pago,
-                mapping.caja,
+                mapping.caja or "",
                 "" if is_cash else self._norm_bank_code(mapping.cod_bco),
-                "" if is_cash else mapping.sucursal_bco,
+                "" if is_cash else (mapping.sucursal_bco or ""),
             )
             payment_mode_by_key.setdefault(key, mapping.journal_id)
 
@@ -403,8 +442,15 @@ class IvessPaymentImportWizard(models.TransientModel):
         cod_clientes = {g["cod_cliente"] for g in groups if g.get("cod_cliente")}
         partner_by_bejerman = {}
         if cod_clientes:
+            # Solo clientes de la compañía activa (o compartidos): un
+            # cliente de otra compañía no se puede usar en el recibo.
             for partner in self.env["res.partner"].search(
-                [("codigo_bejerman", "in", list(cod_clientes))]
+                [
+                    ("codigo_bejerman", "in", list(cod_clientes)),
+                    "|",
+                    ("company_id", "=", False),
+                    ("company_id", "=", self.env.company.id),
+                ]
             ):
                 partner_by_bejerman[partner.codigo_bejerman] = (
                     partner_by_bejerman.get(
@@ -534,6 +580,11 @@ class IvessPaymentImportWizard(models.TransientModel):
                     % group["pto_vta"]
                 )
 
+        if journal and not group["comprobante_anulado"]:
+            period_error = self._check_journal_period(journal, fecha)
+            if period_error:
+                errors.append(period_error)
+
         detail_vals, detail_errors, _matched_partners, applied_total = cache[
             "detail_results"
         ][index]
@@ -546,8 +597,8 @@ class IvessPaymentImportWizard(models.TransientModel):
         if not errors and abs(applied_total - importe_total) > 0.01:
             errors.append(
                 _(
-                    "La suma de los importes aplicados a facturas (%.2f) no"
-                    " coincide con el importe total del recibo (%.2f)."
+                    "La suma de los importes del recibo (%.2f) no coincide con"
+                    " el importe total del recibo (%.2f)."
                 )
                 % (applied_total, importe_total)
             )
@@ -622,6 +673,68 @@ class IvessPaymentImportWizard(models.TransientModel):
                 matches = journals
             result[pto_vta] = (matches[0] if len(matches) == 1 else None, len(matches))
         return result
+
+    def _check_journal_period(self, journal, fecha):
+        """Replica la validación de ivess_validate_period.account.move._post
+        (si ese módulo está instalado) para avisar en la previsualización y
+        no recién al confirmar: allí, ante un período inválido, el módulo
+        hace un commit() antes de lanzar el error, lo que deja el recibo a
+        medio crear y destruye el savepoint de cada recibo.
+
+        :return: mensaje de error o None.
+        """
+        if not hasattr(self.env["account.move"], "_validate_period"):
+            return None
+        if not journal.due_date:
+            return _(
+                "El diario '%s' no tiene fecha de cierre establecida"
+                " (configurar en Contabilidad > Diarios > Actualizar períodos"
+                " de diarios)."
+            ) % (journal.display_name)
+        if fecha and fecha < journal.due_date:
+            return _(
+                "La fecha del recibo (%s) es anterior a la fecha de cierre"
+                " del diario '%s' (%s)."
+            ) % (
+                fecha.strftime("%d-%m-%Y"),
+                journal.display_name,
+                journal.due_date.strftime("%d-%m-%Y"),
+            )
+        return None
+
+    def _recover_failed_receipt(self, result_lines):
+        """Limpia lo que pudo quedar de uno o más recibos que fallaron
+        después de que algún módulo hiciera commit() dentro de la
+        transacción (ver _check_journal_period): rollback de la transacción
+        abortada y baja de los recibos/asientos en borrador que ese commit
+        dejó guardados."""
+        self.env.cr.rollback()
+        self.env.invalidate_all()
+        references = result_lines.mapped("comprobante_ref")
+        leftovers = self.env["account.payment.order"].search(
+            [
+                ("type", "=", "receipt"),
+                ("state", "=", "draft"),
+                ("reference", "in", references),
+                ("partner_id", "in", result_lines.partner_id.ids),
+            ]
+        )
+        if leftovers:
+            leftovers.cancel_voucher()
+            leftovers.unlink()
+        # El asiento en borrador también quedó guardado por el commit, pero
+        # puede no estar enlazado todavía al recibo (move_id no se escribió).
+        draft_moves = self.env["account.move"].search(
+            [
+                ("move_type", "=", "entry"),
+                ("state", "=", "draft"),
+                ("ref", "in", references),
+                ("journal_id", "in", result_lines.journal_id.ids),
+            ]
+        )
+        if draft_moves:
+            draft_moves.with_context(force_delete=True).unlink()
+        self.env.cr.commit()  # pylint: disable=invalid-commit
 
     def _resolve_partner(self, group, matched_partners, partner_by_bejerman):
         """Resuelve el cliente del recibo.
@@ -861,82 +974,397 @@ class IvessPaymentImportWizard(models.TransientModel):
     # action_confirm): mismo criterio que
     # IvessInvoiceImportWizard._CONFIRM_CHUNK_SIZE, para que un import largo
     # no dependa de una única transacción gigante.
-    _CONFIRM_COMMIT_EVERY = 200
+    # Segundos sin señal de vida a partir de los cuales una carga en proceso
+    # se considera interrumpida (servidor caído o reiniciado): hay que volver
+    # a empezar la carga. Cada lote informa su avance cada pocos segundos.
+    _STALL_SECONDS = 120
+
+    @api.depends("state", "last_heartbeat")
+    def _compute_is_stalled(self):
+        now = fields.Datetime.now()
+        for wizard in self:
+            wizard.is_stalled = bool(
+                wizard.state == "processing"
+                and wizard.last_heartbeat
+                and (now - wizard.last_heartbeat).total_seconds()
+                > self._STALL_SECONDS
+            )
+
+    # Cantidad de recibos a cuenta (sin facturas) que se crean y postean
+    # juntos, ver _confirm_batch. 0 desactiva el modo por lotes y cada
+    # recibo se procesa de a uno, como siempre.
+    _CONFIRM_BATCH_SIZE = 200
 
     def action_confirm(self):
+        """Deja la importación lista y la delega al cron: la petición no
+        espera a que se creen los recibos (puede tardar varios minutos), la
+        pantalla muestra una barra de progreso y la carga no se cuelga."""
         self.ensure_one()
-        # Ver IvessInvoiceImportWizard.action_confirm: tracking_disable evita
-        # el overhead de chatter de mail.thread en cada create()/write(), que
-        # no aporta nada en una importación histórica.
-        self = self.with_context(tracking_disable=True)
-        processed = 0
+        if self.state != "preview":
+            raise UserError(_("La importación ya fue confirmada."))
+        pending = self.env["ivess.payment.import.result.line"]
         for result_line in self.result_line_ids:
             if result_line.has_error:
                 result_line.resultado = "error"
-                continue
-            if result_line.comprobante_anulado:
+            elif result_line.comprobante_anulado:
                 # Un recibo anulado en el sistema origen nunca llegó a
                 # cobrarse: a diferencia de una factura anulada (que sí tuvo
                 # CAE y debe registrarse y cancelarse para no perder
                 # numeración), acá no hay nada que registrar en Odoo.
                 result_line.resultado = "skipped"
-                continue
-            try:
-                with self.env.cr.savepoint():
-                    payment_order = self._create_payment_order(result_line)
-                result_line.write(
-                    {"resultado": "ok", "odoo_payment_order_id": payment_order.id}
-                )
-            except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001
-                result_line.write(
-                    {
-                        "resultado": "error",
-                        "has_error": True,
-                        "error_message": _("Error al crear el cobro: %s") % exc,
-                    }
-                )
-            processed += 1
-            if processed % self._CONFIRM_COMMIT_EVERY == 0:
-                # Confirma en tandas en vez de dejar TODO el import en una
-                # sola transacción: si el proceso se corta a mitad de camino
-                # (timeout, reinicio), lo ya procesado queda guardado (ver
-                # el mismo comentario, con más detalle, en
-                # IvessInvoiceImportWizard.action_confirm).
-                # pylint: disable=invalid-commit
-                self.env.cr.commit()
-
-        self.ok_count = len(
-            self.result_line_ids.filtered(lambda r: r.resultado == "ok")
-        )
-        self.error_count = len(
-            self.result_line_ids.filtered(lambda r: r.resultado == "error")
-        )
-        self.skipped_count = len(
-            self.result_line_ids.filtered(lambda r: r.resultado == "skipped")
-        )
-        self.state = "done"
-        return self._reopen()
-
-    def _create_payment_order(self, result_line):
-        company = result_line.journal_id.company_id
-        order = self.env["account.payment.order"].create(
+            else:
+                pending |= result_line
+        self.write(
             {
-                "partner_id": result_line.partner_id.id,
-                "journal_id": result_line.journal_id.id,
-                "type": "receipt",
-                "company_id": company.id,
-                "date": result_line.fecha,
-                "reference": result_line.comprobante_ref,
-                "name": result_line.comprobante_ref,
-                "disable_retentions": True,
+                "state": "processing",
+                "progress_total": len(pending),
+                "progress_done": 0,
+                "last_heartbeat": fields.Datetime.now(),
+                "process_error": False,
             }
         )
-        order.income_line_ids = [
-            (0, 0, vals) for vals in self._prepare_income_line_vals(order, result_line)
-        ]
-        order.payment_mode_line_ids = [
-            (0, 0, vals) for vals in self._prepare_payment_mode_line_vals(result_line)
-        ]
+        # El cron lee el wizard desde otra transacción: debe estar guardado
+        # antes de dispararlo.
+        self.env.cr.commit()  # pylint: disable=invalid-commit
+        self._launch_processing()
+        return self._reopen()
+
+    def _launch_processing(self):
+        """Arranca el procesamiento en segundo plano.
+
+        Si el cron de Odoo atiende esta base (en producción, con una única
+        base configurada), se dispara el cron. Si no (por ejemplo con una
+        base restaurada para pruebas cuando el servidor se levantó con
+        db_name fijo, el cron solo corre para esa base), se procesa en un
+        hilo del propio servidor.
+        """
+        self.ensure_one()
+        dbname = self.env.cr.dbname
+        if dbname in cron_database_list():
+            self.env.ref("ivess_invoice_import.ir_cron_payment_import")._trigger()
+            return
+        threading.Thread(
+            target=self._process_in_thread,
+            args=(dbname, self.id),
+            name="ivess-payment-import-%s" % self.id,
+            daemon=True,
+        ).start()
+
+    @api.model
+    def _process_in_thread(self, dbname, wizard_id):
+        try:
+            with Registry(dbname).cursor() as cr:
+                env = api.Environment(cr, api.SUPERUSER_ID, {})
+                env["ivess.payment.import.wizard"].browse(wizard_id)._run_pending()
+        except Exception:  # pylint: disable=broad-except # noqa: BLE001
+            _logger.exception(
+                "Importación de cobros %s: falló el proceso en segundo plano",
+                wizard_id,
+            )
+
+    @api.model
+    def _cron_process_pending(self):
+        """Cron: procesa las importaciones confirmadas.
+
+        Una carga que quedó "procesando" pero sin señal de vida (el servidor
+        se cayó o se reinició a mitad de camino) NO se reanuda: se marca
+        como interrumpida y hay que volver a empezar la carga. Lo que ya se
+        creó no se duplica: la previsualización lo detecta como "Ya existe".
+        """
+        for wizard in self.search([("state", "=", "processing")]):
+            wizard._run_pending()
+
+    def _run_pending(self):
+        """Procesa una importación confirmada (desde el cron o desde el hilo
+        en segundo plano). No reanuda una carga interrumpida."""
+        self.ensure_one()
+        if self.state != "processing":
+            return
+        if self.is_stalled:
+            self.state = "interrupted"
+            self._notify_user(
+                _(
+                    "La importación se interrumpió (el servidor dejó de"
+                    " responder). Volvé a empezar la carga."
+                ),
+                "danger",
+            )
+            self.env.cr.commit()  # pylint: disable=invalid-commit
+            return
+        # Se procesa con el usuario que confirmó la importación (autor y
+        # permisos de los recibos, igual que cuando se hacía en la misma
+        # petición).
+        wizard = self.with_user(self.create_uid)
+        try:
+            wizard._process_confirm()
+        except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001
+            self.env.cr.rollback()
+            self.env.invalidate_all()
+            wizard = self.browse(self.id)
+            wizard.write({"state": "interrupted", "process_error": str(exc)})
+            wizard._notify_user(
+                _("La importación se interrumpió por un error: %s") % exc,
+                "danger",
+            )
+            self.env.cr.commit()  # pylint: disable=invalid-commit
+
+    def _process_confirm(self):
+        self.ensure_one()
+        # Ver IvessInvoiceImportWizard.action_confirm: tracking_disable evita
+        # el overhead de chatter de mail.thread en cada create()/write(), que
+        # no aporta nada en una importación histórica. mail_create_nolog y
+        # mail_create_nosubscribe evitan además el mensaje de creación y los
+        # seguidores de cada recibo/asiento.
+        self = self.with_context(
+            tracking_disable=True,
+            mail_create_nolog=True,
+            mail_create_nosubscribe=True,
+            mail_auto_subscribe_no_notify=True,
+        )
+        done = 0
+        pending_singles = 0
+        batch = self.env["ivess.payment.import.result.line"]
+        for result_line in self.result_line_ids.filtered(
+            lambda r: r.resultado == "pending"
+        ):
+            if self._CONFIRM_BATCH_SIZE and self._is_batchable(result_line):
+                batch |= result_line
+                if len(batch) >= self._CONFIRM_BATCH_SIZE:
+                    self._confirm_batch(batch)
+                    done += len(batch)
+                    batch = self.env["ivess.payment.import.result.line"]
+                    self._report_progress(done)
+                continue
+            self._confirm_one(result_line)
+            done += 1
+            pending_singles += 1
+            if pending_singles >= self._PROGRESS_EVERY:
+                pending_singles = 0
+                self._report_progress(done)
+        if batch:
+            self._confirm_batch(batch)
+            done += len(batch)
+
+        self.write(
+            {
+                "ok_count": len(
+                    self.result_line_ids.filtered(lambda r: r.resultado == "ok")
+                ),
+                "error_count": len(
+                    self.result_line_ids.filtered(lambda r: r.resultado == "error")
+                ),
+                "skipped_count": len(
+                    self.result_line_ids.filtered(lambda r: r.resultado == "skipped")
+                ),
+                "progress_done": done,
+                "last_heartbeat": fields.Datetime.now(),
+                "state": "done",
+            }
+        )
+        self._notify_user(
+            _(
+                "Importación finalizada: %(ok)s cobros creados, %(err)s con"
+                " error y %(skipped)s anulados en origen."
+            )
+            % {
+                "ok": self.ok_count,
+                "err": self.error_count,
+                "skipped": self.skipped_count,
+            },
+            "warning" if self.error_count else "success",
+        )
+        self.env.cr.commit()  # pylint: disable=invalid-commit
+
+    # Cada cuántos recibos procesados de a uno se informa el avance.
+    _PROGRESS_EVERY = 25
+
+    def _notify_user(self, message, notification_type):
+        """Avisa al usuario que confirmó la importación con una notificación
+        emergente de Odoo (bus), aunque se haya ido de la pantalla del
+        wizard: la importación corre en segundo plano. Es solo un aviso: si
+        falla no debe afectar a la importación."""
+        self.ensure_one()
+        try:
+            self.create_uid._bus_send(
+                "simple_notification",
+                {
+                    "title": _("Importación de cobros"),
+                    "message": message,
+                    "type": notification_type,
+                    "sticky": True,
+                },
+            )
+        except Exception:  # pylint: disable=broad-except # noqa: BLE001
+            _logger.exception(
+                "Importación de cobros %s: no se pudo enviar la notificación",
+                self.id,
+            )
+
+    def _report_progress(self, done):
+        """Guarda el avance (y con él todo lo creado hasta ahora): la barra
+        de progreso lo lee desde otra transacción, y si el proceso se corta
+        a mitad de camino lo ya procesado queda guardado."""
+        self.write({"progress_done": done, "last_heartbeat": fields.Datetime.now()})
+        self.env.cr.commit()  # pylint: disable=invalid-commit
+
+    def _confirm_one(self, result_line):
+        """Crea y valida un recibo, de a uno, y registra el resultado en su
+        línea de previsualización."""
+        error = None
+        try:
+            with self.env.cr.savepoint():
+                payment_order = self._create_payment_order(result_line)
+            result_line.write(
+                {"resultado": "ok", "odoo_payment_order_id": payment_order.id}
+            )
+        except psycopg2.Error as exc:
+            # El savepoint ya no existe: algún módulo hizo commit() dentro de
+            # la transacción antes de fallar. El error real es el que se
+            # estaba manejando cuando falló el rollback.
+            error = exc.__context__ or exc
+            self._recover_failed_receipt(result_line)
+        except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001
+            error = exc
+        if error is not None:
+            result_line.write(
+                {
+                    "resultado": "error",
+                    "has_error": True,
+                    "error_message": _("Error al crear el cobro: %s") % error,
+                }
+            )
+
+    @staticmethod
+    def _is_batchable(result_line):
+        """Recibo a cuenta: ninguna de sus líneas aplica a una factura."""
+        details = result_line.detail_line_ids
+        return bool(details) and not details.filtered("invoice_id")
+
+    def _confirm_batch(self, result_lines):
+        """Crea y postea varios recibos a cuenta juntos.
+
+        Odoo es mucho más eficiente creando y posteando muchos registros en
+        una sola llamada que de a uno (el costo fijo de cada llamada se
+        reparte entre todos). Si algo falla en el lote (un recibo con un
+        dato inválido, un módulo que hace commit(), etc.) se descarta el
+        lote entero y se reprocesa recibo por recibo con _confirm_one, que
+        es quien registra el error de cada uno.
+        """
+        orders = None
+        try:
+            with self.env.cr.savepoint():
+                orders = self._create_payment_orders_batch(result_lines)
+        except psycopg2.Error:
+            # Un módulo hizo commit() dentro de la transacción y destruyó el
+            # savepoint (ver _check_journal_period).
+            self._recover_failed_receipt(result_lines)
+        except Exception:  # pylint: disable=broad-except # noqa: BLE001
+            pass
+        if orders is None:
+            for result_line in result_lines:
+                self._confirm_one(result_line)
+            return
+        for result_line, order in zip(result_lines, orders):
+            result_line.write(
+                {"resultado": "ok", "odoo_payment_order_id": order.id}
+            )
+
+    def _create_payment_orders_batch(self, result_lines):
+        orders = self.env["account.payment.order"].create(
+            [self._prepare_order_vals(line) for line in result_lines]
+        )
+        self._post_receipts_batch(orders)
+        return orders
+
+    def _post_receipts_batch(self, orders):
+        """Genera y postea el asiento de varios recibos a cuenta juntos.
+
+        Es el equivalente en lote de account.payment.order.proforma_voucher /
+        action_move_line_create (l10n_ar_eynes) para un recibo sin líneas de
+        aplicación: mismas líneas de pago, misma línea que acredita al
+        cliente, mismo número de recibo (la secuencia se consume de a uno,
+        en orden), y los valores de cada asiento salen de los mismos métodos
+        de l10n_ar_eynes (account_move_get, create_move_lines y
+        writeoff_move_line_get). Todo lo que no sea el caso simple lanza
+        UserError y _confirm_batch lo procesa por el camino de siempre.
+        """
+        for order in orders:
+            self._check_batch_supported(order)
+        ctx = {"check_move_validity": False, "skip_invoice_sync": True}
+        for order in orders:
+            order.number = order.get_next_sequence(consume=True)
+        moves = (
+            self.env["account.move"]
+            .with_context(**ctx)
+            .create([order.account_move_get() for order in orders])
+        )
+        line_vals = []
+        for order, move in zip(orders, moves):
+            lines = order.create_move_lines(move.id)
+            line_total = sum(line["debit"] - line["credit"] for line in lines)
+            writeoff = order.writeoff_move_line_get(line_total, move.id, move.name)
+            line_vals += lines + ([writeoff] if writeoff else [])
+        self.env["account.move.line"].with_context(**ctx).create(line_vals)
+        moves.action_post()
+        for order, move in zip(orders, moves):
+            order.write(
+                {"move_id": move.id, "state": "posted", "posted_before": True}
+            )
+
+    @staticmethod
+    def _check_batch_supported(order):
+        """El modo por lotes solo cubre el recibo a cuenta simple (sin
+        retenciones, cheques, conceptos ni líneas de aplicación) y repite las
+        validaciones de proforma_voucher que le aplican."""
+        if (
+            order.line_ids
+            or order.concept_line_ids
+            or order.retention_ids
+            or order.third_party_check_receipt_ids
+            or order.third_party_check_ids
+            or order.issued_check_ids
+        ):
+            raise UserError(_("El recibo no es un cobro a cuenta simple."))
+        if round(order.writeoff_amount, 2) < 0.0 or not order.amount:
+            raise UserError(_("Importe del recibo inválido."))
+        if not order.payment_rate:
+            raise UserError(_("Tipo de cambio del recibo inválido."))
+
+    def _prepare_order_vals(self, result_line):
+        journal = result_line.journal_id
+        company = journal.company_id
+        # Misma moneda que calcula account.payment.order
+        # (_compute_default_journal_currency): la del diario o, si no tiene,
+        # la de la compañía.
+        currency = journal.currency_id or company.currency_id
+        # Un único create() con las líneas incluidas: evita los dos write()
+        # posteriores (income_line_ids / payment_mode_line_ids), cada uno
+        # con su propio recálculo de campos dependientes.
+        return {
+            "partner_id": result_line.partner_id.id,
+            "journal_id": journal.id,
+            "type": "receipt",
+            "company_id": company.id,
+            "date": result_line.fecha,
+            "reference": result_line.comprobante_ref,
+            "name": result_line.comprobante_ref,
+            "disable_retentions": True,
+            "income_line_ids": [
+                (0, 0, vals)
+                for vals in self._prepare_income_line_vals(
+                    currency, company, result_line
+                )
+            ],
+            "payment_mode_line_ids": [
+                (0, 0, vals)
+                for vals in self._prepare_payment_mode_line_vals(result_line)
+            ],
+        }
+
+    def _create_payment_order(self, result_line):
+        order = self.env["account.payment.order"].create(
+            self._prepare_order_vals(result_line)
+        )
         result = order.proforma_voucher()
         # proforma_voucher no lanza ante un error al generar el asiento:
         # lo captura, deja el recibo en borrador y devuelve un popup.
@@ -979,7 +1407,7 @@ class IvessPaymentImportWizard(models.TransientModel):
         ]
 
     @staticmethod
-    def _prepare_income_line_vals(order, result_line):
+    def _prepare_income_line_vals(currency, company, result_line):
         income_vals = []
         for detail in result_line.detail_line_ids:
             invoice = detail.invoice_id
@@ -1006,8 +1434,8 @@ class IvessPaymentImportWizard(models.TransientModel):
                     "account_id": move_line.account_id.id,
                     "amount": detail.importe,
                     "type": "income",
-                    "currency_id": order.currency_id.id,
-                    "original_currency_id": order.company_id.currency_id.id,
+                    "currency_id": currency.id,
+                    "original_currency_id": company.currency_id.id,
                 }
             )
         return income_vals
