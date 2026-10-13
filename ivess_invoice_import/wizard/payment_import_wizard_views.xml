@@ -6,6 +6,20 @@
             <form string="Importar cobros de clientes desde Excel">
                 <field name="state" invisible="1" />
 
+                <!-- La carga se cortó (servidor caído o reiniciado): hay que
+                     volver a empezar -->
+                <div
+          class="alert alert-warning"
+          role="alert"
+          invisible="state != 'interrupted'"
+        >
+                    <strong>La carga se interrumpió.</strong>
+                    Volvé a empezar: subí el archivo de nuevo y previsualizá. Los
+                    cobros que ya se habían creado se detectan como "Ya existe" y
+                    no se duplican.
+                    <field name="process_error" invisible="not process_error" />
+                </div>
+
                 <!-- Paso 1: carga de archivo -->
                 <group invisible="state != 'upload'">
                     <field name="filename" invisible="1" />
@@ -13,7 +27,7 @@
                 </group>
 
                 <!-- Paso 2: previsualización -->
-                <group invisible="state != 'preview'" col="4">
+                <group invisible="state not in ('preview', 'interrupted', 'done')" col="4">
                     <field name="total_count" />
                     <field name="ok_count" />
                     <field name="error_count" />
@@ -27,7 +41,7 @@
         />
                 <field
           name="result_line_ids"
-          invisible="state not in ('preview', 'done')"
+          invisible="state not in ('preview', 'interrupted', 'done')"
         >
                     <list
             decoration-danger="has_error and resultado != 'ok'"
@@ -114,6 +128,41 @@
             string="Volver"
             invisible="state != 'preview'"
           />
+                    <button
+            name="action_back_to_upload"
+            type="object"
+            string="Volver a empezar"
+            class="btn-primary"
+            invisible="state != 'interrupted'"
+          />
+                    <button string="Cerrar" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Vista liviana mientras se procesa: sin la lista de recibos, para poder
+         recargarla cada pocos segundos. -->
+    <record id="view_ivess_payment_import_wizard_progress" model="ir.ui.view">
+        <field name="name">ivess.payment.import.wizard.progress</field>
+        <field name="model">ivess.payment.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Importando cobros...">
+                <field name="state" invisible="1" />
+                <field name="progress_total" invisible="1" />
+                <field name="is_stalled" invisible="1" />
+                <div class="text-center py-4">
+                    <h3>Importando cobros…</h3>
+                    <p class="text-muted">
+                        Podés cerrar esta ventana: la importación sigue en segundo plano.
+                    </p>
+                    <field
+            name="progress_done"
+            widget="ivess_import_progressbar"
+            options="{'max_value': 'progress_total'}"
+          />
+                </div>
+                <footer>
                     <button string="Cerrar" class="btn-secondary" special="cancel" />
                 </footer>
             </form>

@@ -30,10 +30,15 @@
           (account.journal tipo "receipt") se resuelve automáticamente
           tomando el único diario de ese tipo configurado en la compañía
           (a diferencia de las facturas, un recibo no es un comprobante
-          autorizado por AFIP: no hay un diario distinto por letra/punto
-          de venta para desambiguar). El cliente se determina a
+          autorizado por AFIP: no hay un diario distinto por letra para
+          desambiguar). Si hay más de un diario "receipt", se elige por
+          punto de venta (columna "pto de vta") contra los dígitos del
+          código o del nombre del diario. Los recibos sin factura asociada
+          se importan como pagos a cuenta: el cliente sale de "cod
+          cliente" (código Bejerman) y el importe de "importe del
+          movimiento". Si hay facturas, el cliente se determina a
           través de la factura ya importada que cada línea cancela (no hay
-          CUIT en este archivo), y se deduplica contra
+          CUIT en este archivo). Se deduplica contra
           account.payment.order.reference. Los recibos anulados en origen
           no se importan (no generan asiento). El medio de pago real
           (líneas de payment_mode_line_ids) se resuelve por línea a partir
@@ -54,9 +59,15 @@
         "views/account_tax_views.xml",
         "views/invoice_import_tax_code_views.xml",
         "views/payment_import_payment_method_code_views.xml",
+        "data/ir_cron.xml",
         "wizard/invoice_import_wizard_views.xml",
         "wizard/payment_import_wizard_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "ivess_invoice_import/static/src/js/import_progress_bar.js",
+        ],
+    },
     "demo": [],
     "installable": True,
     "auto_install": False,

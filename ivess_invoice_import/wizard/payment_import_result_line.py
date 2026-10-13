@@ -43,7 +43,7 @@ class IvessPaymentImportResultLine(models.TransientModel):
         "account.journal",
         string="Diario",
         help="Diario de Recibo de Cobranza (type='receipt') resuelto"
-        " automáticamente: el único diario de ese tipo de la compañía.",
+        " automáticamente a partir del punto de venta del recibo.",
     )
     detail_line_ids = fields.One2many(
         "ivess.payment.import.detail.line",
