@@ -59,3 +59,12 @@ class TestBreakdownIntake(IntakeTestCommon):
         result = self.env["ivess.breakdown.intake"].create_ticket(**payload)
         self.assertIn("error", result)
         self.assertIn("patente", result["error"])
+
+    def test_ticket_name_has_unified_format(self):
+        result = self.env["ivess.breakdown.intake"].create_ticket(
+            **self._base_payload(breakdown_reason="Pinchazo de goma")
+        )
+        self.assertEqual(
+            result["ticket_name"],
+            f"Rep. {self.dispatch_number.number} · Auxilio · Pinchazo de goma · {self.plate}",
+        )

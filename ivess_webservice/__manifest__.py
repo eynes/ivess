@@ -1,6 +1,6 @@
 {
     "name": "Ivess Webservice",
-    "version": "19.0.0.0.3",
+    "version": "19.0.0.0.4",
     "summary": "Integración con el middleware de Ivess vía JSON-2 API",
     "description": """
         Expone los servicios consumidos por el middleware de Ivess

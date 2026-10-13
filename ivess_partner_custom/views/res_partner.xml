@@ -5,6 +5,42 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="%(ivess_partner_custom.action_ivess_visita_fuera_ruta)d"
+                            type="action"
+                            string="Pedir visita fuera de ruta"
+                            context="{'default_partner_id': id}"
+                            invisible="not id"/>
+                    <button name="%(logistic_custom_ivess.action_delivery_route_line_visitas)d"
+                            type="action"
+                            string="Ver visitas"
+                            invisible="not id"
+                            groups="sales_team.group_sale_salesman_all_leads"/>
+                    <button name="%(ivess_partner_custom.action_ivess_traspaso_saldo)d"
+                            type="action"
+                            string="Traspasar saldo y dar de baja"
+                            context="{'default_origen_id': id}"
+                            invisible="not id or not active"
+                            groups="account.group_account_invoice"/>
+                    <button name="%(ivess_partner_custom.action_ivess_desvincular_hija)d"
+                            type="action"
+                            string="Desvincular del grupo"
+                            context="{'default_hija_id': id}"
+                            invisible="not id or not parent_id or type != 'other'"/>
+                </header>
+            </xpath>
+            <xpath expr="//div[@name='button_box']" position="before">
+                <div class="alert alert-warning mb-3" role="alert" invisible="not vat_duplicado_ids">
+                    <div>Ya hay contactos con este número de documento:</div>
+                    <field name="vat_duplicado_ids" widget="many2many_tags" readonly="1"/>
+                    <div>Si es otra cuenta del mismo cliente, elegí de cuál colgarla como hija. Si no, guardá normalmente y se crea un contacto nuevo igual.</div>
+                    <field name="alta_madre_id"
+                           placeholder="Colgar como hija de..."
+                           domain="[('id', 'in', vat_duplicado_ids)]"
+                           options="{'no_create': True, 'no_open': True}"/>
+                </div>
+            </xpath>
             <xpath expr="//page[@name='accounting']" position="inside">
                 <group name="group_requiere_comprobante">
                     <field name="requiere_comprobante"/>
@@ -18,6 +54,115 @@
                 <field name="unbilled_balance"/>
                 <field name="final_balance"/>
             </xpath>
+            <xpath expr="//page[@name='sales_purchases']/group[@name='container_row_2']" position="after">
+                <group name="group_facturacion_cobranza" string="Facturación y Cobranza">
+                    <field name="regimen_facturacion"/>
+                    <field name="pagador_modo"/>
+                    <field name="pagador_id"
+                           readonly="pagador_modo != 'especifico'"
+                           required="pagador_modo == 'especifico'"/>
+                    <field name="traspaso_destino_id" invisible="not traspaso_destino_id"/>
+                    <field name="traspaso_move_id" invisible="not traspaso_move_id"/>
+                    <field name="traspaso_origen_ids" widget="many2many_tags" invisible="not traspaso_origen_ids"/>
+                    <field name="deuda_ventas"/>
+                    <field name="deuda_frio_calor"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_form_direccion_entrega" model="ir.ui.view">
+        <field name="name">res.partner.form.direccion.entrega</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.address_street_extended_city_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//span[@name='address_name']/field[@name='type_address_label']" position="attributes">
+                <attribute name="invisible">is_company or type == 'contact'</attribute>
+            </xpath>
+            <xpath expr="//span[@name='address_name']/span" position="replace">
+                <span invisible="not is_company and type != 'contact'">Dirección de Facturación</span>
+            </xpath>
+            <xpath expr="//span[@name='address_name']/following-sibling::field[@name='zip'][1]" position="after">
+                <span class="o_form_label o_td_label" name="delivery_address_name">
+                    <b>Dirección de Entrega</b>
+                </span>
+                <div class="o_address_format">
+                    <field name="delivery_street" placeholder="Calle..." class="o_address_street"/>
+                    <field name="delivery_street2" placeholder="Calle 2..." class="o_address_street"/>
+                    <field name="delivery_num" placeholder="Número"/>
+                    <field name="delivery_floor" placeholder="Piso"/>
+                    <field name="delivery_door" placeholder="Puerta"/>
+                    <field name="delivery_apartment" placeholder="Depto."/>
+                </div>
+                <field name="delivery_country_id"
+                       placeholder="País"
+                       options='{"no_open": True, "no_create": True}'/>
+                <field name="delivery_state_id"
+                       placeholder="Provincia"
+                       options="{'no_open': True, 'no_quick_create': True}"
+                       context="{'country_id': delivery_country_id, 'default_country_id': delivery_country_id}"/>
+                <field name="delivery_city"
+                       placeholder="Ciudad"
+                       invisible="delivery_country_enforce_cities and (delivery_city_id or delivery_city in ('', False))"/>
+                <field name="delivery_country_enforce_cities" invisible="1"/>
+                <field name="delivery_city_id"
+                       placeholder="Ciudad"
+                       domain="[('country_id', '=', delivery_country_id), ('state_id', '=', delivery_state_id)]"
+                       invisible="not delivery_country_enforce_cities"
+                       context="{'default_country_id': delivery_country_id, 'default_state_id': delivery_state_id, 'default_zipcode': delivery_zip}"/>
+                <field name="delivery_zip" placeholder="Código Postal"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_tree_direccion_entrega" model="ir.ui.view">
+        <field name="name">res.partner.list.direccion.entrega</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_tree_inherit_logistic"/>
+        <field name="arch" type="xml">
+            <field name="repartos" position="before">
+                <field name="delivery_street" string="Calle de Entrega" optional="hide"/>
+                <field name="direccion_completa" optional="hide"/>
+            </field>
+            <field name="repartos" position="after">
+                <field name="currency_id" column_invisible="1"/>
+                <field name="deuda_ventas" optional="hide"/>
+                <field name="deuda_frio_calor" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_res_partner_filter_direccion_entrega" model="ir.ui.view">
+        <field name="name">res.partner.search.direccion.entrega</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_res_partner_filter_inherit_logistic"/>
+        <field name="arch" type="xml">
+            <field name="street" position="attributes">
+                <attribute name="filter_domain">[('direccion_completa', 'ilike', self)]</attribute>
+            </field>
+        </field>
+    </record>
+
+    <!-- Clientes por Reparto: la misma búsqueda de dirección que en Contactos -->
+    <record id="view_partner_distribution_reparto_search_direccion" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.search.direccion</field>
+        <field name="model">partner.distribution</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_distribution_reparto_search"/>
+        <field name="arch" type="xml">
+            <field name="partner_street" position="attributes">
+                <attribute name="filter_domain">[('partner_id.direccion_completa', 'ilike', self)]</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_res_partner_filter_inherit_ivess_partner_custom" model="ir.ui.view">
+        <field name="name">res.partner.search.inherit.ivess.partner.custom</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <field name="parent_id" position="after">
+                <field name="pagador_id"/>
+            </field>
         </field>
     </record>
 </odoo>

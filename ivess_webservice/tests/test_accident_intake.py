@@ -87,3 +87,12 @@ class TestAccidentIntake(IntakeTestCommon):
             **self._base_payload(accident_time="25:99")
         )
         self.assertIn("error", result)
+
+    def test_ticket_name_has_unified_format(self):
+        result = self.env["ivess.accident.intake"].create_ticket(
+            **self._base_payload(accident_date="07/10/2026")
+        )
+        self.assertEqual(
+            result["ticket_name"],
+            f"Rep. {self.dispatch_number.number} · Siniestro · 07/10/2026 · {self.plate}",
+        )

@@ -8,6 +8,9 @@
                 <setting id="minutos_x_convertir_factura_setting" help="Minutos que deben transcurrir para convertir a factura">
                     <field name="minutos_x_convertir_factura" widget="float_time"/>
                 </setting>
+                <setting id="hora_limite_pedidos_setting" help="Los pedidos de visita para el mismo día cargados después de esta hora muestran un aviso. No se bloquean.">
+                    <field name="hora_limite_pedidos" widget="float_time"/>
+                </setting>
             </xpath>
         </field>
     </record>

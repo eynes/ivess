@@ -3,6 +3,7 @@ from odoo import api, models
 
 class IvessHelpdeskIntake(models.Model):
     _name = "ivess.helpdesk.intake"
+    _inherit = "ivess.intake.mixin"
     _description = "Intake de tickets de helpdesk desde middleware Ivess"
 
     @api.model
@@ -69,16 +70,13 @@ class IvessHelpdeskIntake(models.Model):
             for k, v in item.items()
         ]
 
-    def _build_ticket_name(self, items, patente, dispatch_route=None):
-        descriptions = [
-            str(v) if k.strip().casefold() == "observaciones" else k
+    def _build_ticket_name(self, items, patente, dispatch=""):
+        details = [
+            str(v) if k.strip().casefold() == "observaciones" else f"{k}: {v}"
             for item in items
             for k, v in item.items()
         ]
-        parts = descriptions + [patente] if descriptions else [patente]
-        if dispatch_route:
-            parts = [dispatch_route.display_name] + parts
-        return " - ".join(parts)
+        return self._intake_build_ticket_name(dispatch, "Chequeo", ", ".join(details), patente)
 
     def _create_helpdesk_ticket(self, team, equipment, patente, items, intake_user="", payload=None,
                                  dispatch_route=None, dispatch=""):
@@ -87,7 +85,7 @@ class IvessHelpdeskIntake(models.Model):
         if workshop_maintenance_team:
             create_ctx["maintenance_team_id_ctx"] = workshop_maintenance_team.id
         return self.env["helpdesk.ticket"].with_context(**create_ctx).create({
-            "name": self._build_ticket_name(items, patente, dispatch_route),
+            "name": self._build_ticket_name(items, patente, dispatch),
             "user_id": self.env.user.id,
             "equipment_id": equipment.id,
             "ticket_source": "other",

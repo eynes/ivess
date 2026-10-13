@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_ivess_desvincular_hija_form" model="ir.ui.view">
+        <field name="name">ivess.desvincular.hija.form</field>
+        <field name="model">ivess.desvincular.hija</field>
+        <field name="arch" type="xml">
+            <form string="Desvincular del grupo">
+                <div class="alert alert-info" role="alert">
+                    La cuenta deja de pertenecer al grupo y queda como cuenta individual. Lo facturado
+                    hasta hoy sigue registrado en la cuenta madre. El CUIT y el tipo de documento no
+                    se cambian desde acá.
+                </div>
+                <group>
+                    <field name="hija_id"/>
+                    <field name="madre_id"/>
+                    <field name="regimen_facturacion"/>
+                    <field name="pagador_modo"/>
+                    <field name="pagador_id"
+                           invisible="pagador_modo != 'especifico'"
+                           required="pagador_modo == 'especifico'"
+                           options="{'no_create': True}"/>
+                    <field name="pricelist_id" options="{'no_create': True}"/>
+                </group>
+                <footer>
+                    <button name="action_confirmar" type="object" string="Desvincular" class="btn-primary"/>
+                    <button string="Cancelar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ivess_desvincular_hija" model="ir.actions.act_window">
+        <field name="name">Desvincular del grupo</field>
+        <field name="res_model">ivess.desvincular.hija</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -43,7 +43,7 @@ class IvessWorkshopNewsIntake(models.Model):
         dispatch_route = self._intake_resolve_dispatch(dispatch)
 
         vals = {
-            "name": f"Novedad - {patente} - {observations[:60]}",
+            "name": self._intake_build_ticket_name(dispatch, "Novedad", observations, patente),
             "team_id": team.id,
             "ticket_source": "other",
             "partner_phone": kwargs.get("partner_phone", ""),
