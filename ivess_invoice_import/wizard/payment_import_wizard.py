@@ -437,7 +437,7 @@ class IvessPaymentImportWizard(models.TransientModel):
             )
             payment_mode_by_key.setdefault(key, mapping.journal_id)
 
-        receipt_journal_by_pos = self._find_receipt_journals_by_pos(groups)
+        receipt_journal_by_tipo = self._find_receipt_journals_by_tipo(groups)
 
         cod_clientes = {g["cod_cliente"] for g in groups if g.get("cod_cliente")}
         partner_by_bejerman = {}
@@ -509,7 +509,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                 )
 
         return {
-            "receipt_journal_by_pos": receipt_journal_by_pos,
+            "receipt_journal_by_tipo": receipt_journal_by_tipo,
             "detail_results": detail_results,
             "partner_results": partner_results,
             "orders_by_key": orders_by_key,
@@ -534,15 +534,6 @@ class IvessPaymentImportWizard(models.TransientModel):
             }
 
         errors = []
-        if group["tipo_comprobante"] != "RMP":
-            errors.append(
-                _(
-                    "tipo de comprobante '%s' no soportado (esta versión solo"
-                    " importa 'RMP')."
-                )
-                % group["tipo_comprobante"]
-            )
-
         try:
             fecha = self._to_date(group["fecha"]) if group["fecha"] else False
         except ValueError:
@@ -559,25 +550,27 @@ class IvessPaymentImportWizard(models.TransientModel):
             group["letra"], group["pto_vta"], group["num_compr"]
         )
 
-        journal, journal_candidates = cache["receipt_journal_by_pos"][group["pto_vta"]]
+        journal, journal_candidates = cache["receipt_journal_by_tipo"][
+            group["tipo_comprobante"]
+        ]
         if not journal:
             if journal_candidates:
                 errors.append(
                     _(
-                        "El punto de venta '%(pos)s' coincide con %(count)s"
-                        " diarios de tipo 'Recibo de Cobranza'; debe coincidir"
-                        " con uno solo."
+                        "El tipo de comprobante '%(tipo)s' coincide con"
+                        " %(count)s diarios de tipo 'Recibo de Cobranza'"
+                        " (código POS); debe coincidir con uno solo."
                     )
-                    % {"pos": group["pto_vta"], "count": journal_candidates}
+                    % {"tipo": group["tipo_comprobante"], "count": journal_candidates}
                 )
             else:
                 errors.append(
                     _(
                         "No se encontró un diario de tipo 'Recibo de Cobranza'"
-                        " (account.journal type='receipt') para el punto de"
-                        " venta '%s'."
+                        " (account.journal type='receipt') con código POS"
+                        " '%s'."
                     )
-                    % group["pto_vta"]
+                    % group["tipo_comprobante"]
                 )
 
         if journal and not group["comprobante_anulado"]:
@@ -635,23 +628,17 @@ class IvessPaymentImportWizard(models.TransientModel):
             "detail_line_ids": detail_vals,
         }
 
-    def _find_receipt_journals_by_pos(self, groups):
+    def _find_receipt_journals_by_tipo(self, groups):
         """Resuelve el diario de Recibo de Cobranza (account.journal con
-        type='receipt') de la compañía activa para cada punto de venta
-        distinto del archivo (columna "pto de vta" del recibo).
+        type='receipt') de la compañía activa para cada tipo de comprobante
+        distinto del archivo (primera columna: RMP, BJU, RTT, etc.).
 
-        Puede haber más de un diario 'receipt' (uno por punto de venta de
-        cobranza): se matchea el punto de venta contra los dígitos del
-        código del diario o, si no coincide, contra los dígitos de su
-        nombre (mismo criterio que IvessInvoiceImportWizard._find_journal,
-        sin filtrar por letra: account.journal.denomination no tiene un
-        valor que represente la "X" de los recibos de "aguas"). Si ningún
-        diario coincide pero la compañía tiene un único diario 'receipt',
-        se usa ese (comportamiento anterior a la selección por punto de
-        venta). Se resuelve una sola vez por punto de venta distinto.
+        El diario se identifica por su código POS (account.journal.code),
+        que debe ser igual al tipo de comprobante (sin distinguir
+        mayúsculas). El punto de venta del recibo no interviene.
 
-        :return: dict pto_vta -> (diario o None, cantidad de diarios
-            candidatos).
+        :return: dict tipo_comprobante -> (diario o None, cantidad de
+            diarios candidatos).
         """
         journals = self.env["account.journal"].search(
             [
@@ -659,19 +646,12 @@ class IvessPaymentImportWizard(models.TransientModel):
                 ("company_id", "=", self.env.company.id),
             ]
         )
-        digits_to_int = IvessInvoiceImportWizard._digits_to_int
         result = {}
-        for pto_vta in {g["pto_vta"] for g in groups if not g.get("error")}:
-            pos_number = digits_to_int(pto_vta)
-            matches = journals.browse()
-            if pos_number is not None:
-                matches = journals.filtered(
-                    lambda j, pos=pos_number: digits_to_int(j.code) == pos
-                    or digits_to_int(j.name) == pos
-                )
-            if not matches and len(journals) == 1:
-                matches = journals
-            result[pto_vta] = (matches[0] if len(matches) == 1 else None, len(matches))
+        for tipo in {g["tipo_comprobante"] for g in groups if not g.get("error")}:
+            matches = journals.filtered(
+                lambda j, tipo=tipo: (j.code or "").strip().upper() == tipo
+            )
+            result[tipo] = (matches[0] if len(matches) == 1 else None, len(matches))
         return result
 
     def _check_journal_period(self, journal, fecha):
