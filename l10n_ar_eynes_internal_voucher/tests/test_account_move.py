@@ -50,3 +50,30 @@ class TestAccountMove(TestInternalVoucherCommon):
 
         self.assertIn(normal_invoice.id, invoice_ids)
         self.assertNotIn(internal_invoice.id, invoice_ids)
+
+    def test_vat_subjournal_excludes_internal_voucher(self):
+        # The subjournal query INNER JOINs the fiscal position.
+        fiscal_position = self.env.ref('l10n_ar_eynes.fiscal_position_cf')
+        normal_invoice = self._create_invoice(self.normal_journal)
+        normal_invoice.fiscal_position_id = fiscal_position
+        normal_invoice.action_post()
+
+        internal_invoice = self._create_invoice(self.internal_voucher_journal)
+        internal_invoice.fiscal_position_id = fiscal_position
+        internal_invoice.action_post()
+
+        wizard = self.env['account.tax.subjournal'].create(
+            {
+                'date_from': fields.Date.today().replace(day=1),
+                'date_to': fields.Date.today(),
+                'based_on': 'sale',
+            }
+        )
+        report_model = self.env['report.report_xlsx.move_line_list_subj']
+        rows = report_model._get_line_vals(
+            ['out_invoice', 'out_refund'], wizard
+        )
+        invoice_ids = {row['invoice_id'] for row in rows}
+
+        self.assertIn(normal_invoice.id, invoice_ids)
+        self.assertNotIn(internal_invoice.id, invoice_ids)
