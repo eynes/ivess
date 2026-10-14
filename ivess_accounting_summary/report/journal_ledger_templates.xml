@@ -7,7 +7,7 @@
     inherit_id="account_financial_report.report_journal_ledger_base"
   >
         <xpath expr="//div[hasclass('page')]/div[hasclass('row')]" position="replace">
-            <div class="row" style="text-align: center;">
+            <div style="display: block; width: 100%; text-align: center;">
                 <h4 class="mt0">DIARIO GENERAL</h4>
                 <div><b t-out="o.company_id.name" /></div>
                 <div>EJERCICIO: <t t-out="fiscal_year_name" /></div>
