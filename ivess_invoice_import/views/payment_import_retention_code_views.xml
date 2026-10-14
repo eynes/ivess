@@ -1,0 +1,34 @@
+<odoo>
+    <record id="view_ivess_payment_import_retention_code_list" model="ir.ui.view">
+        <field name="name">ivess.payment.import.retention.code.list</field>
+        <field name="model">ivess.payment.import.retention.code</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="code" />
+                <field name="tax_id" />
+                <field name="company_id" groups="base.group_multi_company" />
+            </list>
+        </field>
+    </record>
+
+    <record id="action_ivess_payment_import_retention_code" model="ir.actions.act_window">
+        <field name="name">Retenciones (importación de cobros)</field>
+        <field name="res_model">ivess.payment.import.retention.code</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Mapeá cada código de las columnas "retencion 1..5" del Excel
+                de importación de cobros con la retención de ventas de Odoo
+                correspondiente.
+            </p>
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_ivess_payment_import_retention_code"
+        name="Retenciones (importación de cobros)"
+        parent="account.menu_finance_configuration"
+        action="action_ivess_payment_import_retention_code"
+        sequence="202"
+    />
+</odoo>
