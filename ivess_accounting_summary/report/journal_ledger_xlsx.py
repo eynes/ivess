@@ -37,10 +37,11 @@ class JournalLedgerXlsx(models.AbstractModel):
         report_data["row_pos"] += 1
 
     def _define_formats(self, workbook, report_data, data=None):
-        super()._define_formats(workbook, report_data, data=data)
+        res = super()._define_formats(workbook, report_data, data=data)
         # _write_report_title solo recibe el título; el encabezado del libro
         # diario necesita el wizard.
         report_data["wizard_id"] = data["wizard_id"]
+        return res
 
     def _get_report_columns(self, report):
         columns = [
@@ -54,7 +55,7 @@ class JournalLedgerXlsx(models.AbstractModel):
             )
         if report.with_account_name:
             columns.append(
-                {"header": _("Account Name"), "field": "account_name", "width": 15}
+                {"header": _("Account Name"), "field": "account_name", "width": 30}
             )
         if not report.hide_partner:
             columns.append({"header": _("Partner"), "field": "partner", "width": 25})

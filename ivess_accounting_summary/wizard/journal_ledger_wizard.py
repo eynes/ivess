@@ -1,4 +1,4 @@
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 
 
 class JournalLedgerReportWizard(models.TransientModel):
@@ -16,6 +16,16 @@ class JournalLedgerReportWizard(models.TransientModel):
             "asientos de neteo), para no duplicar información."
         ),
     )
+
+    @api.model
+    def _get_sort_options(self):
+        # La traducción es_AR de "Entry number" en account_financial_report
+        # viene con la codificación rota ("N??mero"); se vuelve a declarar el
+        # término acá para traducirlo desde este módulo.
+        return [
+            ("move_name", _("Entry number")),
+            ("date", self.env._("Date")),
+        ]
 
     def _prepare_report_journal_ledger(self):
         res = super()._prepare_report_journal_ledger()
