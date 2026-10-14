@@ -103,6 +103,18 @@
                 />
                             </list>
                         </field>
+                        <field name="retention_line_ids" invisible="not retention_line_ids">
+                            <list>
+                                <field name="codigo" />
+                                <field name="tax_id" />
+                                <field name="importe" />
+                                <field name="has_error" invisible="1" />
+                                <field
+                  name="error_message"
+                  decoration-danger="has_error"
+                />
+                            </list>
+                        </field>
                     </form>
                 </field>
 

@@ -52,6 +52,8 @@ EXPECTED_HEADERS = [
 
 # Columnas que identifican la cabecera del recibo agrupado (mismo criterio
 # que GROUP_KEY_FIELDS de invoice_import_wizard.py).
+# Posición (base 0) de la columna "retencion 1"; luego alternan código/monto.
+RETENTION_FIRST_COLUMN = 21
 GROUP_KEY_FIELDS = ("tipo_comprobante", "letra", "pto_vta", "num_compr")
 HEADER_ONLY_FIELDS = ("fecha", "cod_cliente", "importe_total", "comprobante_anulado")
 DETAIL_FIELDS = (
@@ -104,6 +106,7 @@ def group_payment_rows(rows):
             group = {f: row[f] for f in GROUP_KEY_FIELDS}
             for f in HEADER_ONLY_FIELDS:
                 group[f] = row.get(f)
+            group["retenciones"] = row.get("retenciones") or []
             group["lines"] = []
             group["row_numbers"] = []
             group["error"] = None
@@ -388,7 +391,20 @@ class IvessPaymentImportWizard(models.TransientModel):
             "cod_bco": self._to_str(cell(18)),
             "sucursal_bco": self._to_str(cell(19)),
             "importe_movimiento_moneda_local": cell(20),
+            "retenciones": self._read_retentions(cell),
         }
+
+    def _read_retentions(self, cell):
+        """Pares (código, monto) de las columnas opcionales "retencion N" /
+        "monto retencion N" (N = 1..5, a partir de la columna 22). Un recibo
+        puede traer hasta 5 retenciones distintas."""
+        retentions = []
+        for index in range(RETENTION_FIRST_COLUMN, RETENTION_FIRST_COLUMN + 10, 2):
+            code = self._to_str(cell(index))
+            amount = cell(index + 1)
+            if code or amount not in (None, ""):
+                retentions.append((code, amount))
+        return retentions
 
     # ------------------------------------------------------------------
     # Cache de lookups para la previsualización: mismo criterio que
@@ -508,7 +524,15 @@ class IvessPaymentImportWizard(models.TransientModel):
                     orders_by_key.get(okey, self.env["account.payment.order"]) | order
                 )
 
+        retention_tax_by_code = {
+            mapping.code: mapping.tax_id
+            for mapping in self.env["ivess.payment.import.retention.code"].search(
+                [("company_id", "=", self.env.company.id)]
+            )
+        }
+
         return {
+            "retention_tax_by_code": retention_tax_by_code,
             "receipt_journal_by_tipo": receipt_journal_by_tipo,
             "detail_results": detail_results,
             "partner_results": partner_results,
@@ -587,13 +611,27 @@ class IvessPaymentImportWizard(models.TransientModel):
         if partner_error:
             errors.append(partner_error)
 
-        if not errors and abs(applied_total - importe_total) > 0.01:
+        retention_vals, retention_errors = self._resolve_retentions(
+            group, cache, importe_total
+        )
+        errors.extend(retention_errors)
+
+        # En un recibo a cuenta el importe del movimiento es lo cobrado por
+        # el medio de pago, sin las retenciones: el total del recibo es
+        # cobrado + retenciones. Si el recibo aplica a facturas, el importe
+        # aplicado ya es el bruto (incluye las retenciones).
+        retention_total = sum(vals[2]["importe"] for vals in retention_vals)
+        on_account = not any(
+            not self._is_on_account_line(line) for line in group["lines"]
+        )
+        expected_total = applied_total + (retention_total if on_account else 0.0)
+        if not errors and abs(expected_total - importe_total) > 0.01:
             errors.append(
                 _(
                     "La suma de los importes del recibo (%.2f) no coincide con"
                     " el importe total del recibo (%.2f)."
                 )
-                % (applied_total, importe_total)
+                % (expected_total, importe_total)
             )
 
         if partner and not group["comprobante_anulado"]:
@@ -626,7 +664,68 @@ class IvessPaymentImportWizard(models.TransientModel):
             "has_error": bool(errors),
             "error_message": "\n".join(errors) if errors else False,
             "detail_line_ids": detail_vals,
+            "retention_line_ids": retention_vals,
         }
+
+    def _resolve_retentions(self, group, cache, importe_total):
+        """Resuelve las retenciones del recibo contra el mapeo configurable
+        ivess.payment.import.retention.code.
+
+        :return: tupla (comandos create para retention_line_ids, errores).
+        """
+        errors = []
+        vals = []
+        total = 0.0
+        for code, raw_amount in group.get("retenciones") or []:
+            if not code:
+                errors.append(
+                    _("Hay un monto de retención (%s) sin código de retención.")
+                    % raw_amount
+                )
+                continue
+            try:
+                amount = self._to_float(raw_amount) if raw_amount not in (None, "") else 0.0
+            except (TypeError, ValueError):
+                errors.append(
+                    _("Monto inválido para la retención '%(code)s': '%(amount)s'.")
+                    % {"code": code, "amount": raw_amount}
+                )
+                continue
+            tax = cache["retention_tax_by_code"].get(code)
+            line_error = False
+            if not tax:
+                line_error = _(
+                    "No hay una retención configurada para el código '%s'"
+                    " (Contabilidad > Configuración > Retenciones"
+                    " (importación de cobros))."
+                ) % code
+                errors.append(line_error)
+            elif not amount:
+                line_error = _("La retención '%s' tiene monto cero.") % code
+                errors.append(line_error)
+            total += amount
+            vals.append(
+                (
+                    0,
+                    0,
+                    {
+                        "codigo": code,
+                        "tax_id": tax.id if tax else False,
+                        "importe": amount,
+                        "has_error": bool(line_error),
+                        "error_message": line_error,
+                    },
+                )
+            )
+        if total and total - importe_total > 0.01:
+            errors.append(
+                _(
+                    "La suma de las retenciones (%.2f) supera el importe total"
+                    " del recibo (%.2f)."
+                )
+                % (total, importe_total)
+            )
+        return vals, errors
 
     def _find_receipt_journals_by_tipo(self, groups):
         """Resuelve el diario de Recibo de Cobranza (account.journal con
@@ -1216,9 +1315,14 @@ class IvessPaymentImportWizard(models.TransientModel):
 
     @staticmethod
     def _is_batchable(result_line):
-        """Recibo a cuenta: ninguna de sus líneas aplica a una factura."""
+        """Recibo a cuenta (ninguna de sus líneas aplica a una factura) y sin
+        retenciones: las retenciones van por proforma_voucher, uno por uno."""
         details = result_line.detail_line_ids
-        return bool(details) and not details.filtered("invoice_id")
+        return (
+            bool(details)
+            and not details.filtered("invoice_id")
+            and not result_line.retention_line_ids
+        )
 
     def _confirm_batch(self, result_lines):
         """Crea y postea varios recibos a cuenta juntos.
@@ -1262,8 +1366,8 @@ class IvessPaymentImportWizard(models.TransientModel):
         Es el equivalente en lote de account.payment.order.proforma_voucher /
         action_move_line_create (l10n_ar_eynes) para un recibo sin líneas de
         aplicación: mismas líneas de pago, misma línea que acredita al
-        cliente, mismo número de recibo (la secuencia se consume de a uno,
-        en orden), y los valores de cada asiento salen de los mismos métodos
+        cliente, mismo número de recibo (el del Excel, no el de la secuencia del
+        diario), y los valores de cada asiento salen de los mismos métodos
         de l10n_ar_eynes (account_move_get, create_move_lines y
         writeoff_move_line_get). Todo lo que no sea el caso simple lanza
         UserError y _confirm_batch lo procesa por el camino de siempre.
@@ -1271,8 +1375,6 @@ class IvessPaymentImportWizard(models.TransientModel):
         for order in orders:
             self._check_batch_supported(order)
         ctx = {"check_move_validity": False, "skip_invoice_sync": True}
-        for order in orders:
-            order.number = order.get_next_sequence(consume=True)
         moves = (
             self.env["account.move"]
             .with_context(**ctx)
@@ -1328,7 +1430,16 @@ class IvessPaymentImportWizard(models.TransientModel):
             "date": result_line.fecha,
             "reference": result_line.comprobante_ref,
             "name": result_line.comprobante_ref,
+            # Número del recibo = punto de venta + número del Excel, no la
+            # secuencia del diario. posted_before=True evita que
+            # proforma_voucher lo pise con get_next_sequence().
+            "number": self._receipt_number(result_line),
+            "posted_before": True,
             "disable_retentions": True,
+            "retention_ids": [
+                (0, 0, vals)
+                for vals in self._prepare_retention_line_vals(result_line)
+            ],
             "income_line_ids": [
                 (0, 0, vals)
                 for vals in self._prepare_income_line_vals(
@@ -1340,6 +1451,32 @@ class IvessPaymentImportWizard(models.TransientModel):
                 for vals in self._prepare_payment_mode_line_vals(result_line)
             ],
         }
+
+    @staticmethod
+    def _prepare_retention_line_vals(result_line):
+        """Una account.payment.order.retention.line por cada retención del
+        Excel (monto tal cual, la base es el importe total del recibo)."""
+        return [
+            {
+                "retention_id": retention.tax_id.id,
+                "name": retention.tax_id.name,
+                "account_id": retention.tax_id.get_retention_account().id,
+                "amount": retention.importe,
+                "base": result_line.importe_total,
+                "base_amount": result_line.importe_total,
+                "date": result_line.fecha,
+            }
+            for retention in result_line.retention_line_ids
+        ]
+
+    @staticmethod
+    def _receipt_number(result_line):
+        """Número del recibo con el formato PPPP-NNNNNNNN armado con las
+        columnas "pto de vta" y "num de comprobante" del Excel."""
+        return "%s-%s" % (
+            (result_line.pto_vta or "").zfill(4),
+            (result_line.numero_comprobante or "").zfill(8),
+        )
 
     def _create_payment_order(self, result_line):
         order = self.env["account.payment.order"].create(
@@ -1375,6 +1512,20 @@ class IvessPaymentImportWizard(models.TransientModel):
                 amounts_by_journal[journal.id] = 0.0
                 order_by_journal.append(journal)
             amounts_by_journal[journal.id] += detail.importe
+
+        # Odoo calcula amount = medios de pago + retenciones. Si el recibo
+        # aplica a facturas, el importe aplicado es el bruto y las
+        # retenciones se descuentan de los medios de pago (empezando por el
+        # primero) para que cuadre.
+        # Solo si el recibo aplica a facturas: en un recibo a cuenta el
+        # importe del movimiento ya es el neto cobrado.
+        to_deduct = 0.0
+        if result_line.detail_line_ids.filtered("invoice_id"):
+            to_deduct = sum(result_line.retention_line_ids.mapped("importe"))
+        for journal in order_by_journal:
+            deduction = min(to_deduct, amounts_by_journal[journal.id])
+            amounts_by_journal[journal.id] -= deduction
+            to_deduct -= deduction
 
         return [
             {

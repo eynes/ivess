@@ -50,6 +50,11 @@ class IvessPaymentImportResultLine(models.TransientModel):
         "result_line_id",
         string="Facturas aplicadas",
     )
+    retention_line_ids = fields.One2many(
+        "ivess.payment.import.retention.line",
+        "result_line_id",
+        string="Retenciones",
+    )
     detail_count = fields.Integer(
         string="Cant. facturas", compute="_compute_detail_count"
     )
