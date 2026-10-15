@@ -117,6 +117,12 @@ RES_PARTNER_COLUMNS = [
     "autopost_bills",
     "group_rfq",
     "group_on",
+    # required=True con default "madre" en ivess_partner_custom: mismo
+    # problema que los de arriba (el INSERT crudo deja NULL y el primer
+    # write() posterior falla con "Falta el valor requerido ... Tipo de
+    # Pagador"). pagador_id se completa después del INSERT, ver
+    # _bulk_insert_partners.
+    "pagador_modo",
 ]
 
 
@@ -268,6 +274,12 @@ class ResPartnerImportWizard(models.TransientModel):
         # cualquier filtro/reporte que dependa de él.
         self.env.cr.execute(
             "UPDATE res_partner SET commercial_partner_id = id WHERE id = ANY(%s)",
+            (new_ids,),
+        )
+        # pagador_id (compute store=True de ivess_partner_custom): con modo
+        # "madre" y sin parent_id, el pagador es la propia cuenta.
+        self.env.cr.execute(
+            "UPDATE res_partner SET pagador_id = id WHERE id = ANY(%s)",
             (new_ids,),
         )
         self._bulk_insert_categories(new_ids, rows_by_column)
@@ -661,6 +673,7 @@ class ResPartnerImportWizard(models.TransientModel):
             "autopost_bills": "ask",
             "group_rfq": "default",
             "group_on": "default",
+            "pagador_modo": "madre",
             # category_id (m2m) no es una columna de res_partner: no forma
             # parte de RES_PARTNER_COLUMNS, se usa aparte en
             # _bulk_insert_categories después del INSERT.
