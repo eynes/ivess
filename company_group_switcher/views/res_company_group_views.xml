@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_res_company_group_list" model="ir.ui.view">
+        <field name="name">res.company.group.list</field>
+        <field name="model">res.company.group</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle" />
+                <field name="name" />
+                <field name="company_ids" widget="many2many_tags" />
+                <field name="active" column_invisible="True" />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_res_company_group_form" model="ir.ui.view">
+        <field name="name">res.company.group.form</field>
+        <field name="model">res.company.group</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget
+            name="web_ribbon"
+            title="Archivado"
+            bg_color="text-bg-danger"
+            invisible="active"
+          />
+                    <group>
+                        <field name="name" />
+                        <field name="sequence" />
+                        <field name="active" invisible="1" />
+                        <field
+              name="company_ids"
+              widget="many2many_tags"
+              options="{'no_create': True}"
+            />
+                    </group>
+                    <group
+            string="Usuarios con este grupo asignado (sin permiso de cambio)"
+          >
+                        <field name="locked_user_ids" nolabel="1" colspan="2">
+                            <list>
+                                <field name="name" />
+                                <field name="login" />
+                                <field name="can_switch_company" />
+                            </list>
+                        </field>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_res_company_group_search" model="ir.ui.view">
+        <field name="name">res.company.group.search</field>
+        <field name="model">res.company.group</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" />
+                <field name="company_ids" />
+                <filter
+          name="inactive"
+          string="Archivados"
+          domain="[('active', '=', False)]"
+        />
+            </search>
+        </field>
+    </record>
+
+    <record id="action_res_company_group" model="ir.actions.act_window">
+        <field name="name">Grupos de empresas</field>
+        <field name="res_model">res.company.group</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem
+    id="menu_res_company_group"
+    action="action_res_company_group"
+    parent="base.menu_users"
+    groups="base.group_system"
+    sequence="20"
+  />
+
+    <record id="view_users_form_company_group_switcher" model="ir.ui.view">
+        <field name="name">res.users.form.company.group.switcher</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='company_id']" position="after">
+                <field name="can_switch_company" invisible="share" />
+                <field
+          name="assigned_company_group_id"
+          invisible="share or can_switch_company"
+          options="{'no_create': True}"
+        />
+            </xpath>
+        </field>
+    </record>
+</odoo>
