@@ -2,7 +2,7 @@
  *
  * Exposes a reusable `window.RepairScanner.open(onDetect)` API (ZXing-based,
  * DataMatrix/QR/Aztec/Code128/EAN) used by both /my/repairs/scan (single
- * equipment) and /my/repairs/batch (batch processing).
+ * equipment), /my/repairs/batch (batch processing) and the order detail page.
  */
 (function init() {
     var stream = null;
@@ -14,6 +14,12 @@
     var overlay = null;
     var video = null;
     var guide = null;
+
+    // Scanned/typed serials are trimmed and upper-cased (the server matches
+    // case-insensitively too, this just keeps what the technician sees consistent).
+    function normalizeScan(value) {
+        return (value || '').trim().toUpperCase();
+    }
 
     // ── Overlay (built lazily, once, on first open()) ───────────────────────────
     function ensureOverlay() {
@@ -169,11 +175,9 @@
                         rafId = requestAnimationFrame(function () { scanFrame(det); });
                         return;
                     }
-                    // Odoo ZPL uses GS1 AI "21" (serial number) prefix: "21" + lot_name.
-                    // Strip it so the search matches stock.lot.name directly.
-                    if (/^21\d/.test(value) && value.length > 2) {
-                        value = value.slice(2);
-                    }
+                    // The GS1 "21" prefix is NOT stripped here: many real serials start
+                    // with "21" (210000, 2102000...). The server tries with and without it.
+                    value = normalizeScan(value);
                     if (window.navigator.vibrate) window.navigator.vibrate(100);
                     var onDetect = currentOnDetect;
                     stopCamera();
@@ -189,7 +193,7 @@
 
     // ── Public API ────────────────────────────────────────────────────────────
     // window.RepairScanner.open(onDetect): opens the camera overlay; onDetect(value)
-    // is called once with the decoded (GS1-stripped) value, after the camera stops.
+    // is called once with the decoded, trimmed and upper-cased value, after the camera stops.
     function openScanner(onDetect) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert('La cámara no está disponible. Acceda al sitio usando HTTPS.');
@@ -245,25 +249,38 @@
 
     window.RepairScanner = { open: openScanner };
 
-    // ── Adapter for /my/repairs/scan (single-equipment scan page) ──────────────
-    function bindScanPage() {
-        var cameraBtn = document.getElementById('repair-scan-camera-btn');
-        if (!cameraBtn) return;
+    // ── Generic binding for any portal page ───────────────────────────────────
+    // Markup contract:
+    //   <form id="X"> ... <input data-repair-scan-input .../> ... </form>
+    //   <button data-repair-scan-camera data-scan-form="#X">  (or inside the form)
+    // The camera value is written into the form's [data-repair-scan-input] and the
+    // form is submitted. Typed/HID input is normalized on submit (Enter included).
+    function bindScanTriggers() {
+        document.querySelectorAll('[data-repair-scan-input]').forEach(function (input) {
+            var form = input.form;
+            if (!form) return;
+            form.addEventListener('submit', function () {
+                input.value = normalizeScan(input.value);
+            });
+        });
 
-        var barcodeInput = document.getElementById('repair_barcode_input');
-        var scanForm = document.getElementById('repair_scan_form');
-
-        cameraBtn.addEventListener('click', function () {
-            window.RepairScanner.open(function (value) {
-                barcodeInput.value = value;
-                scanForm.submit();
+        document.querySelectorAll('[data-repair-scan-camera]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var selector = btn.getAttribute('data-scan-form');
+                var form = selector ? document.querySelector(selector) : btn.closest('form');
+                var input = form && form.querySelector('[data-repair-scan-input]');
+                if (!form || !input) return;
+                window.RepairScanner.open(function (value) {
+                    input.value = normalizeScan(value);
+                    form.submit();
+                });
             });
         });
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', bindScanPage);
+        document.addEventListener('DOMContentLoaded', bindScanTriggers);
     } else {
-        bindScanPage();
+        bindScanTriggers();
     }
 }());
