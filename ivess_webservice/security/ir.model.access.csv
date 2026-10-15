@@ -71,4 +71,4 @@ access_ir_sequence_bot,ir.sequence.bot,base.model_ir_sequence,ivess_webservice.g
 access_account_journal_bot,account.journal.bot,account.model_account_journal,ivess_webservice.group_ivess_webservice_user,1,0,0,0
 
 access_res_partner_water_consumption_bot,res.partner.water.consumption.bot,logistic_custom_ivess.model_res_partner_water_consumption,ivess_webservice.group_ivess_webservice_user,1,1,1,0
-access_water_container_bot,water.container.bot,logistic_custom_ivess.model_water_container,ivess_webservice.group_ivess_webservice_user,1,1,0,0
+access_water_container_bot,water.container.bot,logistic_custom_ivess.model_water_container,ivess_webservice.group_ivess_webservice_user,1,1,1,0

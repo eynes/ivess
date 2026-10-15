@@ -1,5 +1,6 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+from .water_container import STATE_SELECTION
 
 
 class SaleOrderLine(models.Model):
@@ -21,12 +22,23 @@ class SaleOrderLine(models.Model):
         ],
         string='Turno',
     )
+    container_state = fields.Selection(
+        STATE_SELECTION,
+        string='Estado del Envase',
+        help='Campo técnico: estado del envase informado al vender (servicio web ivess), que se copia al '
+             'movimiento de stock al confirmar la orden. No tiene vista.',
+    )
 
     def _get_synced_repair_order(self):
         self.ensure_one()
         return self.order_id.sudo().repair_order_ids.filtered(
             lambda ro: ro.sale_order_line_id.id == self.id and ro.state != 'cancel'
         )
+
+    def _prepare_procurement_values(self):
+        values = super()._prepare_procurement_values()
+        values['container_state'] = self.container_state
+        return values
 
     def _create_repair_order(self):
         res = super()._create_repair_order()

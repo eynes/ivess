@@ -8,7 +8,12 @@
 
     <!-- Fuera del noupdate para que se aplique tambien en bases ya instaladas.
          Crear sale.order exige el grupo de vendedor: hay campos con restriccion
-         de grupo (p.ej. quotation.document) que no se resuelven con ACLs. -->
+         de grupo (p.ej. quotation.document) que no se resuelven con ACLs.
+         Validar el picking de la venta exige stock.group_stock_user
+         (ivess_roles_custom.button_validate). -->
     <function model="res.groups" name="write"
-              eval="[[ref('group_ivess_webservice_user')], {'implied_ids': [(4, ref('sales_team.group_sale_salesman'))]}]"/>
+              eval="[[ref('group_ivess_webservice_user')], {'implied_ids': [
+                  (4, ref('sales_team.group_sale_salesman')),
+                  (4, ref('stock.group_stock_user')),
+              ]}]"/>
 </odoo>
