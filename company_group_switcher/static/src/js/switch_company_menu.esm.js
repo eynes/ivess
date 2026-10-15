@@ -1,11 +1,11 @@
-import {patch} from "@web/core/utils/patch";
-import {session} from "@web/session";
-import {user} from "@web/core/user";
-import {symmetricalDifference} from "@web/core/utils/arrays";
 import {
   CompanySelector,
   SwitchCompanyMenu,
 } from "@web/webclient/switch_company_menu/switch_company_menu";
+import {patch} from "@web/core/utils/patch";
+import {session} from "@web/session";
+import {symmetricalDifference} from "@web/core/utils/arrays";
+import {user} from "@web/core/user";
 
 const lockedIds = session.company_locked_ids || false;
 
