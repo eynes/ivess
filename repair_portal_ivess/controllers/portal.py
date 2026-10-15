@@ -99,42 +99,23 @@ def _stage_nav_flags(repair):
 
 
 def _resolve_repair_by_barcode(barcode):
-    """Busca la orden de reparación 'frio_calor' activa para un número de serie escaneado.
+    """Órdenes 'frio_calor' ABIERTAS para un número de serie escaneado o tipeado.
 
-    Odoo ZPL encodes lot labels with GS1 AI "21" (serial number) prefix.
-    Physical scanners or unmodified camera scanners may return "21<lot_name>".
-    Build candidate list: try original value first, then without GS1 prefix.
-
-    Retorna el recordset 'repair.order' (vacío si no se encontró).
+    La búsqueda (exacta -> sin distinguir mayúsculas -> normalizada, con y sin el
+    prefijo GS1 "21") vive en repair.order._find_open_by_serial. Nunca devuelve
+    órdenes cerradas. Si hay más de una, el que llama le muestra la lista al técnico.
     """
-    barcode = (barcode or '').strip()
-    if not barcode:
-        return request.env['repair.order'].sudo()
+    barcode = (barcode or '').strip().upper()
+    return request.env['repair.order'].sudo()._find_open_by_serial(
+        barcode, domain=[('repair_equipment_type', '=', 'frio_calor')],
+    )
 
-    candidates = [barcode]
-    if barcode.startswith('21') and len(barcode) > 2:
-        candidates.append(barcode[2:])
 
-    RepairOrder = request.env['repair.order'].sudo()
-    repair = RepairOrder
-    for candidate in candidates:
-        repair = RepairOrder.search([
-            ('lot_id.name', '=', candidate),
-            ('repair_equipment_type', '=', 'frio_calor'),
-            ('state', 'not in', ['cancel', 'done']),
-        ], order='create_date desc', limit=1)
-        if repair:
-            return repair
-
-    for candidate in candidates:
-        repair = RepairOrder.search([
-            ('lot_id.name', '=', candidate),
-            ('repair_equipment_type', '=', 'frio_calor'),
-        ], order='create_date desc', limit=1)
-        if repair:
-            return repair
-
-    return RepairOrder
+def _no_open_repair_message(barcode):
+    return _(
+        "El equipo %s no tiene una orden abierta. Verificar que haya ingresado por Loop.",
+        barcode,
+    )
 
 
 class RepairPortalController(CustomerPortal):
@@ -166,13 +147,24 @@ class RepairPortalController(CustomerPortal):
         if not barcode or not barcode.strip():
             return request.render('repair_portal_ivess.portal_repair_scan', values)
 
-        barcode = barcode.strip()
-        repair = _resolve_repair_by_barcode(barcode)
+        barcode = barcode.strip().upper()
+        repairs = _resolve_repair_by_barcode(barcode)
 
-        if repair:
-            return request.redirect(f'/my/repairs/{repair.id}')
+        if len(repairs) == 1:
+            return request.redirect(f'/my/repairs/{repairs.id}')
 
-        values.update({'barcode': barcode, 'not_found': True})
+        values.update({'barcode': barcode})
+        if repairs:
+            values.update({
+                'candidates': repairs,
+                'stage_labels': _STAGE_LABELS,
+                'stage_badge': _STAGE_BADGE,
+            })
+        else:
+            values.update({
+                'not_found': True,
+                'not_found_message': _no_open_repair_message(barcode),
+            })
         return request.render('repair_portal_ivess.portal_repair_scan', values)
 
     # ============================================================
@@ -263,14 +255,22 @@ class RepairPortalController(CustomerPortal):
         if not batch:
             return request.redirect('/my/repairs/batch')
 
-        barcode = (barcode or '').strip()
+        barcode = (barcode or '').strip().upper()
         if not barcode:
             return request.redirect(f'/my/repairs/batch/{batch_id}')
 
-        repair = _resolve_repair_by_barcode(barcode)
-        if not repair:
-            error = _("No se encontró una orden de reparación para el número de serie '%s'.", barcode)
+        repairs = _resolve_repair_by_barcode(barcode)
+        if not repairs:
+            error = _no_open_repair_message(barcode)
             return request.redirect(f'/my/repairs/batch/{batch_id}?{urlencode({"add_error": error})}')
+        if len(repairs) > 1:
+            error = _(
+                "El equipo %(serial)s tiene varias órdenes abiertas (%(orders)s). "
+                "Agréguela desde el detalle de la orden que corresponda.",
+                serial=barcode, orders=', '.join(repairs.mapped('name')),
+            )
+            return request.redirect(f'/my/repairs/batch/{batch_id}?{urlencode({"add_error": error})}')
+        repair = repairs
 
         try:
             batch.with_context(_portal_user_id=request.env.uid).action_add_repair(repair)

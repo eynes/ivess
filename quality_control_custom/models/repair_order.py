@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import re
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.fields import Domain
@@ -585,46 +586,80 @@ class RepairOrder(models.Model):
         return super().unlink()
 
     @api.model
-    def find_repair_by_serial(self, barcode):
-        # Odoo ZPL lot labels use GS1 AI "21" (serial number) prefix.
-        # Try original value; if not found, strip the "21" prefix and retry.
-        candidates = [barcode]
-        if barcode.startswith('21') and len(barcode) > 2:
-            candidates.append(barcode[2:])
+    def _normalize_serial(self, value):
+        """Mayúscula y sólo alfanuméricos: ignora puntos, asteriscos, guiones y espacios."""
+        return re.sub(r'[^0-9A-Z]', '', (value or '').upper())
 
-        lot = None
+    @api.model
+    def _find_open_by_serial(self, serial, domain=None):
+        """Órdenes de reparación ABIERTAS cuya serie coincide con la escaneada/tipeada.
+
+        Una sola función de búsqueda para el portal y el escáner del backend.
+        Se prueba, en este orden, y se devuelve lo del primer paso que encuentre algo:
+          1. coincidencia exacta;
+          2. sin distinguir mayúsculas/minúsculas;
+          3. normalizada (sólo alfanuméricos, sin distinguir mayúsculas).
+        Cada paso prueba la serie tal cual y sin el prefijo GS1 "21" (etiquetas ZPL de Odoo).
+        Nunca cae a órdenes cerradas/canceladas. Puede devolver más de una orden:
+        el que llama decide cómo resolver la ambigüedad.
+        """
+        serial = (serial or '').strip()
+        if not serial:
+            return self.browse()
+        candidates = [serial]
+        if serial.startswith('21') and len(serial) > 2:
+            candidates.append(serial[2:])
+
+        open_domain = Domain('state', 'not in', ['cancel', 'done'])
+        if domain:
+            open_domain &= Domain(domain)
+
         for candidate in candidates:
-            lot = self.env['stock.lot'].search([('name', '=', candidate)], limit=1)
-            if lot:
-                break
-        if not lot:
-            return {
-                'error': 'not_found',
-                'message': _("No se encontró el número de serie '%s'.") % barcode,
-            }
+            orders = self.search(open_domain & Domain('lot_id.name', '=', candidate),
+                                 order='create_date desc')
+            if orders:
+                return orders
 
-        repair = self.search(
-            [('lot_id', '=', lot.id), ('state', 'not in', ['cancel', 'done'])],
-            order='create_date desc',
-            limit=1,
-        )
-        if not repair:
-            repair = self.search(
-                [('lot_id', '=', lot.id)],
-                order='create_date desc',
-                limit=1,
-            )
-        if not repair:
-            return {
-                'error': 'no_repair',
-                'message': _("No se encontró una orden de reparación para el número de serie '%s'.") % barcode,
-            }
+        for candidate in candidates:
+            # '=ilike' interpreta % y _ como comodines: se escapan para que sea literal.
+            pattern = candidate.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            orders = self.search(open_domain & Domain('lot_id.name', '=ilike', pattern),
+                                 order='create_date desc')
+            if orders:
+                return orders
 
+        wanted = {self._normalize_serial(c) for c in candidates} - {''}
+        if not wanted:
+            return self.browse()
+        open_orders = self.search(open_domain & Domain('lot_id', '!=', False),
+                                  order='create_date desc')
+        return open_orders.filtered(lambda o: self._normalize_serial(o.lot_id.name) in wanted)
+
+    @api.model
+    def find_repair_by_serial(self, barcode):
+        barcode = (barcode or '').strip()
+        orders = self._find_open_by_serial(barcode)
+        if not orders:
+            return {
+                'error': 'no_open_repair',
+                'message': _(
+                    "El equipo %s no tiene una orden abierta. Verificar que haya ingresado por Loop.",
+                    barcode,
+                ),
+            }
+        if len(orders) > 1:
+            return {
+                'error': 'multiple_open_repairs',
+                'message': _(
+                    "El equipo %(serial)s tiene varias órdenes abiertas: %(orders)s. Búsquela desde el listado.",
+                    serial=barcode, orders=', '.join(orders.mapped('name')),
+                ),
+            }
         return {
             'type': 'ir.actions.act_window',
-            'name': repair.name,
+            'name': orders.name,
             'res_model': 'repair.order',
-            'res_id': repair.id,
+            'res_id': orders.id,
             'view_mode': 'form',
             'views': [(False, 'form')],
         }
