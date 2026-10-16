@@ -58,6 +58,14 @@
         <xpath expr="//div[@name='partner']" position="attributes">
             <attribute name="t-if">not hide_partner</attribute>
         </xpath>
+        <!-- La traducción es_AR de "Debit"/"Credit" en account_financial_report
+             viene con la codificación rota ("D??bito"); se fija el texto acá. -->
+        <xpath expr="//div[@name='debit']" position="replace">
+            <div class="act_as_cell" name="debit" style="width: 8.65%;">Débito</div>
+        </xpath>
+        <xpath expr="//div[@name='credit']" position="replace">
+            <div class="act_as_cell" name="credit" style="width: 8.65%;">Crédito</div>
+        </xpath>
         <xpath expr="//div[@name='credit']" position="after">
             <div class="act_as_cell" name="total" style="width: 8.65%;">Total</div>
         </xpath>

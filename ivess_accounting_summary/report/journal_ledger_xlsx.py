@@ -44,6 +44,8 @@ class JournalLedgerXlsx(models.AbstractModel):
         return res
 
     def _get_report_columns(self, report):
+        # "Débito"/"Crédito" van literales: la traducción es_AR de
+        # account_financial_report viene con la codificación rota ("D??bito").
         columns = [
             {"header": _("Entry"), "field": "entry", "width": 18},
             {"header": _("Date"), "field": "date", "width": 11},
@@ -61,8 +63,8 @@ class JournalLedgerXlsx(models.AbstractModel):
             columns.append({"header": _("Partner"), "field": "partner", "width": 25})
         columns += [
             {"header": _("Ref - Label"), "field": "label", "width": 40},
-            {"header": _("Debit"), "field": "debit", "type": "amount", "width": 14},
-            {"header": _("Credit"), "field": "credit", "type": "amount", "width": 14},
+            {"header": "Débito", "field": "debit", "type": "amount", "width": 14},
+            {"header": "Crédito", "field": "credit", "type": "amount", "width": 14},
             {"header": _("Total"), "field": "total", "type": "amount", "width": 14},
         ]
         if report.foreign_currency:
