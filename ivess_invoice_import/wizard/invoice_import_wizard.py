@@ -1151,18 +1151,19 @@ class IvessInvoiceImportWizard(models.TransientModel):
             )
             line_errors.extend(special_tax_errors)
 
-            # Letra B: el precio unitario del Excel viene con el IVA incluido
-            # (consumidor final); se descuenta la alícuota para dejarlo neto,
-            # porque Odoo vuelve a sumar el impuesto de la línea. Aplica a
-            # todo comprobante de letra B (FC, NC y ND), no solo a facturas.
-            # Si la línea además trae impuesto interno (siempre 4,17%), también
-            # viene incluido en el precio y se descuenta, porque Odoo lo vuelve
-            # a calcular desde internal_taxes_ids.
+            # Letra B: el precio unitario del Excel viene con los impuestos
+            # incluidos (consumidor final); se descuentan para dejarlo neto,
+            # porque Odoo vuelve a sumarlos desde la línea. Aplica a todo
+            # comprobante de letra B (FC, NC y ND), no solo a facturas.
+            # El IVA y el impuesto interno (siempre 4,17%) se calculan los
+            # dos sobre el neto, no uno sobre el otro, por eso las alícuotas
+            # se suman: bruto = neto * (1 + IVA% + interno%).
             if letra == "B":
-                if tasa_iva:
-                    precio_unitario = precio_unitario / (1 + tasa_iva / 100.0)
+                tasa_total = tasa_iva
                 if self._has_internal_tax(line["special_taxes"]):
-                    precio_unitario = precio_unitario / (1 + INTERNAL_TAX_RATE / 100.0)
+                    tasa_total += INTERNAL_TAX_RATE
+                if tasa_total:
+                    precio_unitario = precio_unitario / (1 + tasa_total / 100.0)
 
             try:
                 importe_del_renglon = self._to_float(line["importe_del_renglon"])
