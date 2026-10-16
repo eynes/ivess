@@ -38,3 +38,7 @@
 	path = account_financial_reporting
 	url = https://github.com/OCA/account-financial-reporting.git
 	branch = 19.0
+[submodule "server-auth"]
+	path = server-auth
+	url = https://github.com/OCA/server-auth.git
+	branch = 19.0
