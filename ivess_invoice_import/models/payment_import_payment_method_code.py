@@ -11,6 +11,7 @@ class IvessPaymentImportPaymentMethodCode(models.Model):
     medio_pago = fields.Selection(
         [
             ("1", "1 - Caja"),
+            ("2", "2 - Cheque"),
             ("4", "4 - Cuenta bancaria"),
         ],
         string="Medio de pago (origen)",
@@ -31,9 +32,10 @@ class IvessPaymentImportPaymentMethodCode(models.Model):
         help="Valor tal como viene en la columna 'cod bco' del Excel de"
         " importación de cobros. Se usa para desambiguar medios de pago"
         " bancarios cuando hay más de una cuenta bancaria posible bajo el"
-        " mismo medio de pago (ej. HSBC vs Mercado Pago). Se autocompleta"
-        " al elegir el diario (a partir del BIC de su cuenta bancaria),"
-        " pero se puede pisar a mano. Dejar vacío si no aplica.",
+        " mismo medio de pago (ej. HSBC vs Mercado Pago). No aplica a Caja."
+        " Se autocompleta al elegir el diario (a partir del BIC de su"
+        " cuenta bancaria), pero se puede pisar a mano. Dejar vacío si no"
+        " aplica.",
     )
     sucursal_bco = fields.Char(
         string="Sucursal banco (origen)",
@@ -69,8 +71,17 @@ class IvessPaymentImportPaymentMethodCode(models.Model):
         ),
     ]
 
+    @api.onchange("medio_pago")
+    def _onchange_medio_pago(self):
+        if self.medio_pago == "1":
+            # Caja: no lleva banco ni sucursal.
+            self.cod_bco = ""
+            self.sucursal_bco = ""
+
     @api.onchange("journal_id")
     def _onchange_journal_id(self):
+        if self.medio_pago == "1":
+            return
         bank_account = self.journal_id.bank_account_id
         if bank_account.bank_id.bic:
             self.cod_bco = bank_account.bank_id.bic

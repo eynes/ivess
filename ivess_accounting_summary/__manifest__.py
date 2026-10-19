@@ -1,6 +1,6 @@
 {
     "name": "Ivess Accounting Summary",
-    "version": "19.0.0.0.0",
+    "version": "19.0.0.0.1",
     "summary": "Contabilidad Resumida (Diarios Espejo) y Foliación Legal",
     "description": """
         Contabilidad Resumida (Diarios Espejo). Los diarios operativos
@@ -39,10 +39,18 @@
             x_summarize_on_report se colapsan en un único monto
             totalizador "(Resumen Global)", ocultando el desglose por
             partner sin alterar el detalle en pantalla ni en Excel.
+
+        - Fase 4 - Libro Diario OCA (account_financial_report), en PDF,
+          vista y Excel: encabezado "Diario General" con compañía,
+          ejercicio y período; columna Total (débito - crédito) y fila de
+          totales; sin columna ni resumen de impuestos; opciones "Ocultar
+          socio" y "Listar asientos resumen" (muestra los asientos del
+          Diario Legal y oculta los comprobantes ya resumidos); el Excel
+          sale en una única hoja.
     """,
     "author": "Eynes",
     "category": "Accounting",
-    "depends": ["account", "account_reports"],
+    "depends": ["account", "account_reports", "account_financial_report"],
     "data": [
         "security/ir.model.access.csv",
         "views/account_account_views.xml",
@@ -50,6 +58,8 @@
         "views/account_move_views.xml",
         "wizard/account_summary_closing_wizard_views.xml",
         "wizard/legal_folio_renumber_wizard_views.xml",
+        "wizard/journal_ledger_wizard_views.xml",
+        "report/journal_ledger_templates.xml",
     ],
     "demo": [],
     "installable": True,
