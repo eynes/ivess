@@ -47,6 +47,10 @@
           socio" y "Listar asientos resumen" (muestra los asientos del
           Diario Legal y oculta los comprobantes ya resumidos); el Excel
           sale en una única hoja.
+
+        - Libro Mayor OCA: opción "Listar asientos resumen" (misma regla
+          que el Libro Diario), en movimientos del período y saldos
+          iniciales.
     """,
     "author": "Eynes",
     "category": "Accounting",
@@ -59,6 +63,7 @@
         "wizard/account_summary_closing_wizard_views.xml",
         "wizard/legal_folio_renumber_wizard_views.xml",
         "wizard/journal_ledger_wizard_views.xml",
+        "wizard/general_ledger_wizard_views.xml",
         "report/journal_ledger_templates.xml",
     ],
     "demo": [],
