@@ -63,6 +63,10 @@ SPECIAL_TAX_COLUMNS = [
     ("cod imp especiales2", "monto imp especiales2", "base imp especiales2"),
 ]
 
+# Alícuota (%) del impuesto interno: siempre la misma (confirmado por el
+# funcional, T15583). Se usa para netear el precio unitario en comprobantes B.
+INTERNAL_TAX_RATE = 4.17
+
 # Mapeo tipo de comprobante (columna del Excel) -> res.voucher.type.doc_type,
 # para resolver el comprobante Odoo (FC=Factura, ND=Nota de Débito, NC=Nota
 # de Crédito) y derivar el move_type/is_debit_note correspondiente.
@@ -1089,12 +1093,6 @@ class IvessInvoiceImportWizard(models.TransientModel):
                 tasa_iva = 0.0
                 line_errors.append(_("Tasa de IVA inválida: '%s'.") % line["tasa_iva"])
 
-            # Letra B: el precio unitario del Excel viene con el IVA incluido
-            # (consumidor final); se descuenta la alícuota para dejarlo neto,
-            # porque Odoo vuelve a sumar el impuesto de la línea.
-            if letra == "B" and tasa_iva:
-                precio_unitario = precio_unitario / (1 + tasa_iva / 100.0)
-
             try:
                 tasa_iva_no_inscripto = self._to_float(line["tasa_iva_no_inscripto"])
             except (TypeError, ValueError):
@@ -1153,6 +1151,20 @@ class IvessInvoiceImportWizard(models.TransientModel):
             )
             line_errors.extend(special_tax_errors)
 
+            # Letra B: el precio unitario del Excel viene con los impuestos
+            # incluidos (consumidor final); se descuentan para dejarlo neto,
+            # porque Odoo vuelve a sumarlos desde la línea. Aplica a todo
+            # comprobante de letra B (FC, NC y ND), no solo a facturas.
+            # El IVA y el impuesto interno (siempre 4,17%) se calculan los
+            # dos sobre el neto, no uno sobre el otro, por eso las alícuotas
+            # se suman: bruto = neto * (1 + IVA% + interno%).
+            if letra == "B":
+                tasa_total = tasa_iva
+                if self._has_internal_tax(line["special_taxes"]):
+                    tasa_total += INTERNAL_TAX_RATE
+                if tasa_total:
+                    precio_unitario = precio_unitario / (1 + tasa_total / 100.0)
+
             try:
                 importe_del_renglon = self._to_float(line["importe_del_renglon"])
             except (TypeError, ValueError):
@@ -1185,6 +1197,18 @@ class IvessInvoiceImportWizard(models.TransientModel):
             errors.extend(line_errors)
 
         return detail_vals, errors
+
+    def _has_internal_tax(self, special_taxes):
+        """True si la línea trae impuesto interno con monto distinto de 0
+        (la columna "cod impuesto interno", la única sin base propia)."""
+        for slot in special_taxes:
+            if slot["cod"] and slot["base"] is None:
+                try:
+                    if self._to_float(slot["monto"]):
+                        return True
+                except (TypeError, ValueError):
+                    continue
+        return False
 
     def _resolve_special_taxes(
         self, special_taxes, perception_by_code, mapping_by_code
