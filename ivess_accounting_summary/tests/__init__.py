@@ -4,3 +4,4 @@ from . import test_journal_report_collapse
 from . import test_journal_ledger_ivess
 from . import test_general_ledger_ivess
 from . import test_summary_report_dedupe
+from . import test_retention_summarized_debt

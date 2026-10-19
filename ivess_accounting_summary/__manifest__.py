@@ -54,7 +54,12 @@
     """,
     "author": "Eynes",
     "category": "Accounting",
-    "depends": ["account", "account_reports", "account_financial_report"],
+    "depends": [
+        "account",
+        "account_reports",
+        "account_financial_report",
+        "l10n_ar_eynes",
+    ],
     "data": [
         "security/ir.model.access.csv",
         "views/account_account_views.xml",
