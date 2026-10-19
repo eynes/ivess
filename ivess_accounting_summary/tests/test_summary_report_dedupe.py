@@ -204,3 +204,67 @@ class TestSummaryReportDedupe(IvessAccountingSummaryTestCommon):
                 if line["entry_id"] == self.summary.id
             ]
             self.assertLessEqual(len(entries), 1, account["code"])
+
+    def _html(self, wizard, report_name):
+        html = self.env["ir.actions.report"]._render_qweb_html(
+            report_name, [wizard.id], data=wizard._prepare_report_data()
+        )[0]
+        return html.decode() if isinstance(html, bytes) else html
+
+    def test_general_ledger_html_renders_one_summary_row_per_account(self):
+        wizard = self.env["general.ledger.report.wizard"].create(
+            {
+                "company_id": self.env.company.id,
+                "date_from": "2024-03-01",
+                "date_to": "2024-04-30",
+                "target_move": "posted",
+                "only_summary_entries": True,
+            }
+        )
+        html = self._html(wizard, "account_financial_report.general_ledger")
+        self.assertIn(self.summary.name, html)
+        self.assertNotIn(self.bill_paid.name, html)
+        self.assertEqual(html.count(self.summary.name), len(self._summary_accounts()))
+
+    def _summary_accounts(self):
+        # Una fila por cuenta con movimientos del asiento resumen.
+        return self.summary.line_ids.account_id
+
+    def test_journal_ledger_html_and_general_ledger_xlsx_render(self):
+        import io
+
+        import xlsxwriter
+
+        journal = self.env["journal.ledger.report.wizard"].create(
+            {
+                "company_id": self.env.company.id,
+                "date_from": "2024-03-01",
+                "date_to": "2024-04-30",
+                "move_target": "posted",
+                "only_summary_entries": True,
+                "journal_ids": [
+                    (6, 0, (self.operational_journal | self.legal_journal).ids)
+                ],
+            }
+        )
+        self.assertIn(
+            self.summary.name,
+            self._html(journal, "account_financial_report.journal_ledger"),
+        )
+        mayor = self.env["general.ledger.report.wizard"].create(
+            {
+                "company_id": self.env.company.id,
+                "date_from": "2024-03-01",
+                "date_to": "2024-04-30",
+                "target_move": "posted",
+                "only_summary_entries": True,
+            }
+        )
+        workbook = xlsxwriter.Workbook(
+            io.BytesIO(), {"in_memory": True, "constant_memory": True}
+        )
+        self.env["report.a_f_r.report_general_ledger_xlsx"].generate_xlsx_report(
+            workbook, mayor._prepare_report_data(), mayor
+        )
+        self.assertTrue(workbook.worksheets())
+        workbook.close()
