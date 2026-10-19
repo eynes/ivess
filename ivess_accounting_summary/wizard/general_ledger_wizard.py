@@ -8,9 +8,11 @@ class GeneralLedgerReportWizard(models.TransientModel):
         string="Listar asientos resumen",
         help=(
             "Incluye los asientos resumen del Diario Legal y oculta los "
-            "comprobantes que fueron resumidos por un Cierre Mensual (y sus "
-            "asientos de neteo), para no duplicar información. Aplica a los "
-            "movimientos del período y a los saldos iniciales."
+            "comprobantes que fueron resumidos por un Cierre Mensual, sus "
+            "asientos de neteo y los cobros/pagos que ese cierre ya absorbió, "
+            "para no duplicar información. Aplica a los movimientos del "
+            "período y a los saldos iniciales; el asiento resumen sale con "
+            "una única línea por cuenta (sin agrupar por contacto)."
         ),
     )
 
@@ -37,5 +39,20 @@ class GeneralLedgerReportWizard(models.TransientModel):
                         ("journal_id.x_is_legal_journal", "=", True),
                     ],
                 ),
+                (
+                    "move_id",
+                    "not in",
+                    self.env["account.move"]._ivess_get_summarized_payment_ids(
+                        [self.company_id.id]
+                    ),
+                ),
             ]
         return domain
+
+    def _prepare_report_general_ledger(self):
+        res = super()._prepare_report_general_ledger()
+        if self.only_summary_entries:
+            # El asiento resumen se muestra con una única línea por cuenta:
+            # agrupar por contacto lo volvería a abrir.
+            res.update({"grouped_by": "none", "only_summary_entries": True})
+        return res
