@@ -26,7 +26,18 @@ class SaleOrderLine(models.Model):
         STATE_SELECTION,
         string='Estado del Envase',
         help='Campo técnico: estado del envase informado al vender (servicio web ivess), que se copia al '
-             'movimiento de stock al confirmar la orden. No tiene vista.',
+            'movimiento de stock al confirmar la orden. No tiene vista.',
+    )
+    serial_lot_ids = fields.Many2many(
+        'stock.lot',
+        'sale_order_line_serial_lot_rel',
+        'line_id',
+        'lot_id',
+        string='Números de Serie',
+        copy=False,
+        help='Campo técnico: series informadas al vender un producto con seguimiento por número de serie '
+            '(servicio web ivess). Al reservar, el picking toma estas series en lugar de elegir por FIFO. '
+            'No tiene vista.',
     )
 
     def _get_synced_repair_order(self):

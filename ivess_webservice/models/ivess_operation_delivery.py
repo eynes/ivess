@@ -1,5 +1,6 @@
-from odoo import Command, fields, api, models
+from odoo import Command, api, models
 from odoo.exceptions import UserError
+from odoo.fields import Domain
 from datetime import datetime
 import pytz
 
@@ -75,7 +76,7 @@ class IvessOperationDelivery(models.AbstractModel):
                     errors["invalid_types"].append("item_venta[%s] (dict)" % index)
                     continue
                 prefix = "item_venta[%s]." % index
-                unknown_keys = set(item) - set(sale_item) - {"tipo_venta"}
+                unknown_keys = set(item) - set(sale_item) - {"tipo_venta", "series"}
                 # evaluar implementar condicion if unknown_keys
                 for param in sorted(unknown_keys):
                     unknown_item_params.append(prefix + param)
@@ -90,6 +91,14 @@ class IvessOperationDelivery(models.AbstractModel):
                         errors["invalid_types"].append(prefix + "tipo_venta (str)")
                     elif tipo_venta not in container_state_by_tipo_venta:
                         invalid_values.append(prefix + "tipo_venta (%s)" % "/".join(container_state_by_tipo_venta))
+                series = item.get("series")
+                if series is not None:
+                    if type(series) is not list:
+                        errors["invalid_types"].append(prefix + "series (list)")
+                    else:
+                        for serie_index, serie in enumerate(series):
+                            if type(serie) is not str or not serie.strip():
+                                errors["invalid_types"].append("%sseries[%s] (str)" % (prefix, serie_index))
                 if item_errors["missing"] or item_errors["invalid_types"]:
                     continue
                 if item["cantidad"] <= 0:
@@ -181,6 +190,7 @@ class IvessOperationDelivery(models.AbstractModel):
             products = self.env["product.product"].search([
                 ("default_code", "in", list(codes)),
                 ("product_tmpl_id.show_in_app", "=", True),
+                ("sale_ok", "=", True),
             ], order="id")
             for product in products:
                 # default_code deberia ser unico por regla de negocio, pero Odoo
@@ -213,6 +223,51 @@ class IvessOperationDelivery(models.AbstractModel):
             if unexpected_tipo_venta:
                 return {"error": "Parametros no aplicables: %s" % ", ".join(unexpected_tipo_venta)}
 
+            # series identifica la unidad entregada: es obligatoria (una por
+            # unidad) solo en productos con seguimiento por numero de serie.
+            missing_series = []
+            unexpected_series = []
+            invalid_series = []
+            requested_series = set()
+            for index, item in enumerate(item_venta):
+                product = products_by_code[item["codigo_producto"]]
+                series = item.get("series") or []
+                prefix = "item_venta[%s]." % index
+                if product.tracking != "serial":
+                    if series:
+                        unexpected_series.append(prefix + "series (%s no tiene seguimiento por serie)" % product.default_code)
+                    continue
+                if not series:
+                    missing_series.append(prefix + "series (%s tiene seguimiento por serie)" % product.default_code)
+                    continue
+                if not float(item["cantidad"]).is_integer() or len(series) != item["cantidad"]:
+                    invalid_series.append(prefix + "series (una serie por unidad: cantidad entera igual a %s series)" % len(series))
+                for serie in series:
+                    if (product.id, serie) in requested_series:
+                        invalid_series.append(prefix + "series (%s repetida)" % serie)
+                    requested_series.add((product.id, serie))
+            if missing_series:
+                return {"error": "Faltan parametros obligatorios: %s" % ", ".join(missing_series)}
+            if unexpected_series:
+                return {"error": "Parametros no aplicables: %s" % ", ".join(unexpected_series)}
+            if invalid_series:
+                return {"error": "Valor invalido en parametros: %s" % ", ".join(invalid_series)}
+
+            # Las salidas (pickings) no crean series (use_create_lots=False): deben existir las series.
+            lot_by_key = {}
+            if requested_series:
+                lots = self.env["stock.lot"].search(Domain.OR(
+                    Domain([("product_id", "=", product_id), ("name", "=", serie)])
+                    for product_id, serie in requested_series
+                ), order="id desc")
+                lot_by_key = {(lot.product_id.id, lot.name): lot for lot in lots}
+                unknown_series = sorted(
+                    "%s (%s)" % (serie, self.env["product.product"].browse(product_id).default_code)
+                    for product_id, serie in requested_series - set(lot_by_key)
+                )
+                if unknown_series:
+                    return {"error": "No existen numeros de serie: %s" % ", ".join(unknown_series)}
+
         vals = {
             "no_purchase_reason_id": motivo_no_compra.id,
             "visit_date_hour": visit_date_hour,
@@ -244,6 +299,7 @@ class IvessOperationDelivery(models.AbstractModel):
                     "price_unit": item["precio_venta"],
                     "discount": 0.0,
                     "container_state": container_state,
+                    "serial_lot_ids": [Command.set([lot_by_key[(product.id, serie)].id for serie in item.get("series") or []])],
                 }))
             sale_order = sale_order.create({
                 "partner_id": cliente.id,
@@ -292,7 +348,12 @@ class IvessOperationDelivery(models.AbstractModel):
                             for move in shortage
                         ))
                         for move in shortage:
-                            move.quantity = move.product_uom_qty
+                            # Con serie se fuerza cada unidad con su serie: una
+                            # linea sin serie no pasa el _sanity_check del picking.
+                            if move.has_tracking == "serial" and move.sale_line_id.serial_lot_ids:
+                                move.lot_ids = move.sale_line_id.serial_lot_ids
+                            else:
+                                move.quantity = move.product_uom_qty
                     # Mismo criterio que la confirmacion: si la validacion falla se
                     # deshace solo ella, el picking queda sin validar y vinculado.
                     try:
