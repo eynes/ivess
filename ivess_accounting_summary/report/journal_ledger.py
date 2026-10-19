@@ -86,6 +86,16 @@ class JournalLedgerReport(models.AbstractModel):
             groups = {}
             for line in move["report_move_lines"]:
                 groups.setdefault(line["account_id"], []).append(line)
+            # Leyenda del asiento (con su período) para las cuentas cuyas
+            # líneas no la traen, como la deuda por comprobante.
+            summary_label = next(
+                (
+                    ln["label"]
+                    for ln in move["report_move_lines"]
+                    if (ln["label"] or "").startswith("Resumen Global")
+                ),
+                False,
+            )
             collapsed = []
             for lines in groups.values():
                 if len(lines) == 1:
@@ -100,14 +110,7 @@ class JournalLedgerReport(models.AbstractModel):
                         "total": net,
                         "amount_currency": sum(ln["amount_currency"] for ln in lines),
                         "partner_id": False,
-                        "label": next(
-                            (
-                                ln["label"]
-                                for ln in lines
-                                if (ln["label"] or "").startswith("Resumen Global")
-                            ),
-                            lines[0]["label"],
-                        ),
+                        "label": summary_label or lines[0]["label"],
                     }
                 )
                 collapsed.append(merged)

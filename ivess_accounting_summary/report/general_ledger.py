@@ -34,6 +34,16 @@ class GeneralLedgerReport(models.AbstractModel):
             .ids
         )
         currency = self.env.company.currency_id
+        # Leyenda del asiento (con su período) para las cuentas cuyas líneas no
+        # la traen, como la deuda por comprobante.
+        summary_labels = {}
+        for line in self.env["account.move.line"].search(
+            [
+                ("move_id", "in", list(summary_ids)),
+                ("name", "=like", "Resumen Global%"),
+            ]
+        ):
+            summary_labels.setdefault(line.move_id.id, line.name)
         groups = {}
         result = []
         for line in move_lines:
@@ -51,14 +61,7 @@ class GeneralLedgerReport(models.AbstractModel):
                 continue
             merged = dict(item[0])
             net = currency.round(sum(ln["debit"] - ln["credit"] for ln in item))
-            label = next(
-                (
-                    ln["ref_label"]
-                    for ln in item
-                    if (ln["ref_label"] or "").startswith("Resumen Global")
-                ),
-                item[0]["ref_label"],
-            )
+            label = summary_labels.get(item[0]["entry_id"]) or item[0]["ref_label"]
             merged.update(
                 {
                     "debit": net if net > 0 else 0.0,

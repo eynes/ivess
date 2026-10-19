@@ -161,6 +161,13 @@ class TestSummaryReportDedupe(IvessAccountingSummaryTestCommon):
         summary = next(m for m in values["Moves"] if m["move_id"] == self.summary.id)
         account_ids = [line["account_id"] for line in summary["report_move_lines"]]
         self.assertEqual(len(account_ids), len(set(account_ids)))
+        # La deuda por comprobante se colapsa con la leyenda del asiento.
+        debt_line = next(
+            ln
+            for ln in summary["report_move_lines"]
+            if ln["account_id"] == self.payable.x_legal_debt_account_id.id
+        )
+        self.assertTrue(debt_line["label"].startswith("Resumen Global"))
         self.assertAlmostEqual(
             sum(ln["debit"] - ln["credit"] for ln in summary["report_move_lines"]),
             0.0,

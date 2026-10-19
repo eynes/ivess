@@ -1,6 +1,6 @@
 {
     "name": "Ivess Accounting Summary",
-    "version": "19.0.0.0.1",
+    "version": "19.0.0.0.2",
     "summary": "Contabilidad Resumida (Diarios Espejo) y Foliación Legal",
     "description": """
         Contabilidad Resumida (Diarios Espejo). Los diarios operativos
@@ -72,6 +72,7 @@
         "report/journal_ledger_templates.xml",
     ],
     "demo": [],
+    "post_init_hook": "post_init_hook",
     "installable": True,
     "auto_install": False,
     "license": "LGPL-3",
