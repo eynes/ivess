@@ -59,3 +59,20 @@ class TestPaymentLineDescription(TransactionCase):
         wizard = self._wizard()
         with self.assertRaises(UserError):
             wizard.action_apply()
+
+    def test_button_only_for_other_payment_journal(self):
+        self.order.journal_id = self.journal
+        self.assertFalse(self.order.is_other_payment_journal)
+        with self.assertRaises(UserError):
+            self.order.action_edit_line_description()
+
+        self.env.company.other_payment_journal_id = self.journal
+        self.assertTrue(self.order.is_other_payment_journal)
+        action = self.order.action_edit_line_description()
+        self.assertEqual(action['res_model'], 'payment.line.description.wizard')
+
+        other_journal = self.env['account.journal'].create(
+            {'name': 'Pago a Proveedores test', 'code': 'PPT', 'type': 'cash'}
+        )
+        self.order.journal_id = other_journal
+        self.assertFalse(self.order.is_other_payment_journal)

@@ -9,7 +9,11 @@
                 expr="//field[@name='payment_mode_line_ids']"
                 position="before"
             >
-                <div class="mb-2" invisible="state == 'draft' or not payment_mode_line_ids">
+                <field name="is_other_payment_journal" invisible="1" />
+                <div
+                    class="mb-2"
+                    invisible="state == 'draft' or not payment_mode_line_ids or not is_other_payment_journal"
+                >
                     <button
                         name="action_edit_line_description"
                         string="Editar descripción"
