@@ -7,12 +7,15 @@
         método de pago son de solo lectura. Agrega el botón "Editar
         descripción" que abre un wizard para modificar únicamente la
         descripción de cada línea, dejando registro del cambio en el
-        chatter. No modifica los asientos ya generados.
+        chatter. El botón solo se muestra en los pagos cuyo diario es el
+        "Diario de Otros Pagos" configurado en la compañía. No modifica los
+        asientos ya generados.
     """,
     "author": "Eynes",
     "category": "Accounting",
     "depends": [
         "l10n_ar_eynes",
+        "account_payment_order_other_payment_journal",
     ],
     "data": [
         "security/ir.model.access.csv",
