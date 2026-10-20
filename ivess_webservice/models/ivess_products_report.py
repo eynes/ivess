@@ -11,7 +11,7 @@ class IvessProductsReport(models.Model):
             return {"error": "Este servicio no acepta parámetros. La request debe enviarse vacía."}
 
         products = self.env["product.template"].with_context(lang="es_AR").search(
-            [("show_in_app", "=", True)], order="id"
+            [("show_in_app", "=", True), ("sale_ok", "=", True)], order="id"
         )
 
         promo_products = products.filtered("is_promo")

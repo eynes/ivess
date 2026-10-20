@@ -20,6 +20,7 @@
         "custom_ivess_product",
         "ivess_partner_custom",
         "pricelist_custom",
+        "aguas_fc_integration",
     ],
     "data": [
         "data/ir_sequence.xml",

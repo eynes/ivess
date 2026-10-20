@@ -27,3 +27,32 @@ class StockMove(models.Model):
     @api.onchange('water_container_id')
     def _onchange_water_container_id(self):
         self.container_state = self.water_container_id.state if self.water_container_id else False
+
+    def _action_assign(self, force_qty=False):
+        res = super()._action_assign(force_qty=force_qty)
+        
+        serial_moves = self.filtered(
+            lambda m: m.has_tracking == 'serial'
+            and m.sale_line_id.serial_lot_ids
+            and m.state not in ('done', 'cancel')
+            and not m.picked
+        )
+        
+        for move in serial_moves:
+            requested = move.sale_line_id.serial_lot_ids
+
+            # Series pedidas con stock libre en la ubicacion del move
+            quants_in_location = self.env['stock.quant']._gather(move.product_id, move.location_id)
+            free_quants = quants_in_location.filtered(
+                lambda q: q.lot_id in requested and q.available_quantity > 0
+            )
+            free_lots = free_quants.lot_id
+
+            # Series pedidas que este move ya reservo: no figuran como libres
+            reserved_lots = requested & move.move_line_ids.lot_id
+
+            available = free_lots | reserved_lots
+            if set(available.ids) != set(move.lot_ids.ids):
+                move.lot_ids = available
+                move._recompute_state()
+        return res
