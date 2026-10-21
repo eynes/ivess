@@ -1,6 +1,6 @@
 {
     "name": "Ivess Accounting Summary",
-    "version": "19.0.0.0.1",
+    "version": "19.0.0.0.2",
     "summary": "Contabilidad Resumida (Diarios Espejo) y Foliación Legal",
     "description": """
         Contabilidad Resumida (Diarios Espejo). Los diarios operativos
@@ -47,10 +47,19 @@
           socio" y "Listar asientos resumen" (muestra los asientos del
           Diario Legal y oculta los comprobantes ya resumidos); el Excel
           sale en una única hoja.
+
+        - Libro Mayor OCA: opción "Listar asientos resumen" (misma regla
+          que el Libro Diario), en movimientos del período y saldos
+          iniciales.
     """,
     "author": "Eynes",
     "category": "Accounting",
-    "depends": ["account", "account_reports", "account_financial_report"],
+    "depends": [
+        "account",
+        "account_reports",
+        "account_financial_report",
+        "l10n_ar_eynes",
+    ],
     "data": [
         "security/ir.model.access.csv",
         "views/account_account_views.xml",
@@ -59,9 +68,11 @@
         "wizard/account_summary_closing_wizard_views.xml",
         "wizard/legal_folio_renumber_wizard_views.xml",
         "wizard/journal_ledger_wizard_views.xml",
+        "wizard/general_ledger_wizard_views.xml",
         "report/journal_ledger_templates.xml",
     ],
     "demo": [],
+    "post_init_hook": "post_init_hook",
     "installable": True,
     "auto_install": False,
     "license": "LGPL-3",

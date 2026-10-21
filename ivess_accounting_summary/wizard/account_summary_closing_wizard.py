@@ -255,10 +255,15 @@ class AccountSummaryClosingWizard(models.TransientModel):
             legal_pl_totals[line.account_id] += line.balance
 
         legal_bridge_totals = defaultdict(float)
+        legal_bridge_payable = {}
         for line in debt_lines:
             collected = collected_by_line.get(line.id)
             if collected:
-                legal_bridge_totals[line.account_id.x_legal_bridge_account_id] += collected
+                bridge_account = line.account_id.x_legal_bridge_account_id
+                legal_bridge_totals[bridge_account] += collected
+                legal_bridge_payable[bridge_account] = (
+                    line.account_id.account_type == "liability_payable"
+                )
 
         legal_line_vals = []
         for account, balance in legal_pl_totals.items():
@@ -285,7 +290,12 @@ class AccountSummaryClosingWizard(models.TransientModel):
                     0,
                     {
                         "account_id": account.id,
-                        "name": _("Cobrado en el Período %s", period_label),
+                        # Proveedores pagados: misma leyenda que la línea de gastos.
+                        "name": (
+                            _("Resumen Global %s", period_label)
+                            if legal_bridge_payable[account]
+                            else _("Cobrado en el Período %s", period_label)
+                        ),
                         "debit": collected if collected > 0 else 0.0,
                         "credit": -collected if collected < 0 else 0.0,
                     },

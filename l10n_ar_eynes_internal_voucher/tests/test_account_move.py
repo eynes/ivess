@@ -77,3 +77,31 @@ class TestAccountMove(TestInternalVoucherCommon):
 
         self.assertIn(normal_invoice.id, invoice_ids)
         self.assertNotIn(internal_invoice.id, invoice_ids)
+
+    def test_apportionable_vat_subjournal_excludes_internal_voucher(self):
+        # The query INNER JOINs the fiscal position.
+        fiscal_position = self.env.ref('l10n_ar_eynes.fiscal_position_cf')
+        normal_invoice = self._create_invoice(self.normal_journal)
+        normal_invoice.fiscal_position_id = fiscal_position
+        # The query INNER JOINs the voucher type, set by the electronic flow.
+        normal_invoice._force_voucher_type()
+        normal_invoice.action_post()
+
+        internal_invoice = self._create_invoice(self.internal_voucher_journal)
+        internal_invoice.fiscal_position_id = fiscal_position
+        internal_invoice._force_voucher_type()
+        internal_invoice.action_post()
+
+        wizard_model = self.env['account.tax.subjournal.apportionable.wizard']
+        wizard = wizard_model.create(
+            {
+                'company_id': self.env.company.id,
+                'date_from': fields.Date.today().replace(day=1),
+                'date_to': fields.Date.today(),
+                'based_on': 'sale',
+            }
+        )
+        invoice_ids = {row['invoice_id'] for row in wizard._get_line_vals()}
+
+        self.assertIn(normal_invoice.id, invoice_ids)
+        self.assertNotIn(internal_invoice.id, invoice_ids)
