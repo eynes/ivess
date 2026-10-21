@@ -13,3 +13,10 @@ class GeneralLedgerXlsx(models.AbstractModel):
         for column in columns.values():
             column["header"] = fix_text(column["header"])
         return columns
+
+    def _get_report_filters(self, report):
+        # Mismo problema en los rótulos de filtros ("Filtro periodo").
+        return [
+            [fix_text(label), fix_text(value) if isinstance(value, str) else value]
+            for label, value in super()._get_report_filters(report)
+        ]
