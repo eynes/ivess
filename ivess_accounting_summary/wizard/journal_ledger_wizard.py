@@ -12,8 +12,10 @@ class JournalLedgerReportWizard(models.TransientModel):
         string="Listar asientos resumen",
         help=(
             "Muestra los asientos resumen del Diario Legal y oculta los "
-            "comprobantes que fueron resumidos por un Cierre Mensual (y sus "
-            "asientos de neteo), para no duplicar información."
+            "comprobantes que fueron resumidos por un Cierre Mensual, sus "
+            "asientos de neteo y los cobros/pagos que ese cierre ya absorbió, "
+            "para no duplicar información. El asiento resumen sale con una "
+            "única línea por cuenta."
         ),
     )
 
