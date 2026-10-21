@@ -3,6 +3,7 @@ from unittest.mock import patch
 from odoo import fields
 from odoo.tests.common import tagged
 
+from ..wizard.create_libro_iva import LibroIVAExporterWizard
 from .common import TestInternalVoucherCommon
 
 
@@ -22,7 +23,8 @@ class TestCreateLibroIva(TestInternalVoucherCommon):
 
     def _exported_invoices(self, file_format, method, invoices):
         wizard = self._create_wizard(file_format)
-        base = type(wizard).__mro__[1]
+        mro = type(wizard).__mro__
+        base = mro[mro.index(LibroIVAExporterWizard) + 1]
         with patch.object(
             base, method, autospec=True, return_value=([], [])
         ) as mocked:

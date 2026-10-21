@@ -20,6 +20,26 @@ class AccountTaxSubjournalApportionableWizard(models.TransientModel):
 
     _inherit = 'account.tax.subjournal.apportionable.wizard'
 
+    # Codigos AFIP que el mapa de l10n_ar_eynes no contempla (KeyError).
+    _EXTRA_VOUCHER_PREFIXES = {
+        '033': 'LPG ',  # Liquidacion Primaria de Granos
+    }
+
+    def _get_invoice_type(self, voucher_type, denom):
+        try:
+            return super()._get_invoice_type(voucher_type, denom)
+        except KeyError:
+            prefix = self._EXTRA_VOUCHER_PREFIXES.get(
+                voucher_type, '%s ' % voucher_type
+            )
+            _logger.warning(
+                'Subdiario IVA: tipo de comprobante AFIP %s sin mapeo en '
+                'l10n_ar_eynes, se usa el prefijo %r',
+                voucher_type,
+                prefix,
+            )
+            return '%s %s' % (prefix, denom.upper())
+
     def _group_lines_data(self, cols, vat_cols):  # noqa: C901
         query_vals = self._get_line_vals()
         if not len(query_vals):

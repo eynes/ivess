@@ -8,7 +8,7 @@
 
 {
     "name": "L10n AR Fiscal Credit Ivess",
-    "version": "19.0.0.0.2",
+    "version": "19.0.0.0.3",
     "author": "Eynes SRL",
     "website": "http://www.eynes.com.ar",
     "category": "Accounting/Accounting",
