@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="other_payment_view_form_edit_line_description" model="ir.ui.view">
+        <field name="name">account.payment.order.other.payment.form.edit.line.description</field>
+        <field name="model">account.payment.order</field>
+        <field name="inherit_id" ref="l10n_ar_eynes.other_payment_view_form" />
+        <field name="arch" type="xml">
+            <xpath
+                expr="//field[@name='payment_mode_line_ids']"
+                position="before"
+            >
+                <field name="is_other_payment_journal" invisible="1" />
+                <div
+                    class="mb-2"
+                    invisible="state == 'draft' or not payment_mode_line_ids or not is_other_payment_journal"
+                >
+                    <button
+                        name="action_edit_line_description"
+                        string="Editar descripción"
+                        type="object"
+                        class="btn-secondary"
+                        icon="fa-pencil"
+                    />
+                </div>
+            </xpath>
+            <xpath
+                expr="//field[@name='payment_mode_line_ids']/list/field[@name='name']"
+                position="attributes"
+            >
+                <attribute name="invisible">0</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

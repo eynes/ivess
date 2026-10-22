@@ -189,6 +189,44 @@ class AccountMove(models.Model):
                 arch.append(field_node)
         return arch, view
 
+    @api.model
+    def _ivess_get_summarized_payment_ids(self, company_ids):
+        """Ids de cobros/pagos ya absorbidos por un Cierre Mensual.
+
+        El cierre solo marca los comprobantes de los diarios operativos. El
+        cobro/pago de un comprobante resumido vive en otro diario (banco,
+        caja) y quedaría listado junto al asiento resumen, que ya lo
+        incluye ("cobrado en el período" / puente). Se considera absorbido
+        el asiento reconciliado contra un comprobante resumido con fecha
+        igual o anterior a la del asiento resumen; uno posterior sigue
+        visible porque no forma parte del resumen.
+        """
+        partials = self.env["account.partial.reconcile"].search(
+            [
+                ("company_id", "in", company_ids),
+                "|",
+                ("debit_move_id.move_id.x_closed_by_summary_move_id", "!=", False),
+                ("credit_move_id.move_id.x_closed_by_summary_move_id", "!=", False),
+            ]
+        )
+        move_ids = set()
+        for partial in partials:
+            debit_move = partial.debit_move_id.move_id
+            credit_move = partial.credit_move_id.move_id
+            for document, other in (
+                (debit_move, credit_move),
+                (credit_move, debit_move),
+            ):
+                closing = document.x_closed_by_summary_move_id
+                if (
+                    closing
+                    and not other.x_closed_by_summary_move_id
+                    and not other.x_is_summary_entry
+                    and other.date <= closing.date
+                ):
+                    move_ids.add(other.id)
+        return list(move_ids)
+
     def _ivess_renumber_legal_folio(self, company):
         """Renumera x_folio_legal sin huecos para los diarios legales de `company`.
 

@@ -22,3 +22,4 @@ from . import ivess_customer_fc_report
 from . import ivess_fc_stock_in_truck_report
 from . import ivess_messages_report
 from . import ivess_talonarios_report
+from . import ivess_operation_delivery
