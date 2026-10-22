@@ -1,8 +1,33 @@
+from dataclasses import dataclass
+
 from odoo import Command, api, models
 from odoo.exceptions import UserError
 from odoo.fields import Domain
 from datetime import datetime
 import pytz
+
+from ..utils.delivery_params import (
+    BASIC_HEADER_SCHEMA,
+    CONTAINER_STATE_BY_TIPO_VENTA,
+    SALE_SCHEMA,
+    requires_container_state,
+    validate_case_params,
+    validate_header,
+    validate_series,
+    validate_tipo_venta,
+)
+
+APP_DATETIME_FORMAT = "%Y-%m-%d %H%M"
+APP_TIMEZONE = "America/Argentina/Buenos_Aires"
+
+
+@dataclass
+class SaleOutcome:
+    """Resultado de procesar la venta: registros creados y errores no fatales."""
+    order: models.BaseModel
+    picking: models.BaseModel
+    confirm_error: str | bool = False
+    validate_error: str | bool = False
 
 
 class IvessOperationDelivery(models.AbstractModel):
@@ -11,109 +36,39 @@ class IvessOperationDelivery(models.AbstractModel):
 
     @api.model
     def send_operation(self, **kwargs):
-        # Cabecera basica: obligatoria en cualquier operacion.
-        basic_header = {
-            "usuario_reparto": str,
-            "fecha_operacion": str,
-            "nro_reparto": int,
-            "hora_atencion": str,
-            "hora_envio": str,
-            "codigo_cliente": str,
-            "motivo_no_compra": int,
-            "longitud": str,
-            "latitud": str,
-            "metros": (int, float),
-            "fuera_ruta": bool,
-        }
-        # Caso venta (motivo_no_compra == 0).
-        sale = {
-            "item_venta": list,
-        }
-        # Estructura de cada elemento de item_venta.
-        # Numericos aceptan int o float: en JSON un 2 llega como int.
-        sale_item = {
-            "codigo_producto": str,
-            "cantidad": (int, float),
-            "precio_venta": (int, float),
-        }
-        # tipo_venta es opcional a nivel parametro (solo aplica a productos
-        # retornables, ver validacion contra el producto) y por eso no esta en
-        # sale_item, que _check_params trata como obligatorio.
-        # Valor de la app -> water.container.state.
-        container_state_by_tipo_venta = {
-            "V": "en_comodato",
-            "P": "prestado",
-        }
+        """Registra la visita de un reparto, con o sin venta.
 
+        Fases: validar parametros -> resolver registros (ubicacion, reparto,
+        cliente, recorrido, linea) -> validar la venta contra productos y series
+        -> crear y confirmar la venta -> preparar y validar el picking ->
+        escribir la linea del recorrido -> responder.
+
+        Todas las validaciones van antes de cualquier escritura: un return de
+        error no hace rollback.
+        """
         # La app puede no lograr calcular los metros y enviarlos como null
         if "metros" in kwargs and ((kwargs["metros"] is None) or (kwargs["metros"] == 0)):
             kwargs["metros"] = -1
 
         # Fase 1: cabecera basica. Va primero porque motivo_no_compra
         # define el caso y, por ende, que otros parametros se esperan.
-        errors = self._check_params(kwargs, basic_header)
-        if errors["missing"]:
-            return {"error" : "Faltan parametros obligatorios: %s" % ", ".join(errors["missing"])}
-        if errors["invalid_types"]:
-            return {"error" : "Tipo invalido en parametros: %s" % ", ".join(errors["invalid_types"])}
+        error = validate_header(kwargs).message()
+        if error:
+            return {"error": error}
 
         case_schema = {}
         if kwargs["motivo_no_compra"] == 0:
-            case_schema.update(sale)
-        expected_params_types = {**basic_header, **case_schema}
+            case_schema.update(SALE_SCHEMA)
+        expected_params_types = {**BASIC_HEADER_SCHEMA, **case_schema}
 
         unknown_params = set(kwargs) - set(expected_params_types)
         if unknown_params:
             return {"error" : "Parametros no reconocidos: %s" % ", ".join(sorted(unknown_params))}
 
         # Fase 2: parametros propios del caso
-        errors = self._check_params(kwargs, case_schema)
-        unknown_item_params = []
-        invalid_values = []
-        if type(kwargs.get("item_venta")) is list:
-            for index, item in enumerate(kwargs["item_venta"]):
-                if type(item) is not dict:
-                    errors["invalid_types"].append("item_venta[%s] (dict)" % index)
-                    continue
-                prefix = "item_venta[%s]." % index
-                unknown_keys = set(item) - set(sale_item) - {"tipo_venta", "series"}
-                # evaluar implementar condicion if unknown_keys
-                for param in sorted(unknown_keys):
-                    unknown_item_params.append(prefix + param)
-                item_errors = self._check_params(item, sale_item, prefix)
-                errors["missing"] += item_errors["missing"]
-                errors["invalid_types"] += item_errors["invalid_types"]
-                # None equivale a no enviado (la app puede mandar null en
-                # productos no retornables); cualquier otro valor se valida.
-                tipo_venta = item.get("tipo_venta")
-                if tipo_venta is not None:
-                    if type(tipo_venta) is not str:
-                        errors["invalid_types"].append(prefix + "tipo_venta (str)")
-                    elif tipo_venta not in container_state_by_tipo_venta:
-                        invalid_values.append(prefix + "tipo_venta (%s)" % "/".join(container_state_by_tipo_venta))
-                series = item.get("series")
-                if series is not None:
-                    if type(series) is not list:
-                        errors["invalid_types"].append(prefix + "series (list)")
-                    else:
-                        for serie_index, serie in enumerate(series):
-                            if type(serie) is not str or not serie.strip():
-                                errors["invalid_types"].append("%sseries[%s] (str)" % (prefix, serie_index))
-                if item_errors["missing"] or item_errors["invalid_types"]:
-                    continue
-                if item["cantidad"] <= 0:
-                    invalid_values.append(prefix + "cantidad (> 0)")
-                if item["precio_venta"] < 0:
-                    invalid_values.append(prefix + "precio_venta (>= 0)")
-
-        if unknown_item_params:
-            return {"error" : "Parametros no reconocidos: %s" % ", ".join(unknown_item_params)}
-        if errors["missing"]:
-            return {"error" : "Faltan parametros obligatorios: %s" % ", ".join(errors["missing"])}
-        if errors["invalid_types"]:
-            return {"error" : "Tipo invalido en parametros: %s" % ", ".join(errors["invalid_types"])}
-        if invalid_values:
-            return {"error" : "Valor invalido en parametros: %s" % ", ".join(invalid_values)}
+        error = validate_case_params(kwargs, case_schema).message()
+        if error:
+            return {"error": error}
 
         usuario_reparto = kwargs["usuario_reparto"]
         fecha_operacion = kwargs["fecha_operacion"]
@@ -128,16 +83,11 @@ class IvessOperationDelivery(models.AbstractModel):
         fuera_ruta = kwargs["fuera_ruta"]
         item_venta = kwargs.get("item_venta", [])
 
-        fdt = "%Y-%m-%d %H%M"
         try:
-            visit_date_hour = datetime.strptime(fecha_operacion + " " + hora_atencion, fdt)
-            phone_date_hour = datetime.strptime(fecha_operacion + " " + hora_envio, fdt)
+            visit_date_hour = self._app_datetime_to_utc(fecha_operacion, hora_atencion)
+            phone_date_hour = self._app_datetime_to_utc(fecha_operacion, hora_envio)
         except ValueError:
             return {"error" : "Formato invalido: fecha_operacion debe ser YYYY-MM-DD y hora_atencion, hora_envio HHMM."}
-
-        tz = pytz.timezone("America/Argentina/Buenos_Aires")
-        visit_date_hour = tz.localize(visit_date_hour).astimezone(pytz.utc).replace(tzinfo=None)
-        phone_date_hour = tz.localize(phone_date_hour).astimezone(pytz.utc).replace(tzinfo=None)
 
         ubicacion = self.env["stock.location"].search([("aguas_idreparto", "=", aguas_idreparto)], limit=1)
         if not ubicacion:
@@ -173,16 +123,12 @@ class IvessOperationDelivery(models.AbstractModel):
         if not fuera_ruta and not linea:
             return {"error": "El cliente %s no pertenece al recorrido del reparto %s." % (codigo_cliente, aguas_idreparto)}
 
-        # Validaciones de la venta antes de cualquier escritura: un return
-        # de error no hace rollback de lo ya escrito.
         products_by_code = {}
         duplicated_codes = {}
         if item_venta:
             if linea.sale_order_id:
                 return {"error": "El cliente %s ya tiene una venta registrada en el recorrido (%s)." % (codigo_cliente, linea.sale_order_id.name)}
 
-            # El almacen de la orden sale de la ubicacion del reparto: sin
-            # almacen no se puede determinar el tipo de operacion del picking.
             if not ubicacion.warehouse_id:
                 return {"error": "La ubicacion del reparto %s no pertenece a ningun almacen." % aguas_idreparto}
 
@@ -193,10 +139,7 @@ class IvessOperationDelivery(models.AbstractModel):
                 ("sale_ok", "=", True),
             ], order="id")
             for product in products:
-                # default_code deberia ser unico por regla de negocio, pero Odoo
-                # no lo garantiza (sin constraint). Ante un duplicado se toma el
-                # mas antiguo (products viene ordenado por id) y se deja aviso
-                # en la orden para revision.
+                # default_code duplicado: se toma el mas antiguo y se avisa en la orden.
                 code = product.default_code
                 if code not in products_by_code:
                     products_by_code[code] = product
@@ -207,53 +150,17 @@ class IvessOperationDelivery(models.AbstractModel):
             if missing_codes:
                 return {"error": "No existen productos con los codigos: %s" % ", ".join(sorted(missing_codes))}
 
-            # tipo_venta define el estado del envase: solo tiene sentido (y es
-            # obligatorio) en productos retornables.
-            missing_tipo_venta = []
-            unexpected_tipo_venta = []
-            for index, item in enumerate(item_venta):
-                product = products_by_code[item["codigo_producto"]]
-                has_tipo_venta = item.get("tipo_venta") is not None
-                if product.is_returnable and not product.is_frio_calor and not has_tipo_venta:
-                    missing_tipo_venta.append("item_venta[%s].tipo_venta (%s es retornable)" % (index, product.default_code))
-                elif not product.is_returnable and has_tipo_venta:
-                    unexpected_tipo_venta.append("item_venta[%s].tipo_venta (%s no es retornable)" % (index, product.default_code))
-            if missing_tipo_venta:
-                return {"error": "Faltan parametros obligatorios: %s" % ", ".join(missing_tipo_venta)}
-            if unexpected_tipo_venta:
-                return {"error": "Parametros no aplicables: %s" % ", ".join(unexpected_tipo_venta)}
+            error = validate_tipo_venta(item_venta, products_by_code).message()
+            if error:
+                return {"error": error}
 
-            # series identifica la unidad entregada: es obligatoria (una por
-            # unidad) solo en productos con seguimiento por numero de serie.
-            missing_series = []
-            unexpected_series = []
-            invalid_series = []
-            requested_series = set()
-            for index, item in enumerate(item_venta):
-                product = products_by_code[item["codigo_producto"]]
-                series = item.get("series") or []
-                prefix = "item_venta[%s]." % index
-                if product.tracking != "serial":
-                    if series:
-                        unexpected_series.append(prefix + "series (%s no tiene seguimiento por serie)" % product.default_code)
-                    continue
-                if not series:
-                    missing_series.append(prefix + "series (%s tiene seguimiento por serie)" % product.default_code)
-                    continue
-                if not float(item["cantidad"]).is_integer() or len(series) != item["cantidad"]:
-                    invalid_series.append(prefix + "series (una serie por unidad: cantidad entera igual a %s series)" % len(series))
-                for serie in series:
-                    if (product.id, serie) in requested_series:
-                        invalid_series.append(prefix + "series (%s repetida)" % serie)
-                    requested_series.add((product.id, serie))
-            if missing_series:
-                return {"error": "Faltan parametros obligatorios: %s" % ", ".join(missing_series)}
-            if unexpected_series:
-                return {"error": "Parametros no aplicables: %s" % ", ".join(unexpected_series)}
-            if invalid_series:
-                return {"error": "Valor invalido en parametros: %s" % ", ".join(invalid_series)}
+            series_errors, requested_series = validate_series(item_venta, products_by_code)
+            error = series_errors.message()
+            if error:
+                return {"error": error}
 
-            # Las salidas (pickings) no crean series (use_create_lots=False): deben existir las series.
+            # REPASAR
+            # Los pickings de salida no crean series: deben existir.
             lot_by_key = {}
             if requested_series:
                 lots = self.env["stock.lot"].search(Domain.OR(
@@ -278,101 +185,14 @@ class IvessOperationDelivery(models.AbstractModel):
             "app_user": usuario_reparto,
         }
 
-        sale_order = self.env["sale.order"]
-        picking = self.env["stock.picking"]
-        confirm_error = False
-        validate_error = False
+        outcome = SaleOutcome(self.env["sale.order"], self.env["stock.picking"])
         if item_venta:
-            # El precio de la app es absoluto: discount en 0 evita que
-            # pricelist_custom aplique el descuento del cliente encima.
-            # container_state solo aplica a retornables no frio/calor y viaja
-            # en la linea para que llegue al move aunque la confirmacion falle.
-            order_lines = []
-            for item in item_venta:
-                product = products_by_code[item["codigo_producto"]]
-                container_state = False
-                if product.is_returnable and not product.is_frio_calor:
-                    container_state = container_state_by_tipo_venta[item["tipo_venta"]]
-                order_lines.append(Command.create({
-                    "product_id": product.id,
-                    "product_uom_qty": item["cantidad"],
-                    "price_unit": item["precio_venta"],
-                    "discount": 0.0,
-                    "container_state": container_state,
-                    "serial_lot_ids": [Command.set([lot_by_key[(product.id, serie)].id for serie in item.get("series") or []])],
-                }))
-            sale_order = sale_order.create({
-                "partner_id": cliente.id,
-                "warehouse_id": ubicacion.warehouse_id.id,
-                "delivery_route_id": recorrido.id,
-                "order_line": order_lines,
-            })
-            if duplicated_codes:
-                sale_order.message_post(body="#REVISAR Codigos de producto repetidos: se tomo el producto mas antiguo. %s" % "; ".join(
-                    "%s: tomado id %s, descartados ids %s" % (
-                        code, candidates[0].id, ", ".join(str(p.id) for p in candidates[1:]),
-                    ) for code, candidates in sorted(duplicated_codes.items())
-                ))
-            # La venta ya ocurrio: si la confirmacion falla (casi siempre por
-            # configuracion de Odoo, no por los datos enviados) se deshace solo
-            # lo que ella hizo, la orden queda en borrador y se vincula igual.
-            try:
-                with self.env.cr.savepoint():
-                    sale_order.action_confirm()
-            except UserError as e:
-                confirm_error = str(e)
-                sale_order.message_post(
-                    body="La confirmacion automatica desde la app fallo y la orden quedo en borrador: %s" % confirm_error
-                )
-            vals["sale_order_id"] = sale_order.id
-            # Solo hay picking si la confirmacion prosperó (y si la orden tiene
-            # productos almacenables: una orden solo de servicios no genera ninguno).
-            picking = sale_order.picking_ids[:1]
-            if picking:
-                vals["stock_picking_id"] = picking.id
-                # Preparacion fuera de savepoint: son datos de la request (origen
-                # en el camion, cantidad vendida) y deben persistir aunque la
-                # validacion falle, para que una validacion manual sea correcta.
-                # La confirmacion reservo en el almacen: hay que liberar y reservar
-                # de nuevo. write() del picking propaga la ubicacion a sus moves.
-                picking.do_unreserve()
-                picking.write({"location_id": reparto.location_id.id})
-                picking.action_assign()
-                shortage = picking.move_ids.filtered(lambda m: m.state != "assigned")
-                if shortage and not reparto.allow_sale_without_stock:
-                    validate_error = "Stock insuficiente en la ubicacion del reparto para completar el picking %s." % picking.name
-                else:
-                    if shortage:
-                        picking.message_post(body="Stock insuficiente en la ubicacion del reparto: se forzo la cantidad vendida. %s" % "; ".join(
-                            "%s: reservado %s de %s" % (move.product_id.display_name, move.quantity, move.product_uom_qty)
-                            for move in shortage
-                        ))
-                        for move in shortage:
-                            # Con serie se fuerza cada unidad con su serie: una
-                            # linea sin serie no pasa el _sanity_check del picking.
-                            if move.has_tracking == "serial" and move.sale_line_id.serial_lot_ids:
-                                move.lot_ids = move.sale_line_id.serial_lot_ids
-                            else:
-                                move.quantity = move.product_uom_qty
-                    # Mismo criterio que la confirmacion: si la validacion falla se
-                    # deshace solo ella, el picking queda sin validar y vinculado.
-                    try:
-                        with self.env.cr.savepoint():
-                            # skip_backorder: sin esto button_validate devuelve el
-                            # wizard de backorder. Puede devolver acciones de
-                            # impresion, por eso el exito se verifica por el estado.
-                            picking.with_context(
-                                skip_backorder=True,
-                                picking_ids_not_to_backorder=picking.ids,
-                            ).button_validate()
-                            if picking.state != "done":
-                                raise UserError("No se pudo validar el picking %s (estado: %s)." % (picking.name, picking.state))
-                    except UserError as e:
-                        validate_error = str(e)
-                if validate_error:
-                    picking.message_post(
-                        body="La validacion automatica desde la app fallo y el picking quedo sin validar: %s" % validate_error
-                    )
+            outcome = self._process_sale(
+                cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key, duplicated_codes,
+            )
+            vals["sale_order_id"] = outcome.order.id
+            if outcome.picking:
+                vals["stock_picking_id"] = outcome.picking.id
 
         if fuera_ruta:
             linea = self.env["delivery.route.line"].create({
@@ -383,33 +203,137 @@ class IvessOperationDelivery(models.AbstractModel):
         else:
             linea.write(vals)
 
+        return self._build_response(linea, outcome)
+
+    def _process_sale(self, cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key, duplicated_codes):
+        """Crea la venta, la confirma y prepara y valida su picking.
+        Confirmar y validar son best effort: la venta ya ocurrio, asi que si
+        fallan se registra el error y se sigue."""
+        order = self._create_sale_order(
+            cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key, duplicated_codes,
+        )
+        outcome = SaleOutcome(order, self.env["stock.picking"])
+        outcome.confirm_error = self._confirm_sale_order(order)
+        # Sin confirmacion, o con una orden solo de servicios, no hay picking.
+        outcome.picking = order.picking_ids[:1]
+        if outcome.picking:
+            outcome.validate_error = (
+                self._prepare_picking(outcome.picking, reparto)
+                or self._validate_picking(outcome.picking)
+            )
+            if outcome.validate_error:
+                outcome.picking.message_post(
+                    body="La validacion automatica desde la app fallo y el picking quedo sin validar: %s" % outcome.validate_error
+                )
+        return outcome
+
+    def _create_sale_order(self, cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key, duplicated_codes):
+        # El precio de la app es absoluto: discount en 0 evita que
+        # pricelist_custom aplique el descuento del cliente encima.
+        order_lines = []
+        for item in item_venta:
+            product = products_by_code[item["codigo_producto"]]
+            container_state = False
+            if requires_container_state(product):
+                container_state = CONTAINER_STATE_BY_TIPO_VENTA[item["tipo_venta"]]
+            order_lines.append(Command.create({
+                "product_id": product.id,
+                "product_uom_qty": item["cantidad"],
+                "price_unit": item["precio_venta"],
+                "discount": 0.0,
+                "container_state": container_state,
+                "serial_lot_ids": [Command.set([lot_by_key[(product.id, serie)].id for serie in item.get("series") or []])],
+            }))
+        order = self.env["sale.order"].create({
+            "partner_id": cliente.id,
+            "warehouse_id": reparto.location_id.warehouse_id.id,
+            "delivery_route_id": recorrido.id,
+            "order_line": order_lines,
+        })
+        if duplicated_codes:
+            order.message_post(body="#REVISAR Codigos de producto repetidos: se tomo el producto mas antiguo. %s" % "; ".join(
+                "%s: tomado id %s, descartados ids %s" % (
+                    code, candidates[0].id, ", ".join(str(p.id) for p in candidates[1:]),
+                ) for code, candidates in sorted(duplicated_codes.items())
+            ))
+        return order
+
+    def _confirm_sale_order(self, order):
+        """Si la confirmacion falla (casi siempre por configuracion de Odoo,
+        no por los datos enviados) se deshace solo ella y la orden queda en
+        borrador. Devuelve el error o False."""
+        try:
+            with self.env.cr.savepoint():
+                order.action_confirm()
+        except UserError as e:
+            order.message_post(
+                body="La confirmacion automatica desde la app fallo y la orden quedo en borrador: %s" % e
+            )
+            return str(e)
+        return False
+
+    def _prepare_picking(self, picking, reparto):
+        """Pasa el picking a la ubicacion del camion. Devuelve el error si falta
+        stock y el reparto no permite vender sin stock; si lo permite, fuerza la
+        cantidad vendida. Va fuera de savepoint: son datos de la request y deben
+        persistir aunque la validacion falle."""
+        # La confirmacion reservo en el almacen: se libera y se reserva de nuevo.
+        # write() del picking propaga la ubicacion a sus moves.
+        picking.do_unreserve()
+        picking.write({"location_id": reparto.location_id.id})
+        picking.action_assign()
+        shortage = picking.move_ids.filtered(lambda m: m.state != "assigned")
+        if not shortage:
+            return False
+        if not reparto.allow_sale_without_stock:
+            return "Stock insuficiente en la ubicacion del reparto para completar el picking %s." % picking.name
+        picking.message_post(body="Stock insuficiente en la ubicacion del reparto: se forzo la cantidad vendida. %s" % "; ".join(
+            "%s: reservado %s de %s" % (move.product_id.display_name, move.quantity, move.product_uom_qty)
+            for move in shortage
+        ))
+        for move in shortage:
+            # Con serie se fuerza cada unidad con su serie: una linea sin serie
+            # no pasa el _sanity_check del picking.
+            if move.has_tracking == "serial" and move.sale_line_id.serial_lot_ids:
+                move.lot_ids = move.sale_line_id.serial_lot_ids
+            else:
+                move.quantity = move.product_uom_qty
+        return False
+
+    def _validate_picking(self, picking):
+        """Si la validacion falla se deshace solo ella: el picking queda sin
+        validar y vinculado. Devuelve el error o False."""
+        try:
+            with self.env.cr.savepoint():
+                # skip_backorder: sin esto button_validate devuelve el wizard de
+                # backorder. Puede devolver acciones de impresion, por eso el
+                # exito se verifica por el estado.
+                picking.with_context(
+                    skip_backorder=True,
+                    picking_ids_not_to_backorder=picking.ids,
+                ).button_validate()
+                if picking.state != "done":
+                    raise UserError("No se pudo validar el picking %s (estado: %s)." % (picking.name, picking.state))
+        except UserError as e:
+            return str(e)
+        return False
+
+    def _build_response(self, linea, outcome):
         result = {"success": True, "route_line_id": linea.id}
-        if sale_order:
-            result["sale_order_id"] = sale_order.id
-            result["sale_order_confirmed"] = not confirm_error
-            result["picking_validated"] = picking.state == "done"
+        if outcome.order:
+            result["sale_order_id"] = outcome.order.id
+            result["sale_order_confirmed"] = not outcome.confirm_error
+            result["picking_validated"] = outcome.picking.state == "done"
             # Son excluyentes: sin confirmacion no hay picking que validar
-            if confirm_error:
-                result["warning"] = "No se pudo confirmar la venta: %s" % confirm_error
-            elif validate_error:
-                result["warning"] = "No se pudo validar el picking: %s" % validate_error
+            if outcome.confirm_error:
+                result["warning"] = "No se pudo confirmar la venta: %s" % outcome.confirm_error
+            elif outcome.validate_error:
+                result["warning"] = "No se pudo validar el picking: %s" % outcome.validate_error
         return result
 
-    def _check_params(self, params, schema, prefix=""):
-        """Valida params contra schema ({param: tipo | tupla de tipos}).
-        Solo revisa las keys del schema; las desconocidas se controlan aparte.
-        Devuelve {"missing": [...], "invalid_types": [...]}."""
-        missing = []
-        invalid_types = []
-        for param, expected_types in schema.items():
-            if not isinstance(expected_types, tuple):
-                expected_types = (expected_types,)
-            value = params.get(param)
-            if value is None or value == "" or value == []:
-                missing.append(prefix + param)
-            # type() y no isinstance(): bool es subclase de int
-            elif type(value) not in expected_types:
-                invalid_types.append("%s%s (%s)" % (
-                    prefix, param, "/".join(t.__name__ for t in expected_types),
-                ))
-        return {"missing": missing, "invalid_types": invalid_types}
+    def _app_datetime_to_utc(self, fecha, hora):
+        """Convierte fecha YYYY-MM-DD + hora HHMM (hora de Argentina) a UTC naive.
+        Lanza ValueError si el formato es invalido."""
+        local = datetime.strptime(fecha + " " + hora, APP_DATETIME_FORMAT)
+        tz = pytz.timezone(APP_TIMEZONE)
+        return tz.localize(local).astimezone(pytz.utc).replace(tzinfo=None)
