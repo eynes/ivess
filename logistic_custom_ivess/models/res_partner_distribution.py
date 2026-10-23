@@ -105,7 +105,7 @@ class PartnerDistributions(models.Model):
         partner = self.partner_id
         reparto = self.distribution.delivery_number_id
         lat, lon = partner.partner_latitude, partner.partner_longitude
-        if not reparto or not (lat or lon):
+        if not reparto or reparto.is_technical_delivery or not (lat or lon):
             return False
         partner_id = partner._origin.id or 0
         self.env.cr.execute(SQL(
@@ -161,9 +161,10 @@ class PartnerDistributions(models.Model):
                 SELECT DISTINCT tdr.delivery_number_id, rp.id, rp.partner_latitude, rp.partner_longitude
                   FROM delivery_route_line drl
                   JOIN template_delivery_route tdr ON tdr.id = drl.template_route_id
+                  JOIN delivery_route_number drn ON drn.id = tdr.delivery_number_id
                   JOIN res_partner rp ON rp.id = drl.client_id
                  WHERE drl.route_id IS NULL
-                   AND tdr.delivery_number_id IS NOT NULL
+                   AND NOT drn.is_technical_delivery
                    AND rp.active
                    AND rp.id != %s
                    AND rp.partner_latitude BETWEEN %s AND %s

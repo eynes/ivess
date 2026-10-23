@@ -79,8 +79,12 @@ class IvessVisitaFueraRuta(models.TransientModel):
     def _proponer_reparto(self, partner, fecha):
         """Reparto habitual del cliente. Si tiene más de uno, el que le toca el
         día de la semana de la fecha o, si ese día no le toca ninguno, el de
-        su día de visita siguiente."""
-        plantillas = partner.distributions_ids.distribution.filtered("delivery_number_id")
+        su día de visita siguiente. Los repartos técnicos (frío/calor,
+        instalaciones, retiros) nunca se proponen para un pedido."""
+        plantillas = partner.distributions_ids.distribution.filtered(
+            lambda plantilla: plantilla.delivery_number_id
+            and not plantilla.delivery_number_id.is_technical_delivery
+        )
         repartos = plantillas.delivery_number_id
         if len(repartos) <= 1 or not fecha:
             return repartos[:1]
