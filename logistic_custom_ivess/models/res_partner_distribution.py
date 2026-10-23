@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 
-from odoo import models, fields, api, _
+from odoo import Command, models, fields, api, _
 from odoo.exceptions import ValidationError
 from odoo.tools import SQL
 from odoo.tools.misc import formatLang
@@ -83,6 +83,12 @@ class PartnerDistributions(models.Model):
         string='Días más cercanos',
         compute='_compute_dias_sugeridos',
     )
+    sugerencia_ids = fields.One2many(
+        'partner.distribution.sugerencia',
+        'distribution_parent_id',
+        string='Opciones más cercanas',
+        compute='_compute_sugerencia_ids',
+    )
 
     @api.depends('distribution.day')
     def _compute_dia_visita(self):
@@ -99,6 +105,69 @@ class PartnerDistributions(models.Model):
     def _compute_dias_sugeridos(self):
         for rec in self:
             rec.dias_sugeridos = rec._sugerir_dias()
+
+    @api.depends('partner_id', 'distribution')
+    def _compute_sugerencia_ids(self):
+        # Como reparto_sugerido: solo al cargar una distribución nueva.
+        for rec in self:
+            opciones = rec._plantillas_cercanas() if not rec._origin.id else []
+            rec.sugerencia_ids = [Command.clear()] + [Command.create(op) for op in opciones]
+
+    @api.onchange('sugerencia_ids')
+    def _onchange_sugerencia_ids(self):
+        elegida = self.sugerencia_ids.filtered('usar')[-1:]
+        if elegida:
+            self.distribution = elegida.plantilla_id
+
+    def _plantillas_cercanas(self, limit=5):
+        """Las plantillas (reparto + día) cuyos clientes están más cerca del
+        cliente, sin repartos técnicos ni días en que ya lo visitan: promedio
+        de las 3 distancias más cortas, como _sugerir_reparto. La franja es la
+        hora promedio de visita (average_hour) de esos clientes cercanos."""
+        self.ensure_one()
+        partner = self.partner_id
+        lat, lon = partner.partner_latitude, partner.partner_longitude
+        if not (lat or lon):
+            return []
+        partner_id = partner._origin.id or 0
+        self.env.cr.execute(SQL(
+            """
+            SELECT tdr.id, rp.partner_latitude, rp.partner_longitude, rp.average_hour
+              FROM delivery_route_line drl
+              JOIN template_delivery_route tdr ON tdr.id = drl.template_route_id
+              JOIN delivery_route_number drn ON drn.id = tdr.delivery_number_id
+              JOIN res_partner rp ON rp.id = drl.client_id
+             WHERE drl.route_id IS NULL
+               AND NOT drn.is_technical_delivery
+               AND rp.active
+               AND rp.id != %s
+               AND (rp.partner_latitude != 0 OR rp.partner_longitude != 0)
+               AND tdr.day NOT IN (
+                       SELECT actual.day
+                         FROM partner_distribution pd
+                         JOIN template_delivery_route actual ON actual.id = pd.distribution
+                        WHERE pd.partner_id = %s)
+            """,
+            partner_id, partner_id,
+        ))
+        por_plantilla = defaultdict(list)
+        for plantilla_id, la, lo, hora in self.env.cr.fetchall():
+            por_plantilla[plantilla_id].append((_distancia_km((lat, lon), (la, lo)), hora))
+        opciones = []
+        for plantilla_id, cercanos in por_plantilla.items():
+            cercanos = sorted(cercanos, key=lambda c: c[0])[:3]
+            horas = [h for _d, h in cercanos if h]
+            promedio = sum(horas) / len(horas) if horas else False
+            opciones.append((sum(d for d, _h in cercanos) / len(cercanos), plantilla_id, promedio))
+        por_id = {p.id: p for p in self.env['template.delivery.route'].browse([o[1] for o in opciones])}
+        return [{
+            'plantilla_id': plantilla_id,
+            'name': '%s %s' % (
+                por_id[plantilla_id].name,
+                DAY_LABELS_ES.get(por_id[plantilla_id].day, por_id[plantilla_id].day).lower()),
+            'distancia': puntaje,
+            'franja': '~%02d:%02d' % (int(hora), round((hora % 1) * 60)) if hora else False,
+        } for puntaje, plantilla_id, hora in sorted(opciones)[:limit]]
 
     def _sugerir_dias(self):
         """Minuta del 01/10/2026 (cambio de día): los 3 días del mismo reparto
