@@ -53,6 +53,11 @@ class PartnerDistributions(models.Model):
         compute='_compute_dia_visita',
         store=True,
     )
+    orden = fields.Integer(
+        string='Orden',
+        related='route_line_id.sequence',
+        help='Orden del cliente en la plantilla del recorrido.',
+    )
     partner_street = fields.Char(related='partner_id.street', string='Calle')
     partner_num = fields.Char(related='partner_id.num', string='Número')
     partner_city = fields.Char(related='partner_id.city', string='Ciudad')
