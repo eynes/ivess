@@ -1,6 +1,6 @@
 {
     "name": "Sale Custom Ivess",
-    "version": "19.0.0.0.30",
+    "version": "19.0.0.0.31",
     "description": """
     """,
     "author": "Eynes",
@@ -15,6 +15,7 @@
         "mail",
         "stock",
         "crm",
+        "contacts",
         "l10n_ar_eynes",
         "custom_ivess_product",
     ],

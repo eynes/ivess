@@ -21,6 +21,7 @@
                             <field name="delivery_route_line_ids">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
+                                    <field name="sequence" string="Orden"/>
                                     <field name="allowed_client" column_invisible="1" force_save="1"/>
                                     <field name="client_id" widget="many2one_link" optional="show" domain="[('id', 'in', allowed_client)]"/>
                                     <field name="customer_code"/>

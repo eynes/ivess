@@ -198,7 +198,7 @@ class DeliveryRoute(models.Model):
         if template:
             self.truck_id = template.truck_id
             self.delivery_route_line_ids = [(5, 0, 0)] + [
-                (0, 0, {'client_id': line.client_id.id})
+                (0, 0, {'client_id': line.client_id.id, 'sequence': line.sequence})
                 for line in template.delivery_route_line_ids
             ]
         else:
@@ -209,6 +209,7 @@ class DeliveryRoute(models.Model):
         return [(0, 0, {
             'route_id': self.id,
             'client_id': line.client_id.id,
+            'sequence': line.sequence,
             'origin': 'plantilla',
         }) for line in template.delivery_route_line_ids]
 
@@ -373,10 +374,12 @@ class DeliveryRoute(models.Model):
             created |= route
 
         existing_client_ids = route.delivery_route_line_ids.mapped('client_id').ids
+        orden_plantilla = {line.client_id.id: line.sequence for line in template.delivery_route_line_ids}
         new_lines = [
             {
                 'route_id': route.id,
                 'client_id': cid,
+                'sequence': orden_plantilla.get(cid, 10),
                 'origin': 'plantilla',
                 'visit_status_id': False,
                 'no_purchase_reason_id': False,
@@ -587,6 +590,14 @@ class DeliveryRouteLine(models.Model):
         string="Sequence",
         default=10
     )
+    template_order = fields.Integer(
+        string="Orden",
+        compute='_compute_template_order',
+        store=True,
+        help="Orden del cliente en la plantilla cuando se generó la visita. Si"
+        " después se cambia el orden en la plantilla, los recorridos ya"
+        " generados no se tocan.",
+    )
 
     possible_customer_withdrawal = fields.Boolean("Possible Withdrawal", tracking=True)
     reason_customer_withdrawal = fields.Many2one(
@@ -634,6 +645,12 @@ class DeliveryRouteLine(models.Model):
         'account.payment.order',
         string='Cobranzas',
         compute='_compute_cobranza_ids',
+    )
+    total_cobrado = fields.Float(
+        string='Total cobrado',
+        digits='Account',
+        compute='_compute_total_cobrado',
+        help='Suma de las cobranzas de la visita. No cuenta las que están en borrador o anuladas.',
     )
     origin = fields.Char(
         string='Origen',
@@ -962,6 +979,26 @@ class DeliveryRouteLine(models.Model):
             if rec.template_route_id:
                 rec.allowed_client = partner_obj.search([('visit_day', '=', rec.template_route_id.day)], limit=None)
 
+    @api.depends('template_route_id', 'route_id.template_delivery_route_id', 'client_id')
+    def _compute_template_order(self):
+        # En la línea de la plantilla es su propio orden; en la del recorrido,
+        # el de la línea de plantilla del mismo cliente al generarse. No
+        # depende de 'sequence': es una foto, no se mueve si cambia la plantilla.
+        route_lines = self.filtered('route_id')
+        for rec in self - route_lines:
+            rec.template_order = rec.sequence
+        template_lines = self.env['delivery.route.line'].search([
+            ('route_id', '=', False),
+            ('template_route_id', 'in', route_lines.route_id.template_delivery_route_id.ids),
+            ('client_id', 'in', route_lines.client_id.ids),
+        ], order='sequence, id')
+        order_by_key = {}
+        for line in template_lines:
+            order_by_key.setdefault((line.template_route_id.id, line.client_id.id), line.sequence)
+        for rec in route_lines:
+            rec.template_order = order_by_key.get(
+                (rec.route_id.template_delivery_route_id.id, rec.client_id.id), 0)
+
     @api.depends(
         'visit_status_id',
         'visit_status_id.requires_reason'
@@ -991,6 +1028,18 @@ class DeliveryRouteLine(models.Model):
                 recibos_por_visita[recibo.partner_id.id, recibo.date] |= recibo
         for visita in visitas:
             visita.cobranza_ids = recibos_por_visita[visita.client_id.id, visita.delivery_date]
+
+    @api.depends('cobranza_ids')
+    def _compute_total_cobrado(self):
+        # En account.payment.order el importe es "amount" (en la base figura como
+        # "Tax Amount"): es el total de la orden y coincide con lo que acredita
+        # su asiento en la cuenta a cobrar del cliente. No se almacena porque el
+        # campo no es almacenado; el total del pie se suma sobre las visitas
+        # que muestra la lista.
+        for visita in self:
+            visita.total_cobrado = sum(
+                visita.cobranza_ids.filtered(lambda o: o.state not in ('draft', 'cancel')).mapped('amount')
+            )
 
     def action_ver_cobranzas(self):
         self.ensure_one()

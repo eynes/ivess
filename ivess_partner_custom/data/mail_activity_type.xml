@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="mail_activity_type_solicitud_traspaso_saldo" model="mail.activity.type">
+            <field name="name">Solicitud de traspaso de saldo</field>
+            <field name="icon">fa-exchange</field>
+            <field name="res_model">res.partner</field>
+            <field name="delay_count">1</field>
+            <field name="delay_unit">days</field>
+        </record>
+    </data>
+</odoo>

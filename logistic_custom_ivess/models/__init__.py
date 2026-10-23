@@ -31,3 +31,4 @@ from . import stock_rule
 from . import sale_report
 from . import res_config_settings
 from . import account_invoice_report
+from . import partner_distribution_sugerencia

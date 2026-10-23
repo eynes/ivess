@@ -155,10 +155,12 @@ class ResPartner(models.Model):
             if not rec.is_customer or rec.customer_code:
                 continue
             company_id = rec.company_id.id or self.env.company.id
+            # La secuencia puede ser de la compañía o global (sin compañía):
+            # la de la compañía gana.
             sequence = self.env['ir.sequence'].search([
                 ('code', '=', 'res.partner.ivess'),
-                ('company_id', '=', company_id),
-            ], limit=1)
+                ('company_id', 'in', (company_id, False)),
+            ], order='company_id', limit=1)
             if sequence:
                 rec.customer_code = sequence.next_by_id()
 
