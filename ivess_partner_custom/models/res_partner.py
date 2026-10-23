@@ -422,6 +422,30 @@ class ResPartner(models.Model):
                 self._sync_delivery_partner_back()
         return res
 
+    @api.model
+    def get_deuda_visitas(self, partner_id):
+        """Deuda actual del cliente para el encabezado de "Ver visitas": los
+        mismos valores que la ficha (deuda por ventas, por frío/calor y el
+        botón Adeudado). No depende de ningún filtro de la lista. En una madre
+        es la del grupo: la deuda de las hijas se imputa a la madre."""
+        partner = self.browse(partner_id).exists()
+        if not partner:
+            return False
+        partner.check_access("read")
+        total = partner.deuda_ventas + partner.deuda_frio_calor
+        adeudado = partner.total_all_due if "total_all_due" in partner._fields else False
+        return {
+            "id": partner.id,
+            "nombre": partner.display_name,
+            "currency_id": partner.currency_id.id,
+            "deuda_ventas": partner.deuda_ventas,
+            "deuda_frio_calor": partner.deuda_frio_calor,
+            "total": total,
+            "adeudado": adeudado,
+            "puede_ver_adeudado": hasattr(partner, "open_follow_up_report")
+            and self.env.user.has_group("account.group_account_basic"),
+        }
+
     def action_solicitar_traspaso_saldo(self):
         """Quien no tiene el grupo "Traspaso de saldo" no lo ejecuta: abre el
         asistente de actividades ya completo con el contacto, para asignársela

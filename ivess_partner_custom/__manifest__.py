@@ -25,6 +25,11 @@
         "views/res_partner.xml",
         "views/menu_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "ivess_partner_custom/static/src/visitas_deuda/*",
+        ],
+    },
     "installable": True,
     "application": False,
     "license": "LGPL-3",

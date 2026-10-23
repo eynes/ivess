@@ -206,6 +206,18 @@
         </field>
     </record>
 
+    <!-- Ver visitas: encabezado fijo con la deuda del cliente -->
+    <record id="view_delivery_route_line_visitas_list_deuda" model="ir.ui.view">
+        <field name="name">delivery.route.line.visitas.list.deuda</field>
+        <field name="model">delivery.route.line</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_delivery_route_line_visitas_list"/>
+        <field name="arch" type="xml">
+            <list position="attributes">
+                <attribute name="js_class">visitas_deuda_list</attribute>
+            </list>
+        </field>
+    </record>
+
     <!-- Código de cliente en la lista de contactos y en el buscador -->
     <record id="view_partner_tree_customer_code" model="ir.ui.view">
         <field name="name">res.partner.list.customer.code</field>
