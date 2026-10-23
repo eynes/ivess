@@ -145,6 +145,7 @@
                 <field name="cobranza_ids" string="Cobranzas" widget="many2many_tags"/>
                 <button name="action_ver_cobranzas" type="object" icon="fa-external-link"
                         title="Abrir las cobranzas" invisible="not cobranza_ids"/>
+                <field name="total_cobrado" string="Total cobrado" sum="Total cobrado"/>
             </list>
         </field>
     </record>

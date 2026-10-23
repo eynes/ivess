@@ -646,6 +646,12 @@ class DeliveryRouteLine(models.Model):
         string='Cobranzas',
         compute='_compute_cobranza_ids',
     )
+    total_cobrado = fields.Float(
+        string='Total cobrado',
+        digits='Account',
+        compute='_compute_total_cobrado',
+        help='Suma de las cobranzas de la visita. No cuenta las que están en borrador o anuladas.',
+    )
     origin = fields.Char(
         string='Origen',
     )
@@ -1022,6 +1028,18 @@ class DeliveryRouteLine(models.Model):
                 recibos_por_visita[recibo.partner_id.id, recibo.date] |= recibo
         for visita in visitas:
             visita.cobranza_ids = recibos_por_visita[visita.client_id.id, visita.delivery_date]
+
+    @api.depends('cobranza_ids')
+    def _compute_total_cobrado(self):
+        # En account.payment.order el importe es "amount" (en la base figura como
+        # "Tax Amount"): es el total de la orden y coincide con lo que acredita
+        # su asiento en la cuenta a cobrar del cliente. No se almacena porque el
+        # campo no es almacenado; el total del pie se suma sobre las visitas
+        # que muestra la lista.
+        for visita in self:
+            visita.total_cobrado = sum(
+                visita.cobranza_ids.filtered(lambda o: o.state not in ('draft', 'cancel')).mapped('amount')
+            )
 
     def action_ver_cobranzas(self):
         self.ensure_one()
