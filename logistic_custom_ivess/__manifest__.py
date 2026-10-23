@@ -15,6 +15,7 @@
         "mail",
         "stock",
         "crm",
+        "contacts",
         "l10n_ar_eynes",
         "custom_ivess_product",
     ],

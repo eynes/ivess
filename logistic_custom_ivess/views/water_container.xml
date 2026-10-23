@@ -71,9 +71,18 @@
         </field>
     </record>
 
+    <!-- Menú de primer nivel de la app Contactos (no cuelga de Configuración,
+         que exige Ventas / Administrador): junta envases y equipos con la ficha
+         del cliente. Los tres menús que cuelgan de acá antes estaban en
+         CRM > Configuración. -->
+    <menuitem id="menu_envases_equipos_root"
+              name="Envases y equipos"
+              parent="contacts.menu_contacts"
+              sequence="10"/>
+
     <menuitem id="menu_water_container_main"
               name="Envases"
-              parent="crm.crm_menu_config"
+              parent="menu_envases_equipos_root"
               sequence="19"
               action="action_water_container"/>
 </odoo>
