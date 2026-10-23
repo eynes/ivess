@@ -159,12 +159,10 @@ class IvessOperationDelivery(models.AbstractModel):
             if error:
                 return {"error": error}
 
-            # REPASAR
-            # Los pickings de salida no crean series: deben existir.
             lot_by_key = {}
             if requested_series:
                 lots = self.env["stock.lot"].search(Domain.OR(
-                    Domain([("product_id", "=", product_id), ("name", "=", serie)])
+                    [("product_id", "=", product_id), ("name", "=", serie)]
                     for product_id, serie in requested_series
                 ), order="id desc")
                 lot_by_key = {(lot.product_id.id, lot.name): lot for lot in lots}
@@ -214,8 +212,7 @@ class IvessOperationDelivery(models.AbstractModel):
         )
         outcome = SaleOutcome(order, self.env["stock.picking"])
         outcome.confirm_error = self._confirm_sale_order(order)
-        # Sin confirmacion, o con una orden solo de servicios, no hay picking.
-        outcome.picking = order.picking_ids[:1]
+        outcome.picking = order.picking_ids.filtered(lambda p: p.picking_type_code == "outgoing")[:1]
         if outcome.picking:
             outcome.validate_error = (
                 self._prepare_picking(outcome.picking, reparto)
