@@ -10,10 +10,13 @@
         "base_address_extended",
         "sale",
         "account",
+        "mail",
         "l10n_ar_eynes",
         "logistic_custom_ivess",
     ],
     "data": [
+        "data/res_groups.xml",
+        "data/mail_activity_type.xml",
         "security/ir.model.access.csv",
         "views/baja_madre_views.xml",
         "views/desvincular_hija_views.xml",

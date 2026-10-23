@@ -46,5 +46,6 @@
         <field name="res_model">ivess.traspaso.saldo</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
+        <field name="group_ids" eval="[(4, ref('ivess_partner_custom.group_traspaso_saldo'))]"/>
     </record>
 </odoo>

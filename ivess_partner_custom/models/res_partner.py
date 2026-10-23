@@ -422,6 +422,29 @@ class ResPartner(models.Model):
                 self._sync_delivery_partner_back()
         return res
 
+    def action_solicitar_traspaso_saldo(self):
+        """Quien no tiene el grupo "Traspaso de saldo" no lo ejecuta: abre el
+        asistente de actividades ya completo con el contacto, para asignársela
+        a alguien del grupo."""
+        self.ensure_one()
+        tipo = self.env.ref("ivess_partner_custom.mail_activity_type_solicitud_traspaso_saldo")
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Solicitar traspaso de saldo"),
+            "res_model": "mail.activity.schedule",
+            "view_mode": "form",
+            "views": [(False, "form")],
+            "target": "new",
+            "context": {
+                "active_model": "res.partner",
+                "active_id": self.id,
+                "active_ids": self.ids,
+                "default_res_model": "res.partner",
+                "default_activity_type_id": tipo.id,
+                "default_summary": _("Traspaso de saldo: %s", self.display_name),
+            },
+        }
+
     def action_archive(self):
         # Una madre con hijas activas no se archiva directo: se abre la
         # elección de la nueva madre (el cliente web ejecuta la acción).

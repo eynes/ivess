@@ -32,7 +32,12 @@
                             string="Traspasar saldo y dar de baja"
                             context="{'default_origen_id': id}"
                             invisible="not id or not active"
-                            groups="account.group_account_invoice"/>
+                            groups="ivess_partner_custom.group_traspaso_saldo"/>
+                    <button name="action_solicitar_traspaso_saldo"
+                            type="object"
+                            string="Solicitar traspaso de saldo"
+                            invisible="not id or not active"
+                            groups="!ivess_partner_custom.group_traspaso_saldo"/>
                     <button name="%(ivess_partner_custom.action_ivess_desvincular_hija)d"
                             type="action"
                             string="Desvincular del grupo"
