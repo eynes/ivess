@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -124,15 +126,23 @@ class AccountMove(models.Model):
         # vez de "Pagado". Si ya estaba cobrado/pagado de verdad ANTES del
         # cierre (fue por la cuenta puente, sin línea propia), no se toca:
         # ese "Pagado" es real.
-        for move in self:
-            if not move.x_closed_by_summary_move_id:
-                continue
-            had_open_debt = bool(
-                move.x_closed_by_summary_move_id.line_ids.filtered(
-                    lambda line: line.x_origin_document_id == move
-                )
-            )
-            if had_open_debt:
+        closed_moves = self.filtered("x_closed_by_summary_move_id")
+        if not closed_moves:
+            return
+        # Comprobantes con deuda abierta, por asiento de cierre: una sola
+        # consulta agrupada. Recorrer las líneas del asiento resumen por cada
+        # comprobante es cuadrático (con decenas de miles de líneas no termina).
+        origin_ids_by_closing = defaultdict(set)
+        for closing_move, origin_move in self.env["account.move.line"]._read_group(
+            [
+                ("move_id", "in", closed_moves.x_closed_by_summary_move_id.ids),
+                ("x_origin_document_id", "!=", False),
+            ],
+            ["move_id", "x_origin_document_id"],
+        ):
+            origin_ids_by_closing[closing_move.id].add(origin_move.id)
+        for move in closed_moves:
+            if move.id in origin_ids_by_closing[move.x_closed_by_summary_move_id.id]:
                 move.status_in_payment = "not_paid"
 
     @api.depends("line_ids.x_summary_move_id")

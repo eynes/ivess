@@ -149,6 +149,8 @@ class AccountSummaryClosingWizard(models.TransientModel):
             date_to=self.date_to,
         )
 
+        lines_by_key = defaultdict(lambda: self.env["account.move.line"])
+        reconcile_netting_by_key = defaultdict(lambda: self.env["account.move.line"])
         for journal in self.operational_journal_ids:
             journal_pl_lines = pl_lines.filtered(
                 lambda line, journal=journal: line.journal_id == journal
@@ -240,15 +242,33 @@ class AccountSummaryClosingWizard(models.TransientModel):
                 {"x_summary_move_id": netting_move.id}
             )
 
+            # Cada línea de deuda abierta se concilia contra su línea de neteo
+            # (misma cuenta, contacto y comprobante de origen). Se indexa el
+            # neteo una sola vez y se acumulan los grupos para conciliar todo
+            # junto al final: buscar la línea de neteo con filtered() por cada
+            # línea es cuadrático y reconcile() de a una pierde ~0,1 s cada vez.
+            netting_by_key = defaultdict(lambda: self.env["account.move.line"])
+            for netting_line in netting_move.line_ids:
+                if netting_line.x_origin_document_id:
+                    netting_by_key[
+                        (
+                            netting_line.account_id.id,
+                            netting_line.partner_id.id,
+                            netting_line.x_origin_document_id.id,
+                        )
+                    ] |= netting_line
             for line in journal_open_debt_lines:
-                netting_line = netting_move.line_ids.filtered(
-                    lambda nl, line=line: (
-                        nl.account_id == line.account_id
-                        and nl.partner_id == line.partner_id
-                        and nl.x_origin_document_id == line.move_id
-                    )
-                )
-                (line | netting_line).reconcile()
+                key = (line.account_id.id, line.partner_id.id, line.move_id.id)
+                lines_by_key[key] |= line
+                reconcile_netting_by_key[key] |= netting_by_key[key]
+
+        # Una sola conciliación en lote (un grupo por comprobante/contacto).
+        self.env["account.move.line"]._reconcile_plan(
+            [
+                lines_by_key[key] | reconcile_netting_by_key[key]
+                for key in lines_by_key
+            ]
+        )
 
         legal_pl_totals = defaultdict(float)
         for line in pl_lines:
