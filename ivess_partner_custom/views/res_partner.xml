@@ -11,7 +11,7 @@
                 <attribute name="invisible">1</attribute>
             </field>
             <xpath expr="//h1[.//field[@name='name']]" position="before">
-                <div class="text-muted" invisible="not is_customer or not customer_code">
+                <div class="text-muted" invisible="not customer_code">
                     <span>Código de cliente: </span><field name="customer_code" readonly="1" class="fw-bold"/>
                 </div>
             </xpath>
