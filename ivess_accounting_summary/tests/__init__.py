@@ -6,3 +6,4 @@ from . import test_general_ledger_ivess
 from . import test_summary_report_dedupe
 from . import test_retention_summarized_debt
 from . import test_translation_repair
+from . import test_summary_job
