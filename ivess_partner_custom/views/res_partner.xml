@@ -200,7 +200,7 @@
             <xpath expr="//list" position="attributes">
                 <attribute name="decoration-success">condicion == 'madre'</attribute>
             </xpath>
-            <field name="display_name" position="after">
+            <field name="display_name" position="before">
                 <field name="condicion"/>
             </field>
         </field>
@@ -224,7 +224,7 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_tree"/>
         <field name="arch" type="xml">
-            <field name="display_name" position="before">
+            <field name="condicion" position="before">
                 <field name="customer_code"/>
             </field>
         </field>
