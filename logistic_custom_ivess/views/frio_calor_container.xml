@@ -53,7 +53,7 @@
 
     <menuitem id="menu_frio_calor_container_main"
               name="Equipos Frio/Calor"
-              parent="crm.crm_menu_config"
+              parent="menu_envases_equipos_root"
               sequence="20"
               action="action_frio_calor_container"/>
 </odoo>

@@ -163,6 +163,62 @@
             <field name="parent_id" position="after">
                 <field name="pagador_id"/>
             </field>
+            <filter name="inactive" position="before">
+                <filter name="condicion_madre" string="Madre" domain="[('condicion', '=', 'madre')]"/>
+                <filter name="condicion_hija" string="Hija" domain="[('condicion', '=', 'hija')]"/>
+                <filter name="condicion_individual" string="Individual" domain="[('condicion', '=', 'individual')]"/>
+                <separator/>
+            </filter>
+            <filter name="group_company" position="after">
+                <filter name="group_condicion" string="Condición" context="{'group_by': 'condicion'}"/>
+            </filter>
+        </field>
+    </record>
+
+    <!-- Condición (madre / hija / individual) al lado del nombre. Decoración
+         opcional: la madre en verde, como en Aguas. -->
+    <record id="view_partner_tree_condicion" model="ir.ui.view">
+        <field name="name">res.partner.list.condicion</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="attributes">
+                <attribute name="decoration-success">condicion == 'madre'</attribute>
+            </xpath>
+            <field name="display_name" position="after">
+                <field name="condicion"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Clientes por Reparto -->
+    <record id="view_partner_distribution_reparto_list_condicion" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.list.condicion</field>
+        <field name="model">partner.distribution</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_distribution_reparto_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="attributes">
+                <attribute name="decoration-success">partner_condicion == 'madre'</attribute>
+            </xpath>
+            <field name="partner_id" position="after">
+                <field name="partner_condicion"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_partner_distribution_reparto_search_condicion" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.search.condicion</field>
+        <field name="model">partner.distribution</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_distribution_reparto_search"/>
+        <field name="arch" type="xml">
+            <field name="reparto_id" position="after">
+                <filter name="condicion_madre" string="Madre" domain="[('partner_condicion', '=', 'madre')]"/>
+                <filter name="condicion_hija" string="Hija" domain="[('partner_condicion', '=', 'hija')]"/>
+                <filter name="condicion_individual" string="Individual" domain="[('partner_condicion', '=', 'individual')]"/>
+            </field>
+            <filter name="group_dia" position="after">
+                <filter name="group_condicion" string="Condición" context="{'group_by': 'partner_condicion'}"/>
+            </filter>
         </field>
     </record>
 </odoo>
