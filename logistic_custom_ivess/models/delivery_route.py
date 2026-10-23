@@ -587,6 +587,11 @@ class DeliveryRouteLine(models.Model):
         string="Sequence",
         default=10
     )
+    template_order = fields.Integer(
+        string="Orden",
+        compute='_compute_template_order',
+        help="Orden del cliente en la plantilla del recorrido.",
+    )
 
     possible_customer_withdrawal = fields.Boolean("Possible Withdrawal", tracking=True)
     reason_customer_withdrawal = fields.Many2one(
@@ -961,6 +966,25 @@ class DeliveryRouteLine(models.Model):
             rec.allowed_client = partner_obj.browse()
             if rec.template_route_id:
                 rec.allowed_client = partner_obj.search([('visit_day', '=', rec.template_route_id.day)], limit=None)
+
+    @api.depends('sequence', 'template_route_id', 'route_id.template_delivery_route_id', 'client_id')
+    def _compute_template_order(self):
+        # En la línea de la plantilla es su propio orden; en la del recorrido,
+        # el de la línea de plantilla del mismo cliente.
+        route_lines = self.filtered('route_id')
+        for rec in self - route_lines:
+            rec.template_order = rec.sequence
+        template_lines = self.env['delivery.route.line'].search([
+            ('route_id', '=', False),
+            ('template_route_id', 'in', route_lines.route_id.template_delivery_route_id.ids),
+            ('client_id', 'in', route_lines.client_id.ids),
+        ], order='sequence, id')
+        order_by_key = {}
+        for line in template_lines:
+            order_by_key.setdefault((line.template_route_id.id, line.client_id.id), line.sequence)
+        for rec in route_lines:
+            rec.template_order = order_by_key.get(
+                (rec.route_id.template_delivery_route_id.id, rec.client_id.id), 0)
 
     @api.depends(
         'visit_status_id',

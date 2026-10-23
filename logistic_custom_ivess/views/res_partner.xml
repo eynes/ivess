@@ -51,6 +51,7 @@
                         <field name="distributions_ids">
                             <list>
                                 <field name="distribution"/>
+                                <field name="orden"/>
                                 <field name="visit_day"/>
                                 <field name="frequency" required="1"/>
                                 <field name="last_visit_date" readonly="1"/>
