@@ -5,6 +5,16 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <!-- Código de cliente arriba, antes del nombre. Antes estaba al final de
+                 Ventas y Compras, debajo de "Canal de alta". -->
+            <field name="customer_code" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </field>
+            <xpath expr="//h1[.//field[@name='name']]" position="before">
+                <div class="text-muted" invisible="not is_customer or not customer_code">
+                    <span>Código de cliente: </span><field name="customer_code" readonly="1" class="fw-bold"/>
+                </div>
+            </xpath>
             <xpath expr="//sheet" position="before">
                 <header>
                     <button name="%(ivess_partner_custom.action_ivess_visita_fuera_ruta)d"
@@ -187,6 +197,29 @@
             </xpath>
             <field name="display_name" position="after">
                 <field name="condicion"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Código de cliente en la lista de contactos y en el buscador -->
+    <record id="view_partner_tree_customer_code" model="ir.ui.view">
+        <field name="name">res.partner.list.customer.code</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <field name="display_name" position="before">
+                <field name="customer_code"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_res_partner_filter_customer_code" model="ir.ui.view">
+        <field name="name">res.partner.search.customer.code</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="customer_code" string="Código de cliente"/>
             </field>
         </field>
     </record>
