@@ -29,6 +29,20 @@ class ResPartner(models.Model):
     requiere_comprobante = fields.Boolean(
         string="Requiere Factura",
     )
+    condicion = fields.Selection(
+        selection=[
+            ("madre", "Madre"),
+            ("hija", "Hija"),
+            ("individual", "Individual"),
+        ],
+        string="Condición",
+        compute="_compute_condicion",
+        store=True,
+        index=True,
+        help="Madre: tiene cuentas hijas activas (contactos de tipo \"Otra"
+        " dirección\"). Hija: cuelga de una madre como \"Otra dirección\"."
+        " Individual: el resto.",
+    )
     codigo_bejerman = fields.Char(
         string="Código Bejerman",
         copy=False,
@@ -419,6 +433,16 @@ class ResPartner(models.Model):
                 "context": {"default_madre_id": self.id},
             }
         return super().action_archive()
+
+    @api.depends("parent_id", "type", "child_ids.type", "child_ids.active")
+    def _compute_condicion(self):
+        for partner in self:
+            if any(child.type == "other" for child in partner.child_ids):
+                partner.condicion = "madre"
+            elif partner.parent_id and partner.type == "other":
+                partner.condicion = "hija"
+            else:
+                partner.condicion = "individual"
 
     def _hijas_activas(self):
         """Cuentas hijas: las que cuelgan de la madre como "other", como las
