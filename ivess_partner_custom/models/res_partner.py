@@ -433,7 +433,11 @@ class ResPartner(models.Model):
             return False
         partner.check_access("read")
         total = partner.deuda_ventas + partner.deuda_frio_calor
-        adeudado = partner.total_all_due if "total_all_due" in partner._fields else False
+        # El botón Adeudado (account_followup) es de Contabilidad: quien no la
+        # tiene ve el resto del encabezado, no ese botón.
+        puede_ver_adeudado = hasattr(partner, "open_follow_up_report") and self.env.user.has_group(
+            "account.group_account_basic"
+        )
         return {
             "id": partner.id,
             "nombre": partner.display_name,
@@ -441,9 +445,8 @@ class ResPartner(models.Model):
             "deuda_ventas": partner.deuda_ventas,
             "deuda_frio_calor": partner.deuda_frio_calor,
             "total": total,
-            "adeudado": adeudado,
-            "puede_ver_adeudado": hasattr(partner, "open_follow_up_report")
-            and self.env.user.has_group("account.group_account_basic"),
+            "adeudado": partner.total_all_due if puede_ver_adeudado else False,
+            "puede_ver_adeudado": puede_ver_adeudado,
         }
 
     def action_solicitar_traspaso_saldo(self):
