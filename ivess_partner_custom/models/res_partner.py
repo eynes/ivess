@@ -402,6 +402,7 @@ class ResPartner(models.Model):
                 if "csv_inherit_commercial" in self._fields:
                     vals["csv_inherit_commercial"] = True
         partners = super().create(vals_list)
+        partners._check_cliente_con_codigo()
         if not self.env.context.get("sync_delivery_partner"):
             partners.filtered(
                 lambda p: p._has_delivery_address()
@@ -413,6 +414,8 @@ class ResPartner(models.Model):
             self._check_madres_sin_hijas_activas()
         self._check_pending_water_containers_before_archiving(vals)
         res = super().write(vals)
+        if vals.keys() & {"is_customer", "customer_rank", "customer_code"}:
+            self._check_cliente_con_codigo()
         if not self.env.context.get("sync_delivery_partner"):
             if vals.keys() & (set(DELIVERY_ADDRESS_FIELDS) | set(DELIVERY_CONTACT_FIELDS)):
                 self.filtered(
@@ -421,6 +424,22 @@ class ResPartner(models.Model):
             if vals.keys() & set(DELIVERY_ADDRESS_FIELDS.values()):
                 self._sync_delivery_partner_back()
         return res
+
+    def _check_cliente_con_codigo(self):
+        """Todo cliente tiene código de cliente (T17178). Se controla después
+        de la asignación automática de logistic_custom_ivess y no como
+        constrains, que corre antes de que el alta reciba su código. Solo se
+        toca al crear o al cambiar is_customer / customer_code: los clientes
+        viejos sin código siguen guardándose mientras no se los modifique así."""
+        sin_codigo = self.filtered(lambda partner: partner.is_customer and not partner.customer_code)
+        if sin_codigo:
+            raise ValidationError(
+                _(
+                    "Un cliente no puede quedar sin código de cliente (si es un alta nueva,"
+                    " revisá que exista la secuencia de códigos). Contactos: %s"
+                )
+                % ", ".join(sin_codigo.mapped("display_name"))
+            )
 
     @api.model
     def get_deuda_visitas(self, partner_id):
