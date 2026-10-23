@@ -186,6 +186,7 @@ class DeliveryRouteMassCreateWizard(models.TransientModel):
                     lines_to_create.append({
                         'route_id': route.id,
                         'client_id': client.id,
+                        'sequence': dist.route_line_id.sequence if dist.route_line_id else 10,
                         'origin': 'plantilla',
                         'visit_status_id': False,
                         'no_purchase_reason_id': False,

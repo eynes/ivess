@@ -198,7 +198,7 @@ class DeliveryRoute(models.Model):
         if template:
             self.truck_id = template.truck_id
             self.delivery_route_line_ids = [(5, 0, 0)] + [
-                (0, 0, {'client_id': line.client_id.id})
+                (0, 0, {'client_id': line.client_id.id, 'sequence': line.sequence})
                 for line in template.delivery_route_line_ids
             ]
         else:
@@ -209,6 +209,7 @@ class DeliveryRoute(models.Model):
         return [(0, 0, {
             'route_id': self.id,
             'client_id': line.client_id.id,
+            'sequence': line.sequence,
             'origin': 'plantilla',
         }) for line in template.delivery_route_line_ids]
 
@@ -373,10 +374,12 @@ class DeliveryRoute(models.Model):
             created |= route
 
         existing_client_ids = route.delivery_route_line_ids.mapped('client_id').ids
+        orden_plantilla = {line.client_id.id: line.sequence for line in template.delivery_route_line_ids}
         new_lines = [
             {
                 'route_id': route.id,
                 'client_id': cid,
+                'sequence': orden_plantilla.get(cid, 10),
                 'origin': 'plantilla',
                 'visit_status_id': False,
                 'no_purchase_reason_id': False,
@@ -590,7 +593,10 @@ class DeliveryRouteLine(models.Model):
     template_order = fields.Integer(
         string="Orden",
         compute='_compute_template_order',
-        help="Orden del cliente en la plantilla del recorrido.",
+        store=True,
+        help="Orden del cliente en la plantilla cuando se generó la visita. Si"
+        " después se cambia el orden en la plantilla, los recorridos ya"
+        " generados no se tocan.",
     )
 
     possible_customer_withdrawal = fields.Boolean("Possible Withdrawal", tracking=True)
@@ -967,10 +973,11 @@ class DeliveryRouteLine(models.Model):
             if rec.template_route_id:
                 rec.allowed_client = partner_obj.search([('visit_day', '=', rec.template_route_id.day)], limit=None)
 
-    @api.depends('sequence', 'template_route_id', 'route_id.template_delivery_route_id', 'client_id')
+    @api.depends('template_route_id', 'route_id.template_delivery_route_id', 'client_id')
     def _compute_template_order(self):
         # En la línea de la plantilla es su propio orden; en la del recorrido,
-        # el de la línea de plantilla del mismo cliente.
+        # el de la línea de plantilla del mismo cliente al generarse. No
+        # depende de 'sequence': es una foto, no se mueve si cambia la plantilla.
         route_lines = self.filtered('route_id')
         for rec in self - route_lines:
             rec.template_order = rec.sequence

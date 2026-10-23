@@ -56,7 +56,11 @@ class PartnerDistributions(models.Model):
     orden = fields.Integer(
         string='Orden',
         related='route_line_id.sequence',
-        help='Orden del cliente en la plantilla del recorrido.',
+        readonly=False,
+        store=True,
+        help='Orden del cliente en la plantilla del recorrido. Al cambiarlo, los'
+        ' recorridos que se generen después salen con el nuevo orden; los ya'
+        ' generados no se tocan.',
     )
     partner_street = fields.Char(related='partner_id.street', string='Calle')
     partner_num = fields.Char(related='partner_id.num', string='Número')
@@ -356,6 +360,7 @@ class PartnerDistributions(models.Model):
                 continue
             new_line = self.env['delivery.route.line'].create({
                 'client_id': self.partner_id.id,
+                'sequence': self.route_line_id.sequence if self.route_line_id else 10,
                 'origin': 'plantilla',
             })
             route.delivery_route_line_ids = [(4, new_line.id)]

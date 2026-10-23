@@ -110,6 +110,7 @@
                         <field name="reparto_sugerido" invisible="not reparto_sugerido" readonly="1" class="text-muted"/>
                         <field name="dias_sugeridos" invisible="not dias_sugeridos" readonly="1" class="text-muted"/>
                         <field name="distribution"/>
+                        <field name="orden"/>
                         <field name="visit_day"/>
                         <field name="frequency" required="1"/>
                         <field name="last_visit_date" readonly="1"/>
@@ -133,13 +134,14 @@
         <field name="model">partner.distribution</field>
         <field name="priority">99</field>
         <field name="arch" type="xml">
-            <list string="Clientes por Reparto" create="0" edit="0" delete="0" default_order="reparto_id, dia_visita, partner_id">
+            <list string="Clientes por Reparto" create="0" edit="0" delete="0" default_order="reparto_id, dia_visita, orden, partner_id">
                 <field name="partner_id" string="Cliente" widget="many2one"/>
                 <field name="partner_street"/>
                 <field name="partner_num"/>
                 <field name="partner_city"/>
                 <field name="reparto_id"/>
                 <field name="dia_visita"/>
+                <field name="orden"/>
                 <field name="distribution" string="Distribución" optional="hide"/>
                 <field name="frequency" string="Frecuencia"/>
             </list>
