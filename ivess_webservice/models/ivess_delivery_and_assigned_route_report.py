@@ -25,11 +25,6 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
     date_to_drn = fields.Date(readonly=True)
     allow_sale_without_stock = fields.Boolean(readonly=True)
     allow_reordering = fields.Boolean(readonly=True)
-    repair_order_sequence_id = fields.Many2one('ir.sequence', readonly=True)
-    number_next_actual = fields.Integer(
-        related='repair_order_sequence_id.number_next_actual',
-        readonly=True,
-    )
 
     #res.partner
     partner_id = fields.Many2one('res.partner', readonly=True)
@@ -59,7 +54,6 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
                     drn.date_to AS date_to_drn,
                     drn.allow_sale_without_stock AS allow_sale_without_stock,
                     drn.allow_reordering AS allow_reordering,
-                    drn.repair_order_sequence_id AS repair_order_sequence_id,
                     rp.id AS partner_id,
                     rp.date_from AS date_from_rp,
                     rp.date_to AS date_to_rp
@@ -117,7 +111,6 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             'date_to_drn',
             'allow_sale_without_stock',
             'allow_reordering',
-            'number_next_actual',
         ]
         route_fields = [
             'route_id',
@@ -154,6 +147,10 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
         for field in delivery_number_fields:
             result[field] = _value(route_and_distribution_fields, field)
 
+        result['repair_orders'] = [
+            {'id': order['id'], 'next_number': order['next_number']}
+            for order in delivery._get_booklets_data()['repair_orders']
+        ]
         result['minutos_x_convertir_factura'] = minutos_x_convertir_factura
 
         for field in route_fields:

@@ -57,18 +57,27 @@ class DeliveryRouteNumber(models.Model):
         default=True,
         help="If checked, customers can enter a manual address for this delivery."
     )
-    remittance_sequence_id = fields.Many2one(
+    remittance_sequence_ids = fields.Many2many(
         'ir.sequence',
-        string='Remittance Booklet',
+        'delivery_route_number_remittance_seq_rel',
+        'route_number_id',
+        'sequence_id',
+        string='Remittance Booklets',
     )
-    collection_journal_id = fields.Many2one(
+    collection_journal_ids = fields.Many2many(
         'account.journal',
-        string='Collection Booklet',
+        'delivery_route_number_collection_journal_rel',
+        'route_number_id',
+        'journal_id',
+        string='Collection Booklets',
         domain=[('type', 'in', ['receipt'])],
     )
-    repair_order_sequence_id = fields.Many2one(
-        'ir.sequence' ,
-        string='Repair Orders Booklet',
+    repair_order_sequence_ids = fields.Many2many(
+        'ir.sequence',
+        'delivery_route_number_repair_seq_rel',
+        'route_number_id',
+        'sequence_id',
+        string='Repair Orders Booklets',
     )
     region_id = fields.Many2one(
         'delivery.route.region',
@@ -131,6 +140,27 @@ class DeliveryRouteNumber(models.Model):
             ('state', 'in', ('draft', 'sincronizado')),
             ('delivery_date', '>=', today),
         ], order='delivery_date asc', limit=1)
+
+    # helper para servicios web ivess
+    def _get_booklets_data(self):
+        self.ensure_one()
+        return {
+            'remittances': [{
+                'id': sequence.id,
+                'prefix': sequence.prefix,
+                'next_number': sequence.number_next_actual,
+            } for sequence in self.remittance_sequence_ids],
+            'collections': [{
+                'id': journal.id,
+                'prefix': journal.code,
+                'next_number': journal.sequence_number_next,
+            } for journal in self.collection_journal_ids],
+            'repair_orders': [{
+                'id': sequence.id,
+                'prefix': sequence.prefix,
+                'next_number': sequence.number_next_actual,
+            } for sequence in self.repair_order_sequence_ids],
+        }
 
 
 class DeliveryRouteNumberMessage(models.Model):
