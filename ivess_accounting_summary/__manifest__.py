@@ -67,6 +67,7 @@
         "account_reports",
         "account_financial_report",
         "l10n_ar_eynes",
+        "l10n_ar_reconciliation",
     ],
     "data": [
         "security/ir.model.access.csv",

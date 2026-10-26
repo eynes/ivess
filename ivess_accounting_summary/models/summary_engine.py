@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from odoo import _, api, models
 from odoo.exceptions import UserError
+from odoo.tools import SQL
 
 
 class AccountSummaryEngine(models.AbstractModel):
@@ -25,6 +26,65 @@ class AccountSummaryEngine(models.AbstractModel):
             return int(value) if value else default
         except ValueError:
             return default
+
+    @api.model
+    def _summary_mark(self, records, field_name, move):
+        """Apunta `field_name` (Many2one a account.move, sin cálculo ni
+        validaciones propias) de `records` a `move` con un único UPDATE.
+
+        Pasar por write() recorre las validaciones y los hooks de todos los
+        módulos de contabilidad por cada lote, y para un simple marcador de
+        trazabilidad eso era más de la mitad del tiempo del cierre."""
+        if not records:
+            return
+        records.flush_recordset([field_name])
+        self.env.cr.execute(
+            SQL(
+                "UPDATE %s SET %s = %s, write_uid = %s, write_date = NOW() AT TIME ZONE 'UTC' WHERE id = ANY(%s)",
+                SQL.identifier(records._table),
+                SQL.identifier(field_name),
+                move.id,
+                self.env.uid,
+                records.ids,
+            )
+        )
+        records.invalidate_recordset([field_name])
+
+    @api.model
+    def _summary_check_move_ids(self):
+        """Ids de los asientos que tienen cheques (emitidos en sus líneas o
+        de terceros depositados con ellos). Es un superconjunto de lo que
+        l10n_ar_reconciliation revisa al conciliar: sin registros por
+        compañía, de modo que nunca omite un asiento que sí tenga cheques."""
+        cr = self.env.cr
+        move_ids = set()
+        if "issued_check_id" in self.env["account.move.line"]._fields:
+            cr.execute(
+                "SELECT DISTINCT move_id FROM account_move_line "
+                "WHERE issued_check_id IS NOT NULL"
+            )
+            move_ids.update(row[0] for row in cr.fetchall())
+        check_model = self.env.registry.get("account.check")
+        if check_model is not None and "deposit_move_id" in check_model._fields:
+            cr.execute(
+                "SELECT DISTINCT deposit_move_id FROM account_check "
+                "WHERE deposit_move_id IS NOT NULL"
+            )
+            move_ids.update(row[0] for row in cr.fetchall())
+        return frozenset(move_ids)
+
+    @api.model
+    def _summary_entry_line_defaults(self):
+        """Valores fijos para las líneas de los asientos que genera el cierre.
+
+        La distribución analítica de una línea sale de los modelos de
+        distribución; sin ninguno configurado siempre es vacía, y calcularla
+        línea por línea (una búsqueda por contacto) es costo puro."""
+        if self.env["account.analytic.distribution.model"].sudo().search_count(
+            [], limit=1
+        ):
+            return {}
+        return {"analytic_distribution": False}
 
     def _summary_period_label(self):
         return _(
@@ -82,6 +142,9 @@ class AccountSummaryEngine(models.AbstractModel):
              "debt": [{"account_id", "partner_id", "origin_id", "name",
                        "residual"}], "closed_move_ids": [ids]}
         """
+        # Los asientos de neteo son asientos manuales: no hay líneas de
+        # factura que sincronizar al crearlos, publicarlos ni conciliarlos.
+        self = self.with_context(skip_invoice_sync=True)
         AccountMove = self.env["account.move"]
         AccountMoveLine = self.env["account.move.line"]
 
@@ -124,6 +187,7 @@ class AccountSummaryEngine(models.AbstractModel):
             collected_by_line[line.id] = collected
 
         netting_moves = AccountMove
+        line_defaults = self._summary_entry_line_defaults()
         period_label = self._summary_period_label()
         # Cada línea de deuda abierta se concilia contra su línea de neteo
         # (misma cuenta, contacto y comprobante de origen). Se indexa el
@@ -207,6 +271,9 @@ class AccountSummaryEngine(models.AbstractModel):
                     )
                 )
 
+            for _command, _unused, line_vals in netting_line_vals:
+                line_vals.update(line_defaults)
+
             netting_move = AccountMove.create(
                 {
                     "journal_id": journal.id,
@@ -220,8 +287,10 @@ class AccountSummaryEngine(models.AbstractModel):
             netting_move.action_post()
             netting_moves |= netting_move
 
-            (journal_pl_lines | journal_debt_lines).write(
-                {"x_summary_move_id": netting_move.id}
+            self._summary_mark(
+                journal_pl_lines | journal_debt_lines,
+                "x_summary_move_id",
+                netting_move,
             )
 
             netting_by_key = defaultdict(lambda: AccountMoveLine)
@@ -240,7 +309,9 @@ class AccountSummaryEngine(models.AbstractModel):
                 netting_lines_by_key[key] |= netting_by_key[key]
 
         # Una sola conciliación en lote (un grupo por comprobante/contacto).
-        AccountMoveLine._reconcile_plan(
+        AccountMoveLine.with_context(
+            ivess_summary_check_move_ids=self._summary_check_move_ids()
+        )._reconcile_plan(
             [lines_by_key[key] | netting_lines_by_key[key] for key in lines_by_key]
         )
 
@@ -345,6 +416,9 @@ class AccountSummaryEngine(models.AbstractModel):
                         },
                     )
                 )
+        line_defaults = self._summary_entry_line_defaults()
+        for _command, _unused, line_vals in vals:
+            line_vals.update(line_defaults)
         return vals
 
     def _summary_move_vals(self, line_ids):

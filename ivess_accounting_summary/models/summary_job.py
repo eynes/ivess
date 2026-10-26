@@ -464,8 +464,10 @@ class AccountSummaryJob(models.Model):
                     limit=slice_size,
                 )
                 if rows:
-                    rows.origin_move_id.write(
-                        {"x_closed_by_summary_move_id": self.summary_move_id.id}
+                    self._summary_mark(
+                        rows.origin_move_id,
+                        "x_closed_by_summary_move_id",
+                        self.summary_move_id,
                     )
                     self.closed_last_id = rows[-1].id
                 else:

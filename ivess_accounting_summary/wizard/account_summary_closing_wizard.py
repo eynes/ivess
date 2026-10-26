@@ -97,8 +97,10 @@ class AccountSummaryClosingWizard(models.TransientModel):
         )
         summary_move.action_post()
 
-        self.env["account.move"].browse(contrib["closed_move_ids"]).write(
-            {"x_closed_by_summary_move_id": summary_move.id}
+        self._summary_mark(
+            self.env["account.move"].browse(contrib["closed_move_ids"]),
+            "x_closed_by_summary_move_id",
+            summary_move,
         )
 
         self.write(
