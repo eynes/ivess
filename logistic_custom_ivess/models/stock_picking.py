@@ -7,6 +7,8 @@ class StockPicking(models.Model):
     def _action_done(self):
         res = super()._action_done()
         self._sync_water_containers()
+        for picking in self:
+            self.env['fc.equipment.history']._sync_from_picking(picking)
         return res
 
     def _sync_water_containers(self):

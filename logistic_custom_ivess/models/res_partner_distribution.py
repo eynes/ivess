@@ -30,6 +30,8 @@ class PartnerDistributions(models.Model):
     _name = 'partner.distribution'
     _inherit = ['visit.schedule.mixin']
     _description = 'Distributions'
+    # El nombre que muestra el mapa de Clientes por Reparto es el del cliente.
+    _rec_name = 'partner_id'
 
     distribution = fields.Many2one('template.delivery.route')
     visit_day = fields.Selection(
@@ -65,6 +67,28 @@ class PartnerDistributions(models.Model):
     partner_street = fields.Char(related='partner_id.street', string='Calle')
     partner_num = fields.Char(related='partner_id.num', string='Número')
     partner_city = fields.Char(related='partner_id.city', string='Ciudad')
+    # Datos de la tarjeta de la vista mapa (el popup muestra el valor tal cual,
+    # por eso las horas y el día van como texto).
+    partner_customer_code = fields.Char(
+        related='partner_id.customer_code',
+        string='Código de Cliente',
+    )
+    direccion_txt = fields.Char(
+        string='Dirección',
+        compute='_compute_direccion_txt',
+    )
+    dia_visita_txt = fields.Char(
+        string='Día',
+        compute='_compute_dia_visita_txt',
+    )
+    hora_promedio_txt = fields.Char(
+        string='Hora Promedio',
+        compute='_compute_horario_txt',
+    )
+    franja_visita_txt = fields.Char(
+        string='Franja de Visita',
+        compute='_compute_horario_txt',
+    )
     frequency = fields.Selection(
         selection=[
             ('weekly', 'Weekly'),
@@ -95,6 +119,42 @@ class PartnerDistributions(models.Model):
         for rec in self:
             dia = rec.distribution.day
             rec.dia_visita = str(WEEKDAY_MAPPING[dia] + 1) if dia else False
+
+    @api.depends('partner_id.street', 'partner_id.num', 'partner_id.city')
+    def _compute_direccion_txt(self):
+        # La dirección completa del popup estándar sale vacía si al cliente le
+        # falta provincia o país; así se ve siempre calle, número y ciudad.
+        for rec in self:
+            partner = rec.partner_id
+            calle = ' '.join(p for p in (partner.street, partner.num) if p)
+            rec.direccion_txt = ', '.join(p for p in (calle, partner.city) if p) or False
+
+    @api.depends('dia_visita')
+    def _compute_dia_visita_txt(self):
+        etiquetas = dict(self._fields['dia_visita'].selection)
+        for rec in self:
+            rec.dia_visita_txt = etiquetas.get(rec.dia_visita) or False
+
+    @api.depends(
+        'partner_id.average_hour',
+        'partner_id.visit_hour_from',
+        'partner_id.visit_hour_to',
+    )
+    def _compute_horario_txt(self):
+        def hora(valor):
+            horas, minutos = divmod(round(valor * 60), 60)
+            return '%02d:%02d' % (horas, minutos)
+
+        for rec in self:
+            partner = rec.partner_id
+            rec.hora_promedio_txt = hora(partner.average_hour) if partner.average_hour else False
+            desde, hasta = partner.visit_hour_from, partner.visit_hour_to
+            if desde and hasta:
+                rec.franja_visita_txt = '%s a %s' % (hora(desde), hora(hasta))
+            elif desde or hasta:
+                rec.franja_visita_txt = ('desde %s' % hora(desde)) if desde else ('hasta %s' % hora(hasta))
+            else:
+                rec.franja_visita_txt = False
 
     @api.depends('partner_id')
     def _compute_reparto_sugerido(self):

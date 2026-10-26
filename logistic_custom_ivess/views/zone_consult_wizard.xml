@@ -1,0 +1,75 @@
+<odoo>
+    <record id="view_zone_consult_wizard_form" model="ir.ui.view">
+        <field name="name">zone.consult.wizard.form</field>
+        <field name="model">zone.consult.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Consultar zona" create="0" edit="1">
+                <field name="searched" invisible="1"/>
+                <field name="distribution_ids" invisible="1"/>
+                <div class="alert alert-warning" role="alert" invisible="not geo_message">
+                    <field name="geo_message" readonly="1" nolabel="1"/>
+                </div>
+                <group>
+                    <group string="Dirección">
+                        <field name="street"/>
+                        <field name="number"/>
+                        <field name="city"/>
+                        <field name="state_id" options="{'no_create': True}"/>
+                        <field name="radius"/>
+                    </group>
+                    <group string="Coordenadas">
+                        <field name="latitude"/>
+                        <field name="longitude"/>
+                    </group>
+                </group>
+                <div invisible="searched or not geo_message" class="text-muted">
+                    Con la latitud y la longitud cargadas, "Buscar" usa esas coordenadas.
+                </div>
+                <div class="alert alert-info" role="alert" invisible="not searched or line_ids">
+                    No pasa ningún reparto dentro del radio.
+                </div>
+                <field name="line_ids" readonly="1" invisible="not searched or not line_ids">
+                    <list string="Repartos en la zona" create="0" delete="0" edit="0">
+                        <field name="delivery_number_id"/>
+                        <field name="visit_day"/>
+                        <field name="client_count"/>
+                        <field name="distance_m"/>
+                        <field name="average_hour_txt"/>
+                        <field name="time_window"/>
+                    </list>
+                </field>
+                <footer>
+                    <button string="Buscar" name="action_search" type="object" class="btn-primary" data-hotkey="q"/>
+                    <button string="Ver en el mapa" name="action_view_map" type="object"
+                            invisible="not searched or not line_ids"/>
+                    <button string="Cerrar" special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_zone_consult_wizard" model="ir.actions.act_window">
+        <field name="name">Consultar zona</field>
+        <field name="res_model">zone.consult.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="view_crm_lead_form_inherit_zone_consult" model="ir.ui.view">
+        <field name="name">crm.lead.form.inherit.zone.consult</field>
+        <field name="model">crm.lead</field>
+        <field name="inherit_id" ref="crm.crm_lead_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_restore']" position="after">
+                <button name="action_consult_zone" string="Consultar zona" type="object"
+                        invisible="not active"/>
+            </xpath>
+        </field>
+    </record>
+
+    <menuitem id="menu_zone_consult_wizard"
+              name="Consultar zona"
+              parent="menu_delivery_route_root"
+              sequence="25"
+              action="action_zone_consult_wizard"/>
+</odoo>

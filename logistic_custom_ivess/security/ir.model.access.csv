@@ -35,3 +35,8 @@ access_water_container_transfer_user,water.container.transfer.user,model_water_c
 access_water_container_transfer_stock,water.container.transfer.stock,model_water_container_transfer,stock.group_stock_user,1,1,1,1
 access_partner_distribution_sugerencia,partner.distribution.sugerencia,model_partner_distribution_sugerencia,sales_team.group_sale_salesman_all_leads,1,1,1,1
 access_partner_distribution_sugerencia_stock,partner.distribution.sugerencia.stock,model_partner_distribution_sugerencia,stock.group_stock_user,1,1,1,1
+access_fc_equipment_history_manager,fc.equipment.history.manager,model_fc_equipment_history,sales_team.group_sale_manager,1,1,1,1
+access_fc_equipment_history_user,fc.equipment.history.user,model_fc_equipment_history,sales_team.group_sale_salesman_all_leads,1,1,1,0
+access_fc_equipment_history_stock,fc.equipment.history.stock,model_fc_equipment_history,stock.group_stock_user,1,1,1,1
+access_zone_consult_wizard,zone.consult.wizard,model_zone_consult_wizard,sales_team.group_sale_salesman_all_leads,1,1,1,1
+access_zone_consult_wizard_line,zone.consult.wizard.line,model_zone_consult_wizard_line,sales_team.group_sale_salesman_all_leads,1,1,1,1

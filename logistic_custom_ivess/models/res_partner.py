@@ -1,7 +1,7 @@
 import logging
 from datetime import timedelta
 
-from odoo import api, fields, models, _
+from odoo import api, fields, models, tools, _
 from odoo.exceptions import ValidationError, UserError
 
 _logger = logging.getLogger(__name__)
@@ -9,6 +9,14 @@ _logger = logging.getLogger(__name__)
 
 class ResPartner(models.Model):
     _inherit = 'res.partner'
+
+    def init(self):
+        super().init()
+        # "Consultar zona" filtra primero por una caja de coordenadas.
+        tools.create_index(
+            self.env.cr, 'res_partner_geo_coords_idx', self._table,
+            ['partner_latitude', 'partner_longitude'],
+        )
 
     is_customer = fields.Boolean(
         string='Es Cliente',
@@ -373,6 +381,15 @@ class ResPartner(models.Model):
         action = self.env.ref('logistic_custom_ivess.action_frio_calor_container').sudo().read()[0]
         action['domain'] = [('partner_id', '=', self.id), ('is_frio_calor', '=', True)]
         action['context'] = {'default_partner_id': self.id}
+        return action
+
+    def action_open_fc_history(self):
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id('logistic_custom_ivess.action_fc_equipment_history')
+        action['context'] = {
+            'cliente_actual_id': self.id,
+            'search_default_cliente_actual': 1,
+        }
         return action
 
     def action_open_water_consumption(self):
