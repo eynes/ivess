@@ -93,7 +93,7 @@ msgstr "Número de asiento"
 #. module: ivess_accounting_summary
 #. odoo-python
 #: code:addons/ivess_accounting_summary/report/journal_ledger_xlsx.py:0
-msgid "PERIODO: %s"
+msgid "PERÍODO: %s"
 msgstr ""
 
 #. module: ivess_accounting_summary

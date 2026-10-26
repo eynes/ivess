@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_calendar_public_holiday_form_workday" model="ir.ui.view">
+        <field name="name">calendar.public.holiday.form.workday</field>
+        <field name="model">calendar.public.holiday</field>
+        <field name="inherit_id" ref="calendar_public_holiday.view_calendar_public_holiday_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='line_ids']/list/field[@name='variable_date']" position="after">
+                <field name="is_workday" />
+            </xpath>
+        </field>
+    </record>
+</odoo>

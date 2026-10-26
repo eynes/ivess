@@ -147,7 +147,10 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
         for field in delivery_number_fields:
             result[field] = _value(route_and_distribution_fields, field)
 
-        result['repair_orders'] = delivery._get_booklets_data()['repair_orders']
+        result['repair_orders'] = [
+            {'id': order['id'], 'next_number': order['next_number']}
+            for order in delivery._get_booklets_data()['repair_orders']
+        ]
         result['minutos_x_convertir_factura'] = minutos_x_convertir_factura
 
         for field in route_fields:

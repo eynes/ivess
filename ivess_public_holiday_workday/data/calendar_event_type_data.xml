@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+    <record id="event_type_holiday_workday" model="calendar.event.type">
+        <field name="name">Feriado laborable</field>
+        <field name="color">10</field>
+    </record>
+    <record id="calendar_public_holiday.event_type_holiday" model="calendar.event.type">
+        <field name="color">1</field>
+    </record>
+</odoo>

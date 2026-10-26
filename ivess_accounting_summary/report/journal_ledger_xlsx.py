@@ -22,7 +22,7 @@ class JournalLedgerXlsx(models.AbstractModel):
             _("DIARIO GENERAL"),
             report.company_id.name,
             _("EJERCICIO: %s", report._ivess_get_fiscal_year_name()),
-            _("PERIODO: %s", report._ivess_get_period_text()),
+            _("PERÍODO: %s", report._ivess_get_period_text()),
         ]
         for line in lines:
             sheet.merge_range(

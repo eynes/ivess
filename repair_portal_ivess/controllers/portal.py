@@ -112,6 +112,34 @@ def _resolve_repair_by_barcode(barcode):
 
 
 def _no_open_repair_message(barcode):
+    """Mensaje del lector cuando la serie no tiene orden abierta. Si el equipo
+    ingresó embolsado (su último movimiento es un traslado de embolsados), lo dice."""
+    env = request.env
+    candidates = [barcode]
+    if barcode.startswith('21') and len(barcode) > 2:
+        candidates.append(barcode[2:])
+    lots = env['stock.lot'].sudo().search([('name', 'in', candidates)])
+    for lot in lots:
+        last_line = env['stock.move.line'].sudo().search(
+            [('lot_id', '=', lot.id), ('state', '=', 'done')],
+            order='date desc, id desc', limit=1,
+        )
+        picking = last_line.picking_id
+        embolsado_type = picking.company_id.aguas_fc_embolsado_picking_type_id
+        if picking and embolsado_type and picking.picking_type_id == embolsado_type:
+            fecha = (picking.date_done or picking.create_date).strftime('%d/%m/%Y')
+            message = _(
+                "El equipo %(serie)s está en expedición: ingresó embolsado el %(fecha)s (%(traslado)s). "
+                "No lleva orden de reparación.",
+                serie=lot.name, fecha=fecha, traslado=picking.name,
+            )
+            cancelada = env['repair.order'].sudo().search(
+                [('lot_id', '=', lot.id), ('embolsado_picking_id', '=', picking.id)],
+                order='id desc', limit=1,
+            )
+            if cancelada:
+                message += ' ' + _("Orden cancelada: %s.", cancelada.name)
+            return message
     return _(
         "El equipo %s no tiene una orden abierta. Verificar que haya ingresado por Loop.",
         barcode,
@@ -353,7 +381,7 @@ class RepairPortalController(CustomerPortal):
         ['/my/repairs', '/my/repairs/page/<int:page>'],
         type='http', auth='user', website=True,
     )
-    def portal_my_repairs(self, page=1, **kw):
+    def portal_my_repairs(self, page=1, aviso=None, **kw):
         redir = self._check_group_repair()
         if redir:
             return redir
@@ -379,6 +407,7 @@ class RepairPortalController(CustomerPortal):
             'repairs': repairs,
             'pager': pager,
             'page_name': 'repairs',
+            'aviso': aviso,
             'stage_labels': _STAGE_LABELS,
             'stage_badge': _STAGE_BADGE,
         })
@@ -605,6 +634,39 @@ class RepairPortalController(CustomerPortal):
         except Exception as e:
             _logger.exception("Portal send_to_descarte failed repair_id=%s: %s", repair_id, e)
         return request.redirect(f'/my/repairs/{repair_id}')
+
+    @http.route(
+        ['/my/repairs/<int:repair_id>/embolsado_a_expedicion'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_repair_embolsado_a_expedicion(self, repair_id, **kw):
+        redir = self._check_group_repair()
+        if redir:
+            return redir
+        repair = request.env['repair.order'].sudo().browse(repair_id)
+        if not repair.exists() or not repair.can_embolsado_a_expedicion:
+            return request.redirect(f'/my/repairs/{repair_id}')
+        try:
+            # Savepoint: si falla a mitad de camino no queda la orden cancelada sin traslado.
+            with request.env.cr.savepoint():
+                repair.with_context(_portal_user_id=request.env.uid).action_embolsado_a_expedicion()
+        except UserError as e:
+            return request.redirect(f'/my/repairs/{repair_id}?' + urlencode({'add_error': str(e)}))
+        except Exception as e:
+            _logger.exception("Portal embolsado_a_expedicion failed repair_id=%s: %s", repair_id, e)
+            return request.redirect(f'/my/repairs/{repair_id}')
+        if repair.embolsado_picking_id:
+            aviso = _(
+                "Orden %(orden)s cancelada. El equipo %(serie)s pasó a expedición (%(traslado)s).",
+                orden=repair.name, serie=repair.lot_id.name,
+                traslado=repair.embolsado_picking_id.name,
+            )
+        else:
+            aviso = _(
+                "Orden %(orden)s cancelada. El equipo %(serie)s ya estaba en expedición.",
+                orden=repair.name, serie=repair.lot_id.name,
+            )
+        return request.redirect('/my/repairs?' + urlencode({'aviso': aviso}))
 
     @http.route(
         ['/my/repairs/<int:repair_id>/back_from_descarte'],

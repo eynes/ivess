@@ -1,7 +1,14 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from odoo import _, api, fields, models
 from odoo.addons.logistic_custom_ivess.models.visit_schedule_mixin import WEEKDAY_MAPPING
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tools.misc import format_date
+
+# Odoo.sh corre en UTC y los usuarios pueden no tener zona horaria: la fecha y la
+# hora de los pedidos son siempre las de Argentina.
+AR_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 class IvessVisitaFueraRuta(models.TransientModel):
@@ -17,7 +24,7 @@ class IvessVisitaFueraRuta(models.TransientModel):
     fecha = fields.Date(
         string="Fecha",
         required=True,
-        default=fields.Date.context_today,
+        default=lambda self: self._ahora_ar().date(),
     )
     reparto_id = fields.Many2one(
         comodel_name="delivery.route.number",
@@ -40,6 +47,20 @@ class IvessVisitaFueraRuta(models.TransientModel):
         compute="_compute_reparto_distinto",
     )
 
+    @api.model
+    def _ahora_ar(self):
+        return datetime.now(AR_TZ)
+
+    @api.constrains("fecha")
+    def _check_fecha_no_pasada(self):
+        hoy = self._ahora_ar().date()
+        for wizard in self:
+            if wizard.fecha and wizard.fecha < hoy:
+                raise ValidationError(
+                    _("No se puede pedir una visita para una fecha pasada (%(fecha)s). Elegí hoy o una fecha posterior.")
+                    % {"fecha": format_date(self.env, wizard.fecha)}
+                )
+
     @api.depends("fecha")
     def _compute_fuera_de_hora(self):
         # Minuta del 24/09/2026: los pedidos cargados después de la hora límite
@@ -48,7 +69,7 @@ class IvessVisitaFueraRuta(models.TransientModel):
             self.env["ir.config_parameter"].sudo().get_param("logistic_custom_ivess.hora_limite_pedidos")
             or 15.0
         )
-        ahora = fields.Datetime.context_timestamp(self, fields.Datetime.now())
+        ahora = self._ahora_ar()
         pasada = ahora.hour + ahora.minute / 60.0 > limite
         for wizard in self:
             wizard.fuera_de_hora = (
@@ -60,7 +81,7 @@ class IvessVisitaFueraRuta(models.TransientModel):
 
     @api.depends("fecha", "partner_id")
     def _compute_franja_vencida(self):
-        ahora = fields.Datetime.context_timestamp(self, fields.Datetime.now())
+        ahora = self._ahora_ar()
         hora_actual = ahora.hour + ahora.minute / 60.0
         for wizard in self:
             hasta = wizard.partner_id.visit_hour_to
@@ -74,13 +95,17 @@ class IvessVisitaFueraRuta(models.TransientModel):
 
     def _default_reparto_id(self):
         partner = self.env["res.partner"].browse(self.env.context.get("default_partner_id"))
-        return self._proponer_reparto(partner, fields.Date.context_today(self))
+        return self._proponer_reparto(partner, self._ahora_ar().date())
 
     def _proponer_reparto(self, partner, fecha):
         """Reparto habitual del cliente. Si tiene más de uno, el que le toca el
         día de la semana de la fecha o, si ese día no le toca ninguno, el de
-        su día de visita siguiente."""
-        plantillas = partner.distributions_ids.distribution.filtered("delivery_number_id")
+        su día de visita siguiente. Los repartos técnicos (frío/calor,
+        instalaciones, retiros) nunca se proponen para un pedido."""
+        plantillas = partner.distributions_ids.distribution.filtered(
+            lambda plantilla: plantilla.delivery_number_id
+            and not plantilla.delivery_number_id.is_technical_delivery
+        )
         repartos = plantillas.delivery_number_id
         if len(repartos) <= 1 or not fecha:
             return repartos[:1]

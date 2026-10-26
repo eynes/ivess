@@ -5,6 +5,16 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
+            <!-- Código de cliente arriba, antes del nombre. Antes estaba al final de
+                 Ventas y Compras, debajo de "Canal de alta". -->
+            <field name="customer_code" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </field>
+            <xpath expr="//h1[.//field[@name='name']]" position="before">
+                <div class="text-muted" invisible="not customer_code">
+                    <span>Código de cliente: </span><field name="customer_code" readonly="1" class="fw-bold"/>
+                </div>
+            </xpath>
             <xpath expr="//sheet" position="before">
                 <header>
                     <button name="%(ivess_partner_custom.action_ivess_visita_fuera_ruta)d"
@@ -22,7 +32,12 @@
                             string="Traspasar saldo y dar de baja"
                             context="{'default_origen_id': id}"
                             invisible="not id or not active"
-                            groups="account.group_account_invoice"/>
+                            groups="ivess_partner_custom.group_traspaso_saldo"/>
+                    <button name="action_solicitar_traspaso_saldo"
+                            type="object"
+                            string="Solicitar traspaso de saldo"
+                            invisible="not id or not active"
+                            groups="!ivess_partner_custom.group_traspaso_saldo"/>
                     <button name="%(ivess_partner_custom.action_ivess_desvincular_hija)d"
                             type="action"
                             string="Desvincular del grupo"
@@ -163,6 +178,97 @@
             <field name="parent_id" position="after">
                 <field name="pagador_id"/>
             </field>
+            <filter name="inactive" position="before">
+                <filter name="condicion_madre" string="Madre" domain="[('condicion', '=', 'madre')]"/>
+                <filter name="condicion_hija" string="Hija" domain="[('condicion', '=', 'hija')]"/>
+                <filter name="condicion_individual" string="Individual" domain="[('condicion', '=', 'individual')]"/>
+                <separator/>
+            </filter>
+            <filter name="group_company" position="after">
+                <filter name="group_condicion" string="Condición" context="{'group_by': 'condicion'}"/>
+            </filter>
+        </field>
+    </record>
+
+    <!-- Condición (madre / hija / individual) al lado del nombre. Decoración
+         opcional: la madre en verde, como en Aguas. -->
+    <record id="view_partner_tree_condicion" model="ir.ui.view">
+        <field name="name">res.partner.list.condicion</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="attributes">
+                <attribute name="decoration-success">condicion == 'madre'</attribute>
+            </xpath>
+            <field name="display_name" position="before">
+                <field name="condicion"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Ver visitas: encabezado fijo con la deuda del cliente -->
+    <record id="view_delivery_route_line_visitas_list_deuda" model="ir.ui.view">
+        <field name="name">delivery.route.line.visitas.list.deuda</field>
+        <field name="model">delivery.route.line</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_delivery_route_line_visitas_list"/>
+        <field name="arch" type="xml">
+            <list position="attributes">
+                <attribute name="js_class">visitas_deuda_list</attribute>
+            </list>
+        </field>
+    </record>
+
+    <!-- Código de cliente en la lista de contactos y en el buscador -->
+    <record id="view_partner_tree_customer_code" model="ir.ui.view">
+        <field name="name">res.partner.list.customer.code</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <field name="condicion" position="before">
+                <field name="customer_code"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_res_partner_filter_customer_code" model="ir.ui.view">
+        <field name="name">res.partner.search.customer.code</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="customer_code" string="Código de cliente"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Clientes por Reparto -->
+    <record id="view_partner_distribution_reparto_list_condicion" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.list.condicion</field>
+        <field name="model">partner.distribution</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_distribution_reparto_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="attributes">
+                <attribute name="decoration-success">partner_condicion == 'madre'</attribute>
+            </xpath>
+            <field name="partner_id" position="after">
+                <field name="partner_condicion"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_partner_distribution_reparto_search_condicion" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.search.condicion</field>
+        <field name="model">partner.distribution</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_distribution_reparto_search"/>
+        <field name="arch" type="xml">
+            <field name="reparto_id" position="after">
+                <filter name="condicion_madre" string="Madre" domain="[('partner_condicion', '=', 'madre')]"/>
+                <filter name="condicion_hija" string="Hija" domain="[('partner_condicion', '=', 'hija')]"/>
+                <filter name="condicion_individual" string="Individual" domain="[('partner_condicion', '=', 'individual')]"/>
+            </field>
+            <filter name="group_dia" position="after">
+                <filter name="group_condicion" string="Condición" context="{'group_by': 'partner_condicion'}"/>
+            </filter>
         </field>
     </record>
 </odoo>

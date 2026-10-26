@@ -38,3 +38,11 @@
 	path = account_financial_reporting
 	url = https://github.com/OCA/account-financial-reporting.git
 	branch = 19.0
+[submodule "hr-holidays"]
+	path = hr-holidays
+	url = https://github.com/OCA/hr-holidays.git
+	branch = 19.0
+[submodule "calendar"]
+	path = calendar
+	url = https://github.com/OCA/calendar.git
+	branch = 19.0

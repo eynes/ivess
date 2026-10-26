@@ -224,3 +224,20 @@ class TestCompanyGroup(TransactionCase):
             .search([])
         )
         self.assertIn(hidden, admin_visible)
+
+    def test_locked_user_computes_color_of_company_outside_scope(self):
+        """El color de empresas fuera del alcance se calcula sin AccessError.
+
+        El formulario del usuario pide company_ids con color; si el partner
+        de una empresa del usuario fuera del grupo tiene company_id propio, la
+        regla de res.partner lo niega con el contexto recortado y el cliente
+        recarga en bucle.
+        """
+        self.c3.partner_id.sudo().company_id = self.c3
+        env = self._env(self.locked_user, [self.c3.id])
+        self.assertNotIn(self.c3.id, env.companies.ids)
+        self.env.invalidate_all()
+        company = self.c3.with_env(env)
+        with env.protecting([company._fields["color"]], company):
+            company._compute_color()
+        self.assertEqual(company.color, self.c3.partner_id.color or self.c3.id % 12)

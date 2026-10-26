@@ -51,6 +51,7 @@
                         <field name="distributions_ids">
                             <list>
                                 <field name="distribution"/>
+                                <field name="orden"/>
                                 <field name="visit_day"/>
                                 <field name="frequency" required="1"/>
                                 <field name="last_visit_date" readonly="1"/>
@@ -109,10 +110,21 @@
                         <field name="reparto_sugerido" invisible="not reparto_sugerido" readonly="1" class="text-muted"/>
                         <field name="dias_sugeridos" invisible="not dias_sugeridos" readonly="1" class="text-muted"/>
                         <field name="distribution"/>
+                        <field name="orden"/>
                         <field name="visit_day"/>
                         <field name="frequency" required="1"/>
                         <field name="last_visit_date" readonly="1"/>
                     </group>
+                    <separator string="Opciones de reparto y día más cercanas" invisible="not sugerencia_ids"/>
+                    <field name="sugerencia_ids" nolabel="1" invisible="not sugerencia_ids">
+                        <list create="0" delete="0" editable="bottom" no_open="1">
+                            <field name="plantilla_id" column_invisible="1"/>
+                            <field name="name"/>
+                            <field name="distancia"/>
+                            <field name="franja"/>
+                            <field name="usar" widget="boolean_icon" options="{'icon': 'fa-check-circle'}" string="Usar"/>
+                        </list>
+                    </field>
                     <separator string="Historial de Mensajes"/>
                     <field name="message_ids" nolabel="1">
                         <list create="0">
@@ -132,13 +144,14 @@
         <field name="model">partner.distribution</field>
         <field name="priority">99</field>
         <field name="arch" type="xml">
-            <list string="Clientes por Reparto" create="0" edit="0" delete="0" default_order="reparto_id, dia_visita, partner_id">
+            <list string="Clientes por Reparto" create="0" edit="0" delete="0" default_order="reparto_id, dia_visita, orden, partner_id">
                 <field name="partner_id" string="Cliente" widget="many2one"/>
                 <field name="partner_street"/>
                 <field name="partner_num"/>
                 <field name="partner_city"/>
                 <field name="reparto_id"/>
                 <field name="dia_visita"/>
+                <field name="orden"/>
                 <field name="distribution" string="Distribución" optional="hide"/>
                 <field name="frequency" string="Frecuencia"/>
             </list>

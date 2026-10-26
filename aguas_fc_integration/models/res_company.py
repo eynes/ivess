@@ -53,3 +53,9 @@ class ResCompany(models.Model):
         domain=[('code', '=', 'internal')],
         help='Tipo de operación para los traslados de ingreso de equipos no normalizados desde Loop. No tiene que generar orden de reparación: dejar desmarcado "Es operación FC" y sin puntos de calidad Frío/Calor.',
     )
+    aguas_fc_embolsado_picking_type_id = fields.Many2one(
+        comodel_name='stock.picking.type',
+        string='Tipo de Operación Embolsados FC',
+        domain=[('code', '=', 'internal')],
+        help='Tipo de operación para los traslados de equipos embolsados que descarga Loop (hacia AC/EQUIPOS FC REPARADOS). No tiene que generar orden de reparación: dejar desmarcado "Es operación FC" y sin puntos de calidad Frío/Calor.',
+    )

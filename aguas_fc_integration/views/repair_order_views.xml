@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_repair_order_form_inherit_aguas_fc_embolsado" model="ir.ui.view">
+        <field name="name">repair.order.form.inherit.aguas.fc.embolsado</field>
+        <field name="model">repair.order</field>
+        <field name="inherit_id" ref="repair.view_repair_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_validate']" position="before">
+                <field name="can_embolsado_a_expedicion" invisible="1"/>
+                <button name="action_embolsado_a_expedicion"
+                        type="object"
+                        string="Embolsado: pasar a expedición"
+                        confirm="Se cancela la orden y el equipo pasa a AC/EQUIPOS FC REPARADOS. ¿Continuar?"
+                        invisible="not can_embolsado_a_expedicion"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
