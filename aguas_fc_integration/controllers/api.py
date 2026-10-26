@@ -50,12 +50,21 @@ class AguasFCController(http.Controller):
 
         data = kwargs
 
-        required = ["fecha", "idreparto", "equipos"]
-        error = self._check_required(data, required)
+        embolsados = self._as_list(data.get("embolsados")) or []
+        if embolsados:
+            # Con embolsados, "equipos" puede venir vacío.
+            error = self._check_required(data, ["fecha", "idreparto"])
+        else:
+            error = self._check_required(data, ["fecha", "idreparto", "equipos"])
+            if error and "embolsados" in data and data.get("fecha") and data.get("idreparto"):
+                error = {
+                    "success": False,
+                    "error": "Las listas 'equipos' y 'embolsados' vienen vacías.",
+                }
         if error:
             return error
 
-        equipos = self._as_list(data["equipos"])
+        equipos = self._as_list(data.get("equipos")) or []
 
         try:
             return (
@@ -67,6 +76,7 @@ class AguasFCController(http.Controller):
                     fecha=data["fecha"],
                     tecnico=data.get("tecnico"),
                     usuario=data.get("usuario"),
+                    embolsados=embolsados,
                 )
             )
         except Exception as e:
