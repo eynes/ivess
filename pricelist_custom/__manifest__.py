@@ -15,6 +15,7 @@
     'data': [
         'security/ir.model.access.csv',
         'views/template_delivery_route_views.xml',
+        'views/partner_distribution_views.xml',
         'views/res_partner_views.xml',
     ],
     'installable': True,

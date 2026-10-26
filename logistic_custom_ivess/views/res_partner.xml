@@ -177,13 +177,45 @@
         </field>
     </record>
 
+    <!-- Mapa de Clientes por Reparto: sin ruta entre los puntos (no es un
+         recorrido). Hereda los filtros y agrupaciones de la búsqueda de la lista. -->
+    <record id="view_partner_distribution_reparto_map" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.map</field>
+        <field name="model">partner.distribution</field>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <map res_partner="partner_id" routing="0" hide_address="1">
+                <field name="direccion_txt" string="Dirección"/>
+                <field name="partner_customer_code" string="Código de Cliente"/>
+                <field name="reparto_id" string="Reparto"/>
+                <field name="dia_visita_txt" string="Día"/>
+                <field name="hora_promedio_txt" string="Hora Promedio"/>
+                <field name="franja_visita_txt" string="Franja de Visita"/>
+            </map>
+        </field>
+    </record>
+
     <record id="action_partner_distribution_reparto" model="ir.actions.act_window">
         <field name="name">Clientes por Reparto</field>
         <field name="res_model">partner.distribution</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">list,map</field>
         <field name="view_id" ref="view_partner_distribution_reparto_list"/>
         <field name="search_view_id" ref="view_partner_distribution_reparto_search"/>
         <field name="domain">[('distribution', '!=', False), ('partner_id.active', '=', True)]</field>
+    </record>
+
+    <record id="action_partner_distribution_reparto_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_partner_distribution_reparto_list"/>
+        <field name="act_window_id" ref="action_partner_distribution_reparto"/>
+    </record>
+
+    <record id="action_partner_distribution_reparto_map" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">map</field>
+        <field name="view_id" ref="view_partner_distribution_reparto_map"/>
+        <field name="act_window_id" ref="action_partner_distribution_reparto"/>
     </record>
 
 </odoo>
