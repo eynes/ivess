@@ -137,6 +137,8 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
         def _value(rec, field):
             value = rec[field]
             if field in unwrap_fields:
+                if field == 'template_delivery_route_id':
+                    return value[1] if value else False
                 return value[0] if value else False
             return value
 
@@ -154,7 +156,8 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
         result['minutos_x_convertir_factura'] = minutos_x_convertir_factura
 
         for field in route_fields:
-            result[field] = _value(route_and_distribution_fields, field)
+            key = 'template_delivery_route_code' if field == 'template_delivery_route_id' else field
+            result[key] = _value(route_and_distribution_fields, field)
 
         # Una entrada por cada delivery.route.line del recorrido
         clients = []
