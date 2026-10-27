@@ -11,6 +11,7 @@ from odoo.modules import module as odoo_module
 _logger = logging.getLogger(__name__)
 
 ACTIVE_STATES = ("queued", "closing", "building", "posting", "marking")
+CHUNK_RETRIES = 4
 
 
 class AccountSummaryJob(models.Model):
@@ -95,6 +96,7 @@ class AccountSummaryJob(models.Model):
     total_lines = fields.Integer(string="Apuntes a resumir", readonly=True)
     processed_lines = fields.Integer(string="Apuntes procesados", readonly=True)
     progress = fields.Float(string="Avance (%)", compute="_compute_progress")
+    progress_label = fields.Char(string="Detalle del avance", compute="_compute_progress")
     chunks_done = fields.Integer(string="Tandas hechas", readonly=True)
     legal_last_debt_id = fields.Integer(readonly=True)
     closed_last_id = fields.Integer(readonly=True)
@@ -125,6 +127,7 @@ class AccountSummaryJob(models.Model):
     @api.depends("processed_lines", "total_lines", "state")
     def _compute_progress(self):
         for job in self:
+            job.progress_label = job._progress_label()
             if job.state == "done":
                 job.progress = 100.0
             elif job.total_lines:
@@ -133,6 +136,23 @@ class AccountSummaryJob(models.Model):
                 job.progress = min(job.processed_lines / job.total_lines, 1.0) * 90.0
             else:
                 job.progress = 0.0
+
+    def _progress_label(self):
+        self.ensure_one()
+        stages = {
+            "queued": _("Esperando su turno"),
+            "closing": _(
+                "Neteando: %(hechos)s de %(total)s apuntes",
+                hechos=self.processed_lines,
+                total=self.total_lines,
+            ),
+            "building": _("Armando el asiento resumen legal"),
+            "posting": _("Publicando el asiento resumen legal"),
+            "marking": _("Marcando los comprobantes cerrados"),
+            "done": _("Terminado"),
+            "error": _("Detenido: ver el motivo del error"),
+        }
+        return stages.get(self.state, "")
 
     @api.depends("date_from", "date_to", "company_id")
     def _compute_display_name(self):
@@ -187,11 +207,13 @@ class AccountSummaryJob(models.Model):
 
     def _schedule(self):
         """Pide al cron que arranque ya, sin esperar a su próximo horario."""
-        cron = self.env.ref(
-            "ivess_accounting_summary.ir_cron_summary_jobs", raise_if_not_found=False
-        )
-        if cron:
-            cron.sudo()._trigger()
+        for suffix in ("", "_2", "_3", "_4"):
+            cron = self.env.ref(
+                f"ivess_accounting_summary.ir_cron_summary_jobs{suffix}",
+                raise_if_not_found=False,
+            )
+            if cron:
+                cron.sudo()._trigger()
 
     # ------------------------------------------------------------------
     # Cron
@@ -204,13 +226,33 @@ class AccountSummaryJob(models.Model):
             if time.monotonic() >= deadline:
                 pending = True
                 break
-            if not job._try_lock():
-                continue
+            # El neteo lo comparten varios crons a la vez (cada uno toma un
+            # diario distinto, ver _step_closing); las demás etapas las hace
+            # un solo cron por vez (ver _claim_stage).
             job._process(deadline)
             if job.state in ACTIVE_STATES:
                 pending = True
         if pending:
             self._schedule()
+
+    def _claim_stage(self):
+        """Reserva las etapas que no se pueden repartir (inicio, armado,
+        publicación y marcado): las hace un solo cron por vez. Candado de la
+        conexión, que sobrevive a los commit de la etapa."""
+        self.env.cr.execute("SELECT pg_try_advisory_lock(%s, 0)", (self.id,))
+        return self.env.cr.fetchone()[0]
+
+    def _release_stage(self):
+        self._advisory_unlock(self.id, 0)
+
+    def _advisory_unlock(self, key1, key2):
+        """Suelta el candado aunque la transacción haya quedado abortada: si
+        no, la conexión lo conservaría al volver al pool."""
+        try:
+            self.env.cr.execute("SELECT pg_advisory_unlock(%s, %s)", (key1, key2))
+        except Exception:  # noqa: BLE001
+            self.env.cr.rollback()
+            self.env.cr.execute("SELECT pg_advisory_unlock(%s, %s)", (key1, key2))
 
     def _try_lock(self):
         self.ensure_one()
@@ -222,7 +264,8 @@ class AccountSummaryJob(models.Model):
                     (self.id,),
                 )
             return True
-        except pg_errors.LockNotAvailable:
+        except (pg_errors.LockNotAvailable, pg_errors.SerializationFailure):
+            # Otro cron lo tiene o lo acaba de modificar: lo toma él.
             return False
 
     def _commit(self):
@@ -241,24 +284,46 @@ class AccountSummaryJob(models.Model):
             job = self.with_user(self.user_id).with_context(
                 allowed_company_ids=[self.company_id.id]
             )
-            if job.state == "queued":
-                job._start()
+            if job.state == "queued" and job._claim_stage():
+                try:
+                    self.env.invalidate_all()
+                    if job.state == "queued":
+                        job._start()
+                finally:
+                    job._release_stage()
             if job.state == "closing":
                 job._step_closing(deadline)
-            if job.state == "building" and time.monotonic() < deadline:
-                job._step_building(deadline)
-            if job.state == "posting" and time.monotonic() < deadline:
-                job._step_posting()
-            if job.state == "marking" and time.monotonic() < deadline:
-                job._step_marking(deadline)
+            self._commit()
+            self.env.invalidate_all()
+            if (
+                job.state in ("building", "posting", "marking")
+                and time.monotonic() < deadline
+                and job._claim_stage()
+            ):
+                try:
+                    self.env.invalidate_all()
+                    if job.state == "building":
+                        job._step_building(deadline)
+                    if job.state == "posting" and time.monotonic() < deadline:
+                        job._step_posting()
+                    if job.state == "marking" and time.monotonic() < deadline:
+                        job._step_marking(deadline)
+                finally:
+                    job._release_stage()
         except Exception as exc:  # noqa: BLE001 - se informa y se reintenta a mano
             # Cada unidad de trabajo corre en un savepoint: lo que falló ya se
             # revirtió y lo confirmado antes de la falla queda.
             self.env.invalidate_all()
             job = self.browse(job_id)
+            # Algunos módulos hacen commit antes de levantar su validación
+            # (p. ej. el cierre de períodos), y entonces el savepoint falla
+            # con un segundo error que tapa el motivo real: se informa ese.
+            cause = exc
+            while not isinstance(cause, UserError) and cause.__context__:
+                cause = cause.__context__
             message = (
-                str(exc)
-                if isinstance(exc, UserError)
+                str(cause)
+                if isinstance(cause, UserError)
                 else traceback.format_exc()[-3000:]
             )
             _logger.exception("Cierre mensual %s: error", job.display_name)
@@ -283,10 +348,11 @@ class AccountSummaryJob(models.Model):
             self.write({"state": "closing", "started_at": fields.Datetime.now()})
         self._commit()
 
-    def _next_chunk(self, chunk_size):
-        """Próximas líneas a netear, siempre con TODAS las líneas de cada
-        asiento (un neteo parcial de un asiento quedaría desbalanceado)."""
-        domain = [("id", "<=", self.snapshot_line_id)]
+    def _next_chunk(self, chunk_size, journal):
+        """Próximas líneas del diario a netear, siempre con TODAS las líneas
+        de cada asiento (un neteo parcial de un asiento quedaría desbalanceado;
+        un asiento pertenece a un solo diario)."""
+        domain = [("id", "<=", self.snapshot_line_id), ("journal_id", "=", journal.id)]
         lines = self._summary_candidate_lines(
             extra_domain=domain, order="move_id, id", limit=chunk_size
         )
@@ -298,33 +364,128 @@ class AccountSummaryJob(models.Model):
         )
         return lines | rest
 
+    def _closing_journal_ids(self):
+        """Diarios con apuntes todavía sin netear, los de más apuntes primero."""
+        groups = self.env["account.move.line"]._read_group(
+            self._summary_candidate_domain()
+            + [("id", "<=", self.snapshot_line_id)],
+            ["journal_id"],
+            ["__count"],
+        )
+        return [journal.id for journal, _count in sorted(groups, key=lambda g: -g[1])]
+
+    def _claim_journal(self, journal_id):
+        """Reserva un diario para este proceso: el neteo de un diario corre
+        en un solo cron a la vez, el de diarios distintos en paralelo. El
+        candado es de la conexión (sobrevive a los commit) y se suelta solo si
+        el proceso se corta."""
+        self.env.cr.execute(
+            "SELECT pg_try_advisory_lock(%s, %s)", (self.id, journal_id)
+        )
+        return self.env.cr.fetchone()[0]
+
+    def _release_journal(self, journal_id):
+        self._advisory_unlock(self.id, journal_id)
+
+    def _closing_is_active(self):
+        self.env.cr.execute(
+            "SELECT state FROM ivess_accounting_summary_job WHERE id = %s", (self.id,)
+        )
+        row = self.env.cr.fetchone()
+        return bool(row) and row[0] == "closing"
+
     def _step_closing(self, deadline):
         chunk_size = self._summary_param("chunk_lines", 500)
-        while True:
-            finished = False
-            with self.env.cr.savepoint():
-                lines = self._next_chunk(chunk_size)
-                if not lines:
-                    self.state = "building"
-                    finished = True
-                else:
-                    number = self.chunks_done + 1
-                    contrib = self._summary_close_lines(
-                        lines, label_suffix=_(" (lote %s)", number)
-                    )
-                    self._store_contrib(contrib)
-                    self.write(
-                        {
-                            "chunks_done": number,
-                            "processed_lines": self.processed_lines + len(lines),
-                            "netting_move_ids": [
-                                (4, move_id) for move_id in contrib["netting_moves"].ids
-                            ],
-                        }
-                    )
-            self._commit()
-            if finished or time.monotonic() >= deadline:
+        while time.monotonic() < deadline and self._closing_is_active():
+            journal_id = next(
+                (
+                    candidate
+                    for candidate in self._closing_journal_ids()
+                    if self._claim_journal(candidate)
+                ),
+                None,
+            )
+            if journal_id is None:
+                self._finish_closing()
                 return
+            try:
+                self._close_journal(self.env["account.journal"].browse(journal_id), chunk_size, deadline)
+            finally:
+                self._release_journal(journal_id)
+
+    def _close_journal(self, journal, chunk_size, deadline):
+        while time.monotonic() < deadline and self._closing_is_active():
+            for attempt in range(CHUNK_RETRIES):
+                try:
+                    done = self._close_chunk(journal, chunk_size)
+                    break
+                except (pg_errors.SerializationFailure, pg_errors.DeadlockDetected):
+                    # Chocó con el neteo de otro diario (p. ej. el mismo
+                    # contacto): la tanda se revirtió entera, se repite.
+                    _logger.warning(
+                        "Cierre mensual %s: tanda repetida (intento %s)",
+                        self.display_name,
+                        attempt + 1,
+                    )
+                    self.env.invalidate_all()
+                    if attempt == CHUNK_RETRIES - 1:
+                        raise
+                    time.sleep(0.5 * (attempt + 1))
+            if not done:
+                return
+
+    def _close_chunk(self, journal, chunk_size):
+        """Netea una tanda del diario en su propia transacción. Devuelve False
+        cuando ya no quedan apuntes."""
+        self._commit()
+        if not odoo_module.current_test:
+            # Los cierres de distintos diarios corren a la vez: sin esperar
+            # a que el otro termine ni abortar por una escritura concurrente.
+            self.env.cr.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
+        with self.env.cr.savepoint():
+            lines = self._next_chunk(chunk_size, journal)
+            if not lines:
+                return False
+            self.env.cr.execute(
+                "SELECT COUNT(*) FROM ivess_summary_job_netting_rel rel "
+                "JOIN account_move move ON move.id = rel.move_id "
+                "WHERE rel.job_id = %s AND move.journal_id = %s",
+                (self.id, journal.id),
+            )
+            number = self.env.cr.fetchone()[0] + 1
+            contrib = self._summary_close_lines(
+                lines, label_suffix=_(" (%(diario)s, lote %(n)s)", diario=journal.code, n=number)
+            )
+            self._store_contrib(contrib)
+            # Al final y con SQL: otro diario avanza a la vez y no se puede
+            # sumar sobre un valor leído antes.
+            self.env.cr.execute(
+                "UPDATE ivess_accounting_summary_job SET "
+                "chunks_done = COALESCE(chunks_done, 0) + 1, "
+                "processed_lines = COALESCE(processed_lines, 0) + %s WHERE id = %s",
+                (len(lines), self.id),
+            )
+            self.env.cr.executemany(
+                "INSERT INTO ivess_summary_job_netting_rel (job_id, move_id) "
+                "VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                [(self.id, move_id) for move_id in contrib["netting_moves"].ids],
+            )
+            self.invalidate_recordset(["chunks_done", "processed_lines", "netting_move_ids"])
+        self._commit()
+        return True
+
+    def _finish_closing(self):
+        """Pasa a armar el asiento legal cuando no queda ningún apunte sin
+        netear en ningún diario. Una tanda a medias de otro cron sigue
+        contando como pendiente hasta que confirma."""
+        self._commit()
+        if not self._try_lock():
+            return
+        self.env.invalidate_all()
+        if self.state == "closing" and not self._closing_journal_ids():
+            with self.env.cr.savepoint():
+                self.state = "building"
+        self._commit()
 
     def _store_contrib(self, contrib):
         Line = self.env["ivess.accounting.summary.job.line"]
@@ -370,7 +531,9 @@ class AccountSummaryJob(models.Model):
     def _step_building(self, deadline):
         Line = self.env["ivess.accounting.summary.job.line"]
         slice_size = self._summary_param("legal_slice_lines", 2000)
-        Move = self.env["account.move"].with_context(check_move_validity=False)
+        Move = self.env["account.move"].with_context(
+            check_move_validity=False, ivess_summary_close=True
+        )
         if not self.summary_move_id:
             with self.env.cr.savepoint():
                 pl, bridge = {}, {}
@@ -445,7 +608,7 @@ class AccountSummaryJob(models.Model):
             self.post_attempts += 1
         self._commit()
         with self.env.cr.savepoint():
-            self.summary_move_id.action_post()
+            self.summary_move_id.with_context(ivess_summary_close=True).action_post()
             self.state = "marking"
         self._commit()
 
@@ -471,6 +634,12 @@ class AccountSummaryJob(models.Model):
                     )
                     self.closed_last_id = rows[-1].id
                 else:
+                    self._summary_log_closed(
+                        self.summary_move_id,
+                        Line.search_count(
+                            [("job_id", "=", self.id), ("kind", "=", "closed")]
+                        ),
+                    )
                     self.write({"state": "done", "finished_at": fields.Datetime.now()})
                     self.message_post(
                         body=_(

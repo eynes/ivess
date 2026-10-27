@@ -236,3 +236,17 @@ class TestAccountSummaryJob(IvessAccountingSummaryTestCommon):
         wizard.action_generate_summary()
         self.assertTrue(wizard.summary_move_id)
         self.assertFalse(self.env["ivess.accounting.summary.job"].search([]))
+
+    def test_small_closing_can_be_sent_to_background(self):
+        self._set_params(sync_line_limit=100000)
+        wizard = self._make_wizard()
+        wizard.run_in_background = True
+        action = wizard.action_generate_summary()
+        self.assertEqual(action["res_model"], "ivess.accounting.summary.job")
+        job = self.env["ivess.accounting.summary.job"].browse(action["res_id"])
+        self.assertEqual(job.state, "queued")
+        self.assertTrue(job.progress_label)
+        self._run_job(job)
+        self.assertEqual(job.state, "done", job.error_message)
+        self.assertEqual(job.progress, 100.0)
+        self.assertEqual(job.progress_label, "Terminado")

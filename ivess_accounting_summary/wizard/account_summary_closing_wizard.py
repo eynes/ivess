@@ -45,6 +45,14 @@ class AccountSummaryClosingWizard(models.TransientModel):
             "deja vacía, se genera automáticamente a partir del período."
         ),
     )
+    run_in_background = fields.Boolean(
+        string="Procesar en segundo plano",
+        help=(
+            "Deja el cierre corriendo por tandas y abre su pantalla de avance, "
+            "sin esperar acá a que termine. Los cierres grandes siempre se "
+            "procesan así."
+        ),
+    )
     netting_move_ids = fields.Many2many(
         comodel_name="account.move",
         relation="ivess_summary_wizard_netting_move_rel",
@@ -80,9 +88,9 @@ class AccountSummaryClosingWizard(models.TransientModel):
         # apuntes y el servidor corta los pedidos largos): se encola y lo
         # procesa un cron por tandas. Los chicos se resuelven en el momento.
         sync_limit = self._summary_param("sync_line_limit", 1000)
-        if len(candidate_lines) > sync_limit and not self.env.context.get(
-            "summary_force_sync"
-        ):
+        if (
+            self.run_in_background or len(candidate_lines) > sync_limit
+        ) and not self.env.context.get("summary_force_sync"):
             return self._summary_enqueue_job(candidate_lines)
 
         contrib = self._summary_close_lines(candidate_lines)
@@ -92,9 +100,8 @@ class AccountSummaryClosingWizard(models.TransientModel):
         if not legal_line_vals:
             raise UserError(_("No hay montos para resumir en el período seleccionado."))
 
-        summary_move = self.env["account.move"].create(
-            self._summary_move_vals(legal_line_vals)
-        )
+        Move = self.env["account.move"].with_context(ivess_summary_close=True)
+        summary_move = Move.create(self._summary_move_vals(legal_line_vals))
         summary_move.action_post()
 
         self._summary_mark(
@@ -102,6 +109,7 @@ class AccountSummaryClosingWizard(models.TransientModel):
             "x_closed_by_summary_move_id",
             summary_move,
         )
+        self._summary_log_closed(summary_move, len(contrib["closed_move_ids"]))
 
         self.write(
             {

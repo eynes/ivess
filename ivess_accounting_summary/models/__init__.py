@@ -8,3 +8,4 @@ from . import retention_concept
 from . import summary_engine
 from . import summary_job
 from . import account_full_reconcile
+from . import res_partner

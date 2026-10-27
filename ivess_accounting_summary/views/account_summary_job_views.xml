@@ -22,7 +22,7 @@
         <field name="name">ivess.accounting.summary.job.form</field>
         <field name="model">ivess.accounting.summary.job</field>
         <field name="arch" type="xml">
-            <form string="Cierre Mensual en Segundo Plano" create="0" edit="0" delete="0">
+            <form string="Cierre Mensual en Segundo Plano" create="0" edit="0" delete="0" js_class="ivess_summary_job_form">
                 <header>
                     <button name="action_retry" type="object" string="Reintentar" class="btn-primary" invisible="state != 'error'" />
                     <button name="action_view_summary_move" type="object" string="Ver Asiento Resumen" class="btn-primary" invisible="not summary_move_id" />
@@ -31,8 +31,10 @@
                 </header>
                 <sheet>
                     <div class="alert alert-info" role="alert" invisible="state in ('done', 'error')">
-                        El cierre se está procesando en segundo plano por tandas. Podés cerrar esta
-                        pantalla: se avisa cuando termina. Si falla, queda el motivo y se puede reintentar.
+                        El cierre se está procesando en segundo plano por tandas y esta pantalla
+                        se actualiza sola. Podés cerrarla y seguir trabajando: el cierre continúa y
+                        se avisa cuando termina (también se sigue desde Cierres Mensuales en Proceso).
+                        Si falla, queda el motivo y se puede reintentar.
                     </div>
                     <div class="alert alert-danger" role="alert" invisible="state != 'error'">
                         <strong>El cierre se detuvo.</strong> Corregí el problema y tocá Reintentar:
@@ -52,6 +54,7 @@
                         <group>
                             <field name="user_id" widget="many2one_avatar_user" />
                             <field name="progress" widget="progressbar" />
+                            <field name="progress_label" />
                             <field name="processed_lines" />
                             <field name="total_lines" />
                             <field name="chunks_done" />

@@ -50,6 +50,23 @@ class AccountSummaryEngine(models.AbstractModel):
         )
         records.invalidate_recordset([field_name])
 
+    def _summary_log_closed(self, summary_move, closed_count):
+        """Un único mensaje en el asiento resumen legal en lugar de uno por
+        cada comprobante cerrado. La trazabilidad de cada comprobante queda en
+        x_closed_by_summary_move_id."""
+        if not closed_count:
+            return
+        summary_move.with_context(mail_notrack=True).message_post(
+            body=_(
+                "Cierre Mensual %(period)s: se resumieron %(count)s comprobantes. "
+                "Cada uno quedó vinculado a este asiento "
+                "(campo «Cerrado por asiento resumen»).",
+                period=self._summary_period_label(),
+                count=closed_count,
+            ),
+            subtype_xmlid="mail.mt_note",
+        )
+
     @api.model
     def _summary_check_move_ids(self):
         """Ids de los asientos que tienen cheques (emitidos en sus líneas o
@@ -144,7 +161,7 @@ class AccountSummaryEngine(models.AbstractModel):
         """
         # Los asientos de neteo son asientos manuales: no hay líneas de
         # factura que sincronizar al crearlos, publicarlos ni conciliarlos.
-        self = self.with_context(skip_invoice_sync=True)
+        self = self.with_context(skip_invoice_sync=True, ivess_summary_close=True)
         AccountMove = self.env["account.move"]
         AccountMoveLine = self.env["account.move.line"]
 
@@ -309,8 +326,13 @@ class AccountSummaryEngine(models.AbstractModel):
                 netting_lines_by_key[key] |= netting_by_key[key]
 
         # Una sola conciliación en lote (un grupo por comprobante/contacto).
+        # Sin seguimiento: cada comprobante cobrado dejaría su propio mensaje
+        # de cambio de estado de pago (y lo notificaría a sus seguidores).
+        # Se reemplaza por un único mensaje en el asiento resumen legal
+        # (_summary_log_closed).
         AccountMoveLine.with_context(
-            ivess_summary_check_move_ids=self._summary_check_move_ids()
+            ivess_summary_check_move_ids=self._summary_check_move_ids(),
+            tracking_disable=True,
         )._reconcile_plan(
             [lines_by_key[key] | netting_lines_by_key[key] for key in lines_by_key]
         )

@@ -100,3 +100,48 @@ class TestSummaryPerformanceShortcuts(IvessAccountingSummaryTestCommon):
         result = self.engine._summary_check_move_ids()
         self.assertTrue(expected <= result)
         self.assertNotIn(invoice.id, result)
+
+    def test_close_logs_one_grouped_message(self):
+        invoice_a = self._create_receivable_move(self.partner_a, 100.0, "2024-03-05")
+        invoice_b = self._create_receivable_move(self.partner_b, 200.0, "2024-03-06")
+        messages_before = self.env["mail.message"].search_count(
+            [("model", "=", "account.move"), ("res_id", "in", (invoice_a | invoice_b).ids)]
+        )
+        self.engine.action_generate_summary()
+        self.env.flush_all()
+        # Los comprobantes cerrados no reciben un mensaje cada uno...
+        self.assertEqual(
+            self.env["mail.message"].search_count(
+                [
+                    ("model", "=", "account.move"),
+                    ("res_id", "in", (invoice_a | invoice_b).ids),
+                ]
+            ),
+            messages_before,
+        )
+        # ...el asiento legal deja uno solo con la cantidad cerrada.
+        summary_move = self.engine.summary_move_id
+        notes = summary_move.message_ids.filtered(
+            lambda message: "se resumieron 2 comprobantes" in (message.body or "")
+        )
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(invoice_a.x_closed_by_summary_move_id, summary_move)
+        self.assertEqual(invoice_b.x_closed_by_summary_move_id, summary_move)
+
+    def test_increase_rank_in_close_is_deferred_and_summed(self):
+        partner = self.partner_a.sudo()
+        partner.customer_rank = 3
+        partner.customer_code = partner.customer_code or "T-1"
+        fresh = self.partner_b.sudo()
+        fresh.customer_rank = 0
+        data = self.env.cr.postcommit.data
+        data.pop("ivess_accounting_summary.increase_rank.customer_rank", None)
+        both = (partner | fresh).with_context(ivess_summary_close=True)
+        both._increase_rank("customer_rank", 2)
+        # Sin rango: se asigna en el momento, como en account.
+        self.assertEqual(fresh.customer_rank, 2)
+        # Con rango: se suma después del commit, agrupado.
+        self.assertEqual(partner.customer_rank, 3)
+        pending = data["ivess_accounting_summary.increase_rank.customer_rank"]
+        self.assertEqual(dict(pending), {partner.id: 2})
+        data.pop("ivess_accounting_summary.increase_rank.customer_rank", None)

@@ -83,6 +83,11 @@
         "report/journal_ledger_templates.xml",
     ],
     "demo": [],
+    "assets": {
+        "web.assets_backend": [
+            "ivess_accounting_summary/static/src/js/summary_job_form.js",
+        ],
+    },
     "post_init_hook": "post_init_hook",
     "installable": True,
     "auto_install": False,
