@@ -50,6 +50,18 @@ EXPECTED_HEADERS = [
     "importe del movimiento en moneda local",
 ]
 
+# Columnas opcionales del cheque (formato nuevo): van entre "importe del
+# movimiento" y "cod bco", por lo que desplazan las columnas siguientes.
+CHECK_HEADERS = [
+    "numero de cheque",
+    "tipo de cheque",
+    "formato",
+    "fecha de recepcion",
+    "fecha de emision",
+    "fecha de vencimiento",
+]
+CHECK_FIRST_COLUMN = 18
+
 # Columnas que identifican la cabecera del recibo agrupado (mismo criterio
 # que GROUP_KEY_FIELDS de invoice_import_wizard.py).
 # Posición (base 0) de la columna "retencion 1"; luego alternan código/monto.
@@ -70,6 +82,13 @@ DETAIL_FIELDS = (
     "cod_bco",
     "sucursal_bco",
     "importe_movimiento_moneda_local",
+    "cheque_cols",
+    "nro_cheque",
+    "tipo_cheque",
+    "formato_cheque",
+    "fecha_recepcion",
+    "fecha_emision_cheque",
+    "fecha_vto_cheque",
 )
 
 
@@ -125,6 +144,10 @@ class IvessPaymentImportWizard(models.TransientModel):
 
     # Código de "medio de pago" que identifica efectivo/caja en el Excel.
     _CASH_MEDIO_PAGO = "1"
+    # Código de "medio de pago" que identifica cheque de terceros.
+    _CHECK_MEDIO_PAGO = "2"
+    _CHECK_TYPES = {"COMUN": "common", "DIFERIDO": "deferred"}
+    _CHECK_FORMATS = {"FISICO": "physical", "ECHEQ": "echeq"}
 
     file =fields.Binary(string="Archivo (.xlsx)", required=True)
     filename = fields.Char(string="Nombre de archivo")
@@ -340,10 +363,17 @@ class IvessPaymentImportWizard(models.TransientModel):
             raise UserError(_("La hoja '%s' del archivo está vacía.") % sheet.title)
 
         headers = [self._normalize_header(h) for h in header_row]
+        # Formato nuevo: trae 6 columnas de cheque antes de "cod bco".
+        with_checks = headers[
+            CHECK_FIRST_COLUMN : CHECK_FIRST_COLUMN + len(CHECK_HEADERS)
+        ] == CHECK_HEADERS
+        expected_headers = list(EXPECTED_HEADERS)
+        if with_checks:
+            expected_headers[CHECK_FIRST_COLUMN:CHECK_FIRST_COLUMN] = CHECK_HEADERS
         mismatches = [
             _("columna %d: se esperaba '%s', se encontró '%s'")
             % (i + 1, expected, headers[i] if i < len(headers) else "")
-            for i, expected in enumerate(EXPECTED_HEADERS)
+            for i, expected in enumerate(expected_headers)
             if (headers[i] if i < len(headers) else "") != expected
         ]
         if mismatches:
@@ -361,12 +391,17 @@ class IvessPaymentImportWizard(models.TransientModel):
         ):
             if all(cell is None for cell in raw_row):
                 continue
-            rows.append(self._row_to_dict(raw_row, row_number))
+            rows.append(self._row_to_dict(raw_row, row_number, with_checks))
         return rows
 
-    def _row_to_dict(self, raw_row, row_number):
+    def _row_to_dict(self, raw_row, row_number, with_checks=False):
+        shift = len(CHECK_HEADERS) if with_checks else 0
+
         def cell(index):
             return raw_row[index] if index < len(raw_row) else None
+
+        def check_cell(offset):
+            return cell(CHECK_FIRST_COLUMN + offset) if with_checks else None
 
         return {
             "_row_number": row_number,
@@ -388,18 +423,25 @@ class IvessPaymentImportWizard(models.TransientModel):
             "tipo_cambio": self._to_str(cell(15)),
             "caja": self._to_str(cell(16)),
             "importe_movimiento": cell(17),
-            "cod_bco": self._to_str(cell(18)),
-            "sucursal_bco": self._to_str(cell(19)),
-            "importe_movimiento_moneda_local": cell(20),
-            "retenciones": self._read_retentions(cell),
+            "cod_bco": self._to_str(cell(18 + shift)),
+            "sucursal_bco": self._to_str(cell(19 + shift)),
+            "importe_movimiento_moneda_local": cell(20 + shift),
+            "cheque_cols": with_checks,
+            "nro_cheque": self._to_str(check_cell(0)),
+            "tipo_cheque": self._to_str(check_cell(1)).upper(),
+            "formato_cheque": self._to_str(check_cell(2)).upper(),
+            "fecha_recepcion": check_cell(3),
+            "fecha_emision_cheque": check_cell(4),
+            "fecha_vto_cheque": check_cell(5),
+            "retenciones": self._read_retentions(cell, RETENTION_FIRST_COLUMN + shift),
         }
 
-    def _read_retentions(self, cell):
+    def _read_retentions(self, cell, first_column=RETENTION_FIRST_COLUMN):
         """Pares (código, monto) de las columnas opcionales "retencion N" /
         "monto retencion N" (N = 1..5, a partir de la columna 22). Un recibo
         puede traer hasta 5 retenciones distintas."""
         retentions = []
-        for index in range(RETENTION_FIRST_COLUMN, RETENTION_FIRST_COLUMN + 10, 2):
+        for index in range(first_column, first_column + 10, 2):
             code = self._to_str(cell(index))
             amount = cell(index + 1)
             if code or amount not in (None, ""):
@@ -454,6 +496,7 @@ class IvessPaymentImportWizard(models.TransientModel):
             payment_mode_by_key.setdefault(key, mapping.journal_id)
 
         receipt_journal_by_tipo = self._find_receipt_journals_by_tipo(groups)
+        check_ctx = self._build_check_context(groups)
 
         cod_clientes = {g["cod_cliente"] for g in groups if g.get("cod_cliente")}
         partner_by_bejerman = {}
@@ -485,7 +528,7 @@ class IvessPaymentImportWizard(models.TransientModel):
             if group.get("error"):
                 continue
             detail_results[index] = self._resolve_detail_lines(
-                group["lines"], invoice_by_ref, payment_mode_by_key
+                group["lines"], invoice_by_ref, payment_mode_by_key, check_ctx
             )
 
         partner_results = {}
@@ -897,7 +940,158 @@ class IvessPaymentImportWizard(models.TransientModel):
                 return mode
         return None
 
-    def _resolve_detail_lines(self, lines, invoice_by_ref, payment_mode_by_key):
+    def _is_check_line(self, line):
+        """Línea cobrada con cheque de terceros: medio de pago '2' en un
+        archivo con las columnas de cheque. Sin esas columnas (formato
+        anterior) el medio '2' sigue resolviéndose por el mapeo a diario."""
+        return bool(
+            line.get("cheque_cols") and line["medio_pago"] == self._CHECK_MEDIO_PAGO
+        )
+
+    def _build_check_context(self, groups):
+        """Diario de cheques de terceros y bancos (por código BCRA, que es el
+        BIC del banco como en el mapeo de medios de pago) para resolver los
+        cheques del archivo en lote."""
+        uses_checks = any(
+            self._is_check_line(line)
+            for group in groups
+            if not group.get("error")
+            for line in group["lines"]
+        )
+        if not uses_checks:
+            return {"journal": None, "bank_by_code": {}, "existing": set(), "seen": {}}
+        journal = self.env["account.journal"].search(
+            [
+                ("type", "=", "third_party_checks"),
+                ("company_id", "=", self.env.company.id),
+            ],
+            limit=1,
+        )
+        bank_by_code = {}
+        for bank in self.env["res.bank"].search([("bic", "!=", False)]):
+            bank_by_code.setdefault(self._norm_bank_code(bank.bic), bank)
+        # Cheques de terceros ya registrados con los números del archivo
+        # (número, banco): el mismo cheque no puede entrar dos veces.
+        numbers = {
+            line["nro_cheque"].zfill(8)
+            for group in groups
+            if not group.get("error")
+            for line in group["lines"]
+            if self._is_check_line(line) and line["nro_cheque"].isdigit()
+        }
+        existing = {
+            (check.number, check.bank_id.id): check
+            for check in self.env["account.check"].search(
+                [
+                    ("internal_type", "=", "third_party"),
+                    ("number", "in", list(numbers)),
+                    ("third_party_check_state", "!=", "cancelled"),
+                    ("company_id", "=", self.env.company.id),
+                ]
+            )
+        }
+        return {
+            "journal": journal,
+            "bank_by_code": bank_by_code,
+            "existing": existing,
+            # (número, banco) -> recibo del archivo que lo trae primero.
+            "seen": {},
+        }
+
+    def _resolve_check_line(self, line, check_ctx, owner=None):
+        """Valida y resuelve los datos del cheque de una línea. Devuelve
+        (vals para la línea de detalle, errores)."""
+        errors = []
+        vals = {"is_check": True}
+
+        number = line["nro_cheque"]
+        if not number:
+            errors.append(_("El cheque no informa número."))
+        elif not number.isdigit() or len(number) > 8:
+            errors.append(
+                _("Número de cheque inválido '%s' (hasta 8 dígitos).") % number
+            )
+        vals["nro_cheque"] = number.zfill(8) if number.isdigit() else number
+
+        check_type = self._CHECK_TYPES.get(line["tipo_cheque"])
+        if not check_type:
+            errors.append(
+                _("Tipo de cheque '%s' no soportado (COMUN o DIFERIDO).")
+                % line["tipo_cheque"]
+            )
+        vals["check_type"] = check_type
+
+        check_format = self._CHECK_FORMATS.get(line["formato_cheque"])
+        if not check_format:
+            errors.append(
+                _("Formato de cheque '%s' no soportado (FISICO o ECHEQ).")
+                % line["formato_cheque"]
+            )
+        vals["check_format"] = check_format
+
+        for field, source, label in (
+            ("reception_date", "fecha_recepcion", _("fecha de recepción")),
+            ("issue_date", "fecha_emision_cheque", _("fecha de emisión")),
+            ("payment_date", "fecha_vto_cheque", _("fecha de vencimiento")),
+        ):
+            raw = line[source]
+            vals[field] = False
+            if raw in (None, ""):
+                # El vencimiento solo es obligatorio para el cheque diferido.
+                if field != "payment_date" or check_type == "deferred":
+                    errors.append(_("El cheque no informa %s.") % label)
+                continue
+            try:
+                vals[field] = self._to_date(raw)
+            except ValueError:
+                errors.append(_("El cheque trae una %s inválida: '%s'.") % (label, raw))
+
+        bank = check_ctx["bank_by_code"].get(self._norm_bank_code(line["cod_bco"]))
+        if not line["cod_bco"]:
+            errors.append(_("El cheque no informa código de banco."))
+        elif not bank:
+            errors.append(
+                _("No se encontró un banco con código (BIC) '%s'.") % line["cod_bco"]
+            )
+        vals["bank_id"] = bank.id if bank else False
+
+        if bank and vals["nro_cheque"].isdigit():
+            key = (vals["nro_cheque"], bank.id)
+            registered = check_ctx["existing"].get(key)
+            if registered:
+                errors.append(
+                    _(
+                        "El cheque %(number)s del banco %(bank)s ya está registrado"
+                        " (cheque de terceros #%(id)s, estado: %(state)s)."
+                    )
+                    % {
+                        "number": vals["nro_cheque"],
+                        "bank": bank.name,
+                        "id": registered.id,
+                        "state": registered.third_party_check_state,
+                    }
+                )
+            elif check_ctx["seen"].setdefault(key, owner) != owner:
+                errors.append(
+                    _(
+                        "El cheque %(number)s del banco %(bank)s aparece en más"
+                        " de un recibo del archivo."
+                    )
+                    % {"number": vals["nro_cheque"], "bank": bank.name}
+                )
+
+        if not check_ctx["journal"]:
+            errors.append(
+                _(
+                    "No hay un diario de tipo 'Cheques de terceros' en la"
+                    " compañía."
+                )
+            )
+        return vals, errors
+
+    def _resolve_detail_lines(
+        self, lines, invoice_by_ref, payment_mode_by_key, check_ctx=None
+    ):
         detail_vals = []
         errors = []
         matched_partners = set()
@@ -980,11 +1174,20 @@ class IvessPaymentImportWizard(models.TransientModel):
                     applied_total += importe
 
             payment_mode = None
-            if line["medio_pago"]:
+            check_vals = {}
+            is_check = check_ctx is not None and self._is_check_line(line)
+            if is_check:
+                # El cheque no va por un diario mapeado: se carga como cheque
+                # de terceros del recibo.
+                check_vals, check_errors = self._resolve_check_line(
+                    line, check_ctx, owner=id(lines)
+                )
+                line_errors.extend(check_errors)
+            elif line["medio_pago"]:
                 payment_mode = self._lookup_payment_mode(payment_mode_by_key, line)
             if not line["medio_pago"]:
                 line_errors.append(_("El recibo no informa medio de pago."))
-            elif not payment_mode:
+            elif not is_check and not payment_mode:
                 line_errors.append(
                     _(
                         "No hay un diario mapeado para el medio de pago '%s'"
@@ -1038,6 +1241,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                         "error_message": "; ".join(line_errors)
                         if line_errors
                         else False,
+                        **check_vals,
                     },
                 )
             )
@@ -1316,11 +1520,13 @@ class IvessPaymentImportWizard(models.TransientModel):
     @staticmethod
     def _is_batchable(result_line):
         """Recibo a cuenta (ninguna de sus líneas aplica a una factura) y sin
-        retenciones: las retenciones van por proforma_voucher, uno por uno."""
+        retenciones ni cheques: las retenciones y los cheques van por
+        proforma_voucher, uno por uno."""
         details = result_line.detail_line_ids
         return (
             bool(details)
             and not details.filtered("invoice_id")
+            and not details.filtered("is_check")
             and not result_line.retention_line_ids
         )
 
@@ -1450,6 +1656,9 @@ class IvessPaymentImportWizard(models.TransientModel):
                 (0, 0, vals)
                 for vals in self._prepare_payment_mode_line_vals(result_line)
             ],
+            "third_party_check_receipt_ids": [
+                (0, 0, vals) for vals in self._prepare_check_vals(result_line)
+            ],
         }
 
     @staticmethod
@@ -1497,45 +1706,87 @@ class IvessPaymentImportWizard(models.TransientModel):
         return order
 
     @staticmethod
-    def _prepare_payment_mode_line_vals(result_line):
-        """Agrupa las líneas de detalle por diario de medio de pago resuelto
-        (payment_mode_id, ver _resolve_detail_lines) y arma una
-        payment_mode_line por cada diario distinto, con el importe sumado
-        de las facturas aplicadas con ese medio de pago: un mismo recibo
-        puede combinar más de un medio de pago (ej. parte efectivo, parte
-        cheque)."""
-        amounts_by_journal = {}
-        order_by_journal = []
+    def _net_amounts(result_line):
+        """Importe por diario de medio de pago (sin cheques) y por cheque
+        (clave: (número, banco)), ya netos de retenciones, en el orden del
+        archivo. Un mismo cheque repartido en varias facturas es uno solo."""
+        mode_amounts = {}
+        check_amounts = {}
+        check_detail = {}
         for detail in result_line.detail_line_ids:
-            journal = detail.payment_mode_id
-            if journal.id not in amounts_by_journal:
-                amounts_by_journal[journal.id] = 0.0
-                order_by_journal.append(journal)
-            amounts_by_journal[journal.id] += detail.importe
+            if detail.is_check:
+                key = (detail.nro_cheque, detail.bank_id.id)
+                check_amounts[key] = check_amounts.get(key, 0.0) + detail.importe
+                check_detail.setdefault(key, detail)
+            else:
+                journal = detail.payment_mode_id
+                mode_amounts[journal] = mode_amounts.get(journal, 0.0) + detail.importe
 
-        # Odoo calcula amount = medios de pago + retenciones. Si el recibo
-        # aplica a facturas, el importe aplicado es el bruto y las
+        # Odoo calcula amount = medios de pago + cheques + retenciones. Si el
+        # recibo aplica a facturas, el importe aplicado es el bruto y las
         # retenciones se descuentan de los medios de pago (empezando por el
-        # primero) para que cuadre.
+        # primero, después los cheques) para que cuadre.
         # Solo si el recibo aplica a facturas: en un recibo a cuenta el
         # importe del movimiento ya es el neto cobrado.
         to_deduct = 0.0
         if result_line.detail_line_ids.filtered("invoice_id"):
             to_deduct = sum(result_line.retention_line_ids.mapped("importe"))
-        for journal in order_by_journal:
-            deduction = min(to_deduct, amounts_by_journal[journal.id])
-            amounts_by_journal[journal.id] -= deduction
-            to_deduct -= deduction
+        for amounts in (mode_amounts, check_amounts):
+            for key in amounts:
+                deduction = min(to_deduct, amounts[key])
+                amounts[key] -= deduction
+                to_deduct -= deduction
+        return mode_amounts, check_amounts, check_detail
 
+    @staticmethod
+    def _prepare_payment_mode_line_vals(result_line):
+        """Una payment_mode_line por cada diario de medio de pago distinto
+        resuelto (payment_mode_id, ver _resolve_detail_lines), con el
+        importe sumado de las líneas con ese medio de pago: un mismo recibo
+        puede combinar más de un medio de pago (ej. parte efectivo, parte
+        transferencia). Los cheques no van acá (ver _prepare_check_vals)."""
+        mode_amounts, _checks, _detail = IvessPaymentImportWizard._net_amounts(
+            result_line
+        )
         return [
             {
                 "payment_mode_id": journal.id,
-                "amount": amounts_by_journal[journal.id],
+                "amount": amount,
                 "name": result_line.comprobante_ref,
                 "date": result_line.fecha,
             }
-            for journal in order_by_journal
+            for journal, amount in mode_amounts.items()
         ]
+
+    def _prepare_check_vals(self, result_line):
+        """Un cheque de terceros (account.check) por cada cheque del
+        recibo; al postear el recibo pasa a 'En cartera'."""
+        _modes, check_amounts, check_detail = self._net_amounts(result_line)
+        journal = self.env["account.journal"].search(
+            [
+                ("type", "=", "third_party_checks"),
+                ("company_id", "=", result_line.journal_id.company_id.id),
+            ],
+            limit=1,
+        )
+        vals_list = []
+        for key, amount in check_amounts.items():
+            detail = check_detail[key]
+            vals_list.append(
+                {
+                    "internal_type": "third_party",
+                    "journal_id": journal.id,
+                    "number": detail.nro_cheque,
+                    "bank_id": detail.bank_id.id,
+                    "type": detail.check_type,
+                    "checkbook_format": detail.check_format,
+                    "amount": amount,
+                    "reception_date": detail.reception_date,
+                    "issue_date": detail.issue_date,
+                    "payment_date": detail.payment_date,
+                }
+            )
+        return vals_list
 
     @staticmethod
     def _prepare_income_line_vals(currency, company, result_line):
