@@ -96,6 +96,13 @@
                                 <field name="tipo_cambio" optional="hide" />
                                 <field name="cod_bco" optional="hide" />
                                 <field name="sucursal_bco" optional="hide" />
+                                <field name="nro_cheque" optional="show" />
+                                <field name="check_type" optional="show" />
+                                <field name="check_format" optional="show" />
+                                <field name="bank_id" optional="show" />
+                                <field name="reception_date" optional="hide" />
+                                <field name="issue_date" optional="hide" />
+                                <field name="payment_date" optional="show" />
                                 <field name="has_error" invisible="1" />
                                 <field
                   name="error_message"
