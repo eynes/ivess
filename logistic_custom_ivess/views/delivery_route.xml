@@ -63,6 +63,7 @@
                                     <field name="delivery_date_hour" optional="show"/>
                                     <field name="sale_order_id" widget="many2one_link" optional="show"/>
                                     <field name="stock_picking_id" widget="many2one_link" optional="show"/>
+                                    <field name="withdrawal_picking_id" widget="many2one_link" optional="show"/>
                                     <field name="frequency" optional="show"/>
                                     <field name="origin" optional="show"/>
                                     <field name="is_vacation" optional="show" readonly="1"/>
@@ -141,7 +142,8 @@
                 <field name="sale_order_id" string="Pedido" widget="many2one"/>
                 <field name="sale_currency_id" column_invisible="1"/>
                 <field name="sale_amount_total" string="Importe" invisible="not sale_order_id"/>
-                <field name="stock_picking_id" string="Remito" widget="many2one"/>
+                <field name="stock_picking_id" string="Remito de venta" widget="many2one"/>
+                <field name="withdrawal_picking_id" string="Remito de retiro" widget="many2one"/>
                 <field name="cobranza_ids" string="Cobranzas" widget="many2many_tags"/>
                 <button name="action_ver_cobranzas" type="object" icon="fa-external-link"
                         title="Abrir las cobranzas" invisible="not cobranza_ids"/>

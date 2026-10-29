@@ -3,8 +3,9 @@
 Solo Python: nada de env ni ORM. Los productos se reciben ya buscados y
 solo se leen sus atributos.
 """
+from dataclasses import dataclass
 
-# Cabecera basica: obligatoria en cualquier operacion.
+# Cabecera basica
 BASIC_HEADER_SCHEMA = {
     "usuario_reparto": str,
     "fecha_operacion": str,
@@ -18,23 +19,70 @@ BASIC_HEADER_SCHEMA = {
     "metros": (int, float),
     "fuera_ruta": bool,
 }
-# Caso venta (motivo_no_compra == 0).
+
+# Venta de productos (motivo_no_compra == 0).
 SALE_SCHEMA = {
     "item_venta": list,
 }
-# Cada elemento de item_venta. Numericos aceptan int o float: en JSON un 2 llega como int.
 SALE_ITEM_SCHEMA = {
     "codigo_producto": str,
     "cantidad": (int, float),
     "precio_venta": (int, float),
 }
-# Opcionales a nivel parametro: se validan contra el producto, no contra el esquema.
 SALE_ITEM_OPTIONAL = {"tipo_venta", "series"}
-# Valor de la app -> water.container.state.
-CONTAINER_STATE_BY_TIPO_VENTA = {
+
+# Retiro de envases: se combina con una venta o con un motivo de no compra, o va solo.
+WITHDRAWAL_SCHEMA = {
+    "item_retiro": list,
+}
+WITHDRAWAL_ITEM_SCHEMA = {
+    "retiro_cod_producto": str,
+    "retiro_cantidad": (int, float),
+}
+WITHDRAWAL_ITEM_OPTIONAL = {"retiro_tipo", "retiro_series"}
+
+CONTAINER_STATE = {
     "V": "en_comodato",
     "P": "prestado",
 }
+
+
+@dataclass(frozen=True)
+class ItemSpec:
+    """Nombres de los campos de una lista de items. Venta y retiro se validan
+    con las mismas reglas; solo cambian los nombres y si el tipo aplica a los
+    frio/calor (strict_tipo)."""
+    list_key: str
+    code: str
+    qty: str
+    tipo: str
+    series: str
+    schema: dict
+    optional: set
+    price: str | None = None
+    strict_tipo: bool = False
+
+
+SALE_ITEMS = ItemSpec(
+    "item_venta", 
+    "codigo_producto", 
+    "cantidad", 
+    "tipo_venta", 
+    "series",
+    SALE_ITEM_SCHEMA, 
+    SALE_ITEM_OPTIONAL, 
+    price="precio_venta",
+)
+WITHDRAWAL_ITEMS = ItemSpec(
+    "item_retiro", 
+    "retiro_cod_producto", 
+    "retiro_cantidad", 
+    "retiro_tipo", 
+    "retiro_series",
+    WITHDRAWAL_ITEM_SCHEMA, 
+    WITHDRAWAL_ITEM_OPTIONAL, 
+    strict_tipo=True,
+)
 # Categorias de error de parametros. El orden es la prioridad: se informa
 # solo la primera categoria que tenga detalles.
 PARAM_ERROR_MESSAGES = {
@@ -100,78 +148,147 @@ def validate_header(params):
     return errors
 
 
-def validate_case_params(params, case_schema):
-    """Fase 2: parametros propios del caso (hoy, item_venta y cada item)."""
+def case_param_names(params):
+    """Parametros propios del caso: item_retiro siempre; item_venta solo cuando
+    no hay motivo de no compra."""
+    names = {WITHDRAWAL_ITEMS.list_key}
+    if params["motivo_no_compra"] == 0:
+        names.add(SALE_ITEMS.list_key)
+    return names
+
+
+def validate_case_params(params):
+    """Fase 2: parametros propios del caso (item_venta, item_retiro y cada item).
+    Una visita sin motivo de no compra necesita venta, retiro o ambos."""
     errors = ParamErrors()
-    check_schema(params, case_schema, errors)
-    if type(params.get("item_venta")) is list:
-        for index, item in enumerate(params["item_venta"]):
-            if type(item) is not dict:
-                errors.add("invalid_type", "item_venta[%s] (dict)" % index)
-                continue
-            prefix = "item_venta[%s]." % index
-            unknown_keys = set(item) - set(SALE_ITEM_SCHEMA) - SALE_ITEM_OPTIONAL
-            for param in sorted(unknown_keys):
-                errors.add("unknown", prefix + param)
-            item_errors = ParamErrors()
-            check_schema(item, SALE_ITEM_SCHEMA, item_errors, prefix)
-            errors.extend(item_errors)
-            tipo_venta = item.get("tipo_venta")
-            if tipo_venta is not None:              # caso de productos retornables, requieren tipo_venta
-                if type(tipo_venta) is not str:
-                    errors.add("invalid_type", prefix + "tipo_venta (str)")
-                elif tipo_venta not in CONTAINER_STATE_BY_TIPO_VENTA:
-                    errors.add("invalid_value", prefix + "tipo_venta (%s)" % "/".join(CONTAINER_STATE_BY_TIPO_VENTA))
-            series = item.get("series")
-            if series is not None:                  # caso de productos con seguimiento por numero de serie, requieren series
-                if type(series) is not list:
-                    errors.add("invalid_type", prefix + "series (list)")
-                else:
-                    for serie_index, serie in enumerate(series):
-                        if type(serie) is not str or not serie.strip():
-                            errors.add("invalid_type", "%sseries[%s] (str)" % (prefix, serie_index))
-            if item_errors:
-                continue
-            if item["cantidad"] <= 0:
-                errors.add("invalid_value", prefix + "cantidad (> 0)")
-            if item["precio_venta"] < 0:
-                errors.add("invalid_value", prefix + "precio_venta (>= 0)")
+    # item_venta / item_retiro en null equivalen a ausente; una lista vacia es faltante.
+    has_sale = params.get(SALE_ITEMS.list_key) is not None
+    has_withdrawal = params.get(WITHDRAWAL_ITEMS.list_key) is not None
+    if params["motivo_no_compra"] == 0 and not has_sale and not has_withdrawal:
+        errors.add("missing", "%s o %s" % (SALE_ITEMS.list_key, WITHDRAWAL_ITEMS.list_key))
+    if has_sale:
+        check_schema(params, SALE_SCHEMA, errors)
+    if has_withdrawal:
+        check_schema(params, WITHDRAWAL_SCHEMA, errors)
+    for spec in (SALE_ITEMS, WITHDRAWAL_ITEMS):
+        validate_items(params, spec, errors)
     return errors
 
 
-def validate_tipo_venta(item_venta, products_by_code):
-    """tipo_venta: obligatorio solo en productos que requieren estado de envase."""
+def validate_items(params, spec, errors):
+    """Forma de cada item de la lista spec.list_key y rangos de cantidad y precio."""
+    items = params.get(spec.list_key)
+    if type(items) is not list:
+        return
+    for index, item in enumerate(items):
+        if type(item) is not dict:
+            errors.add("invalid_type", "%s[%s] (dict)" % (spec.list_key, index))
+            continue
+        prefix = "%s[%s]." % (spec.list_key, index)
+        unknown_keys = set(item) - set(spec.schema) - spec.optional
+        for param in sorted(unknown_keys):
+            errors.add("unknown", prefix + param)
+        item_errors = ParamErrors()
+        check_schema(item, spec.schema, item_errors, prefix)
+        errors.extend(item_errors)
+        tipo = item.get(spec.tipo)
+        if tipo is not None:                    # caso de productos retornables, requieren tipo
+            if type(tipo) is not str:
+                errors.add("invalid_type", prefix + spec.tipo + " (str)")
+            elif tipo not in CONTAINER_STATE:
+                errors.add("invalid_value", prefix + spec.tipo + " (%s)" % "/".join(CONTAINER_STATE))
+        series = item.get(spec.series)
+        if series is not None:                  # caso de productos con seguimiento por numero de serie, requieren series
+            if type(series) is not list:
+                errors.add("invalid_type", prefix + spec.series + " (list)")
+            else:
+                for serie_index, serie in enumerate(series):
+                    if type(serie) is not str or not serie.strip():
+                        errors.add("invalid_type", "%s%s[%s] (str)" % (prefix, spec.series, serie_index))
+        if item_errors:
+            continue
+        if item[spec.qty] <= 0:
+            errors.add("invalid_value", prefix + spec.qty + " (> 0)")
+        if spec.price and item[spec.price] < 0:
+            errors.add("invalid_value", prefix + spec.price + " (>= 0)")
+
+
+def validate_tipo(items, products_by_code, spec=SALE_ITEMS):
+    """tipo (tipo_venta / retiro_tipo): obligatorio solo en productos que requieren estado de envase.
+    En la venta se acepta tambien en retornables frio/calor; en el retiro (strict_tipo) no:
+    el frio/calor se identifica por serie."""
     errors = ParamErrors()
-    for index, item in enumerate(item_venta):
-        product = products_by_code[item["codigo_producto"]]
-        has_tipo_venta = item.get("tipo_venta") is not None
-        if requires_container_state(product) and not has_tipo_venta:
-            errors.add("missing", "item_venta[%s].tipo_venta (%s es retornable)" % (index, product.default_code))
-        elif not product.is_returnable and has_tipo_venta:
-            errors.add("not_applicable", "item_venta[%s].tipo_venta (%s no es retornable)" % (index, product.default_code))
+    for index, item in enumerate(items):
+        product = products_by_code[item[spec.code]]
+        has_tipo = item.get(spec.tipo) is not None
+        prefix = "%s[%s]." % (spec.list_key, index)
+        if requires_container_state(product) and not has_tipo:
+            errors.add("missing", prefix + spec.tipo + " (%s es retornable)" % product.default_code)
+        elif spec.strict_tipo and not requires_container_state(product) and has_tipo:
+            errors.add("not_applicable", prefix + spec.tipo + " (%s no admite tipo de envase)" % product.default_code)
+        elif not spec.strict_tipo and not product.is_returnable and has_tipo:
+            errors.add("not_applicable", prefix + spec.tipo + " (%s no es retornable)" % product.default_code)
     return errors
 
 
-def validate_series(item_venta, products_by_code):
+def validate_series(items, products_by_code, spec=SALE_ITEMS):
     """series: obligatoria (una por unidad) solo con seguimiento por numero de serie.
     Devuelve (errors, requested_series) con requested_series = {(product_id, serie)}."""
     errors = ParamErrors()
     requested_series = set()
-    for index, item in enumerate(item_venta):
-        product = products_by_code[item["codigo_producto"]]
-        series = item.get("series") or []
-        prefix = "item_venta[%s]." % index
+    for index, item in enumerate(items):
+        product = products_by_code[item[spec.code]]
+        series = item.get(spec.series) or []
+        prefix = "%s[%s]." % (spec.list_key, index)
         if product.tracking != "serial":
             if series:
-                errors.add("not_applicable", prefix + "series (%s no tiene seguimiento por serie)" % product.default_code)
+                errors.add("not_applicable", prefix + spec.series + " (%s no tiene seguimiento por serie)" % product.default_code)
             continue
         if not series:
-            errors.add("missing", prefix + "series (%s tiene seguimiento por serie)" % product.default_code)
+            errors.add("missing", prefix + spec.series + " (%s tiene seguimiento por serie)" % product.default_code)
             continue
-        if not float(item["cantidad"]).is_integer() or len(series) != item["cantidad"]:
-            errors.add("invalid_value", prefix + "series (una serie por unidad: cantidad entera igual a %s series)" % len(series))
+        if not float(item[spec.qty]).is_integer() or len(series) != item[spec.qty]:
+            errors.add("invalid_value", prefix + spec.series + " (una serie por unidad: cantidad entera igual a %s series)" % len(series))
         for serie in series:
             if (product.id, serie) in requested_series:
-                errors.add("invalid_value", prefix + "series (%s repetida)" % serie)
+                errors.add("invalid_value", prefix + spec.series + " (%s repetida)" % serie)
             requested_series.add((product.id, serie))
     return errors, requested_series
+
+
+@dataclass(frozen=True)
+class WithdrawalAvailability:
+    """Envases del cliente, ya leidos de la base.
+    quantity: {(product_template_id, estado): cantidad}, solo envases con cantidad > 0.
+    lots: {(product_template_id, nombre_de_serie): lote} de los envases con serie."""
+    quantity: dict
+    lots: dict
+
+
+def validate_withdrawal_availability(items, products_by_code, availability):
+    """Que el cliente tenga lo que se retira. Los repetidos se suman por
+    (producto, estado). Los productos con serie se validan por serie."""
+    errors = ParamErrors()
+    requested = {}          # {(template, estado): cantidad pedida}
+    code_by_template = {}   # {template: default_code}, solo para el mensaje de error
+    for index, item in enumerate(items):
+        product = products_by_code[item[WITHDRAWAL_ITEMS.code]]
+        tmpl_id = product.product_tmpl_id.id # availability indexada x template
+        if product.tracking == "serial":
+            prefix = "%s[%s]." % (WITHDRAWAL_ITEMS.list_key, index)
+            for serie in item.get(WITHDRAWAL_ITEMS.series) or []:
+                if (tmpl_id, serie) not in availability.lots:
+                    errors.add("invalid_value", prefix + WITHDRAWAL_ITEMS.series + " (%s no es un envase del cliente)" % serie)
+        if requires_container_state(product):
+            state = CONTAINER_STATE[item[WITHDRAWAL_ITEMS.tipo]]
+            key = (tmpl_id, state)
+            requested[key] = requested.get(key, 0) + item[WITHDRAWAL_ITEMS.qty]
+            code_by_template[tmpl_id] = product.default_code
+    for (tmpl_id, state), quantity in requested.items():
+        available = availability.quantity.get((tmpl_id, state), 0)
+        if quantity > available:
+            code = code_by_template[tmpl_id]
+            errors.add("invalid_value", "%s (%s en estado %s: se retiran %s, el cliente tiene %s)" % (
+                WITHDRAWAL_ITEMS.qty, code, state, quantity, available,
+            ))
+    return errors
