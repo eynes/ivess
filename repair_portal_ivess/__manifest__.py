@@ -18,6 +18,7 @@
     'depends': [
         'portal',
         'quality_control_custom',
+        'aguas_fc_integration',
     ],
     'data': [
         'security/security.xml',

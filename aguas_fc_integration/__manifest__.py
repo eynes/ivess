@@ -14,6 +14,7 @@
         'security/ir.model.access.csv',
         'views/res_company_views.xml',
         'views/stock_location_views.xml',
+        'views/repair_order_views.xml',
     ],
     'installable': True,
     'auto_install': False,

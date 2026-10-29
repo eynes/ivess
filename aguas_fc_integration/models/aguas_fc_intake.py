@@ -1,6 +1,8 @@
 import logging
+from datetime import datetime
 
-from odoo import SUPERUSER_ID, api, models
+from odoo import SUPERUSER_ID, _, api, models
+from odoo.addons.quality_control_custom.models.repair_order import FRIO_CALOR_STAGES
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -11,7 +13,9 @@ class AguasFCIntake(models.AbstractModel):
     _description = "Procesador de entrada de equipos desde Aguas FC"
 
     @api.model
-    def process_entrada(self, idreparto, equipos, fecha, tecnico=None, usuario=None):
+    def process_entrada(
+        self, idreparto, equipos, fecha, tecnico=None, usuario=None, embolsados=None
+    ):
         self = self.with_user(SUPERUSER_ID)
         src_location = self._localizar_reparto(idreparto)
         if not src_location:
@@ -38,6 +42,19 @@ class AguasFCIntake(models.AbstractModel):
                 f"No está configurado el producto Equipo FC en la empresa {company.name}."
             )
 
+        if embolsados:
+            return self._process_entrada_con_embolsados(
+                idreparto=idreparto,
+                equipos=equipos,
+                embolsados=embolsados,
+                fecha=fecha,
+                company=company,
+                src_location=src_location,
+                taller_location=taller_location,
+                picking_type=picking_type,
+                product=product,
+            )
+
         return self._crear_ingreso(
             idreparto=idreparto,
             equipos=equipos,
@@ -48,6 +65,298 @@ class AguasFCIntake(models.AbstractModel):
             product=product,
             origin=f"AGUAS-{idreparto}-{fecha}",
         )
+
+    # ------------------------------------------------------------------
+    # Embolsados (Loop -> Odoo): equipos que vuelven embolsados y listos para
+    # entregar. No generan orden de reparación: van a expedición desde donde
+    # Odoo los tiene.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _normalizar_series(series):
+        vistas = []
+        for serie in series or []:
+            serie = (serie or "").strip()
+            if serie and serie not in vistas:
+                vistas.append(serie)
+        return vistas
+
+    def _embolsado_config(self, company):
+        picking_type = company.aguas_fc_embolsado_picking_type_id
+        expedicion = company.aguas_fc_expedicion_location_id
+        if not picking_type:
+            raise UserError(
+                _(
+                    "No está configurado el tipo de operación Embolsados FC en la empresa %s.",
+                    company.name,
+                )
+            )
+        if not expedicion:
+            raise UserError(
+                _(
+                    "No está configurada la ubicación Expedición FC en la empresa %s.",
+                    company.name,
+                )
+            )
+        return picking_type, expedicion
+
+    def _embolsado_ubicaciones(self, lot, company):
+        """Ubicaciones internas donde Odoo tiene la serie (cantidad > 0), la de
+        ingreso más reciente primero."""
+        quants = self.env["stock.quant"].search(
+            [
+                ("lot_id", "=", lot.id),
+                ("company_id", "=", company.id),
+                ("location_id.usage", "=", "internal"),
+                ("quantity", ">", 0),
+            ]
+        )
+        quants = quants.sorted(
+            key=lambda q: (q.in_date or datetime.min, q.id), reverse=True
+        )
+        return quants.location_id
+
+    @staticmethod
+    def _embolsado_en_expedicion(location, expedicion):
+        return location.parent_path.startswith(expedicion.parent_path)
+
+    def _embolsado_temporal(self, company):
+        warehouse = company.aguas_fc_picking_type_id.warehouse_id
+        repair_type = warehouse.repair_type_id or self.env["stock.picking.type"].search(
+            [
+                ("code", "=", "repair_operation"),
+                ("company_id", "=", company.id),
+            ],
+            limit=1,
+        )
+        return repair_type.default_product_location_dest_id
+
+    def _clasificar_embolsados(self, series, company, src_location):
+        """Clasifica cada serie (E1-E5) mirando el stock y las órdenes abiertas,
+        sin escribir nada."""
+        _picking_type, expedicion = self._embolsado_config(company)
+        temporal = self._embolsado_temporal(company)
+        items = []
+        for serie in series:
+            lot = self.env["stock.lot"].search(
+                [
+                    ("name", "=", serie),
+                    ("product_id", "=", company.aguas_fc_product_id.id),
+                ],
+                limit=1,
+            )
+            item = {"serie": serie, "lot": lot, "orden": self.env["repair.order"]}
+            ubicaciones = (
+                self._embolsado_ubicaciones(lot, company)
+                if lot
+                else self.env["stock.location"]
+            )
+            ordenes = (
+                self.env["repair.order"].search(
+                    [("lot_id", "=", lot.id), ("state", "not in", ["cancel", "done"])]
+                )
+                if lot
+                else self.env["repair.order"]
+            )
+            if any(self._embolsado_en_expedicion(l, expedicion) for l in ubicaciones):
+                item["caso"] = "E1"
+            elif ordenes:
+                sin_empezar = ordenes.filtered(lambda o: o._embolsado_sin_empezar())
+                if sin_empezar == ordenes:
+                    item.update(caso="E2", orden=ordenes[0])
+                else:
+                    item.update(caso="E3", orden=(ordenes - sin_empezar)[0])
+            elif temporal and temporal in ubicaciones:
+                item.update(caso="E4", origen=temporal)
+            else:
+                item.update(caso="E5", origen=ubicaciones[:1] or src_location)
+            items.append(item)
+        return items
+
+    def _embolsado_crear_traslado(self, company, src_location, lots, origin):
+        # Lo usa también el portal (técnicos sin permisos de stock).
+        self = self.with_user(SUPERUSER_ID)
+        picking_type, expedicion = self._embolsado_config(company)
+        picking = (
+            self.env["stock.picking"]
+            .with_company(company)
+            .create(
+                {
+                    "picking_type_id": picking_type.id,
+                    "location_id": src_location.id,
+                    "location_dest_id": expedicion.id,
+                    "origin": origin,
+                    "company_id": company.id,
+                }
+            )
+        )
+        moves = {}
+        for product in lots.product_id:
+            moves[product] = (
+                self.env["stock.move"]
+                .with_company(company)
+                .create(
+                    {
+                        "picking_id": picking.id,
+                        "product_id": product.id,
+                        "product_uom_qty": len(lots.filtered(lambda l: l.product_id == product)),
+                        "product_uom": product.uom_id.id,
+                        "location_id": src_location.id,
+                        "location_dest_id": expedicion.id,
+                        "company_id": company.id,
+                    }
+                )
+            )
+        picking.action_confirm()
+        for lot in lots:
+            self.env["stock.move.line"].with_company(company).create(
+                {
+                    "move_id": moves[lot.product_id].id,
+                    "picking_id": picking.id,
+                    "product_id": lot.product_id.id,
+                    "lot_id": lot.id,
+                    "quantity": 1,
+                    "location_id": src_location.id,
+                    "location_dest_id": expedicion.id,
+                    "company_id": company.id,
+                }
+            )
+        picking.with_context(
+            skip_sanity_check=True,
+            picking_ids_not_to_backorder=picking.ids,
+        ).button_validate()
+        if picking.state != "done":
+            raise UserError(
+                f"El traslado {picking.name} quedó en estado {picking.state} en lugar de Hecho."
+            )
+        return picking
+
+    def _process_entrada_con_embolsados(
+        self,
+        idreparto,
+        equipos,
+        embolsados,
+        fecha,
+        company,
+        src_location,
+        taller_location,
+        picking_type,
+        product,
+    ):
+        equipos = self._normalizar_series(equipos)
+        embolsados = self._normalizar_series(embolsados)
+        if not equipos and not embolsados:
+            raise UserError(_("Las listas 'equipos' y 'embolsados' vienen vacías."))
+        for serie in embolsados:
+            if serie in equipos:
+                raise UserError(
+                    _("La serie %s viene como equipo y como embolsado.", serie)
+                )
+
+        # Todo se valida y clasifica antes de mover nada.
+        items = self._clasificar_embolsados(embolsados, company, src_location)
+        origin_emb = f"AGUAS-EMB-{idreparto}-{fecha}"
+
+        resultado = {"success": True}
+        if equipos:
+            ingreso = self._crear_ingreso(
+                idreparto=idreparto,
+                equipos=equipos,
+                company=company,
+                src_location=src_location,
+                dest_location=taller_location,
+                picking_type=picking_type,
+                product=product,
+                origin=f"AGUAS-{idreparto}-{fecha}",
+            )
+            resultado.update(ingreso)
+
+        pickings = []
+        detalle = {}
+        grupos = {}
+        for item in items:
+            caso = item["caso"]
+            if caso == "E1":
+                detalle[item["serie"]] = {
+                    "serie": item["serie"],
+                    "resultado": "ya_en_expedicion",
+                }
+            elif caso == "E3":
+                orden = item["orden"]
+                detalle[item["serie"]] = {
+                    "serie": item["serie"],
+                    "resultado": "en_taller",
+                    "orden": orden.name,
+                    "etapa": dict(FRIO_CALOR_STAGES).get(
+                        orden.frio_calor_stage, orden.frio_calor_stage
+                    ),
+                }
+            elif caso == "E2":
+                orden = item["orden"]
+                desde = self._embolsado_ubicaciones(item["lot"], company)[:1]
+                traslado = orden._embolsado_a_expedicion(
+                    origin=origin_emb,
+                    motivo=_(
+                        "el equipo volvió embolsado en la descarga del reparto %(reparto)s del %(fecha)s",
+                        reparto=idreparto,
+                        fecha=fecha,
+                    ),
+                )
+                pickings.append(traslado)
+                detalle[item["serie"]] = {
+                    "serie": item["serie"],
+                    "resultado": "orden_cancelada",
+                    "orden": orden.name,
+                    "desde": desde.complete_name,
+                    "traslado": traslado.name,
+                }
+            else:
+                grupos.setdefault(item["origen"], []).append(item)
+
+        for origen, grupo in grupos.items():
+            lots = self.env["stock.lot"]
+            for item in grupo:
+                lot = item["lot"]
+                if not lot:
+                    lot = (
+                        self.env["stock.lot"]
+                        .with_company(company)
+                        .create(
+                            {
+                                "name": item["serie"],
+                                "product_id": product.id,
+                                "company_id": company.id,
+                            }
+                        )
+                    )
+                lots |= lot
+            traslado = self._embolsado_crear_traslado(company, origen, lots, origin_emb)
+            pickings.append(traslado)
+            for item in grupo:
+                detalle[item["serie"]] = {
+                    "serie": item["serie"],
+                    "resultado": "a_expedicion",
+                    "desde": origen.complete_name,
+                    "traslado": traslado.name,
+                }
+
+        resultado["embolsados_detalle"] = [detalle[i["serie"]] for i in items]
+        resultado["embolsados_procesados"] = len(
+            [d for d in detalle.values() if d["resultado"] in ("a_expedicion", "orden_cancelada")]
+        )
+        if pickings:
+            resultado["embolsados_picking_name"] = pickings[0].name
+        elif items and all(i["caso"] == "E1" for i in items):
+            previo = self.env["stock.picking"].search_count(
+                [
+                    ("origin", "=", origin_emb),
+                    ("company_id", "=", company.id),
+                    ("picking_type_id", "=", company.aguas_fc_embolsado_picking_type_id.id),
+                    ("state", "=", "done"),
+                ]
+            )
+            if previo:
+                resultado["embolsados_ya_registrado"] = True
+        return resultado
 
     # ------------------------------------------------------------------
     # Ingreso de equipos no normalizados (Loop -> Odoo): no van al taller y
@@ -347,6 +656,7 @@ class AguasFCIntake(models.AbstractModel):
         return (
             origin.startswith("AGUAS-")
             and not origin.startswith("AGUAS-NN-")
+            and not origin.startswith("AGUAS-EMB-")
             and picking.picking_type_id == picking.company_id.aguas_fc_picking_type_id
         )
 

@@ -1,0 +1,71 @@
+<odoo>
+    <!-- Historial de equipos F/C por cliente: contrato y orden de trabajo se
+         editan en la lista; el resto sale de los remitos. -->
+    <record id="view_fc_equipment_history_list" model="ir.ui.view">
+        <field name="name">fc.equipment.history.list</field>
+        <field name="model">fc.equipment.history</field>
+        <field name="arch" type="xml">
+            <list string="Historial F/C" editable="bottom" create="0" delete="0">
+                <field name="partner_id" string="Cliente" optional="hide"/>
+                <field name="lot_id"/>
+                <field name="product_id"/>
+                <field name="delivery_date"/>
+                <field name="return_date"/>
+                <field name="state" widget="badge" decoration-success="state == 'en_cliente'" decoration-muted="state == 'retirado'"/>
+                <field name="reason"/>
+                <field name="contract_number"/>
+                <field name="work_order"/>
+                <field name="source"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_fc_equipment_history_search" model="ir.ui.view">
+        <field name="name">fc.equipment.history.search</field>
+        <field name="model">fc.equipment.history</field>
+        <field name="arch" type="xml">
+            <search string="Historial F/C">
+                <field name="lot_id"/>
+                <field name="partner_id"/>
+                <field name="product_id"/>
+                <field name="contract_number"/>
+                <field name="work_order"/>
+                <!-- Cliente de la ficha desde la que se abrió (activo por defecto). -->
+                <filter name="cliente_actual" string="Este cliente"
+                        domain="[('partner_id', '=', context.get('cliente_actual_id'))]"/>
+                <!-- Sumado al anterior, trae también las cuentas hijas. -->
+                <filter name="incluir_hijas" string="Incluir cuentas hijas"
+                        domain="[('partner_id', 'child_of', context.get('cliente_actual_id'))]"/>
+                <separator/>
+                <filter name="en_cliente" string="En el cliente" domain="[('state', '=', 'en_cliente')]"/>
+                <filter name="retirados" string="Retirados" domain="[('state', '=', 'retirado')]"/>
+                <group>
+                    <filter name="group_modelo" string="Modelo" context="{'group_by': 'product_id'}"/>
+                    <filter name="group_anio_entrega" string="Año de entrega" context="{'group_by': 'delivery_date:year'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_fc_equipment_history" model="ir.actions.act_window">
+        <field name="name">Historial F/C</field>
+        <field name="res_model">fc.equipment.history</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_fc_equipment_history_search"/>
+    </record>
+
+    <record id="view_partner_form_inherit_fc_history" model="ir.ui.view">
+        <field name="name">partner.form.inherit.fc.history</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_open_frio_calor_containers']" position="after">
+                <button class="oe_stat_button" type="object" name="action_open_fc_history" icon="fa-history">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Historial F/C</span>
+                    </div>
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>

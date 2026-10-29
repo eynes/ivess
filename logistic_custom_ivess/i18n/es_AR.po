@@ -1255,19 +1255,19 @@ msgid "Booklets"
 msgstr "Talonarios"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__collection_journal_id
-msgid "Collection Booklet"
-msgstr "Talonario de Cobranza"
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__collection_journal_ids
+msgid "Collection Booklets"
+msgstr "Talonarios de Cobranza"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__remittance_sequence_id
-msgid "Remittance Booklet"
-msgstr "Talonario de Remitos"
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__remittance_sequence_ids
+msgid "Remittance Booklets"
+msgstr "Talonarios de Remitos"
 
 #. module: logistic_custom_ivess
-#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__repair_order_sequence_id
-msgid "Repair Orders Booklet"
-msgstr "Talonario de Ordenes de Reparaciones"
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__repair_order_sequence_ids
+msgid "Repair Orders Booklets"
+msgstr "Talonarios de Ordenes de Reparaciones"
 
 #. module: logistic_custom_ivess
 #. odoo-python

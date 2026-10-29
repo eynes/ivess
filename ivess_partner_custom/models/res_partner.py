@@ -29,6 +29,25 @@ class ResPartner(models.Model):
     requiere_comprobante = fields.Boolean(
         string="Requiere Factura",
     )
+    _customer_code_uniq = models.Constraint(
+        "unique(customer_code)",
+        "El código de cliente ya existe. No se puede repetir, tampoco el de una cuenta dada de baja.",
+    )
+
+    condicion = fields.Selection(
+        selection=[
+            ("madre", "Madre"),
+            ("hija", "Hija"),
+            ("individual", "Individual"),
+        ],
+        string="Condición",
+        compute="_compute_condicion",
+        store=True,
+        index=True,
+        help="Madre: tiene cuentas hijas activas (contactos de tipo \"Otra"
+        " dirección\"). Hija: cuelga de una madre como \"Otra dirección\"."
+        " Individual: el resto.",
+    )
     codigo_bejerman = fields.Char(
         string="Código Bejerman",
         copy=False,
@@ -383,6 +402,7 @@ class ResPartner(models.Model):
                 if "csv_inherit_commercial" in self._fields:
                     vals["csv_inherit_commercial"] = True
         partners = super().create(vals_list)
+        partners._check_cliente_con_codigo()
         if not self.env.context.get("sync_delivery_partner"):
             partners.filtered(
                 lambda p: p._has_delivery_address()
@@ -394,6 +414,8 @@ class ResPartner(models.Model):
             self._check_madres_sin_hijas_activas()
         self._check_pending_water_containers_before_archiving(vals)
         res = super().write(vals)
+        if vals.keys() & {"is_customer", "customer_rank", "customer_code"}:
+            self._check_cliente_con_codigo()
         if not self.env.context.get("sync_delivery_partner"):
             if vals.keys() & (set(DELIVERY_ADDRESS_FIELDS) | set(DELIVERY_CONTACT_FIELDS)):
                 self.filtered(
@@ -402,6 +424,72 @@ class ResPartner(models.Model):
             if vals.keys() & set(DELIVERY_ADDRESS_FIELDS.values()):
                 self._sync_delivery_partner_back()
         return res
+
+    def _check_cliente_con_codigo(self):
+        """Todo cliente tiene código de cliente (T17178). Se controla después
+        de la asignación automática de logistic_custom_ivess y no como
+        constrains, que corre antes de que el alta reciba su código. Solo se
+        toca al crear o al cambiar is_customer / customer_code: los clientes
+        viejos sin código siguen guardándose mientras no se los modifique así."""
+        sin_codigo = self.filtered(lambda partner: partner.is_customer and not partner.customer_code)
+        if sin_codigo:
+            raise ValidationError(
+                _(
+                    "Un cliente no puede quedar sin código de cliente (si es un alta nueva,"
+                    " revisá que exista la secuencia de códigos). Contactos: %s"
+                )
+                % ", ".join(sin_codigo.mapped("display_name"))
+            )
+
+    @api.model
+    def get_deuda_visitas(self, partner_id):
+        """Deuda actual del cliente para el encabezado de "Ver visitas": los
+        mismos valores que la ficha (deuda por ventas, por frío/calor y el
+        botón Adeudado). No depende de ningún filtro de la lista. En una madre
+        es la del grupo: la deuda de las hijas se imputa a la madre."""
+        partner = self.browse(partner_id).exists()
+        if not partner:
+            return False
+        partner.check_access("read")
+        total = partner.deuda_ventas + partner.deuda_frio_calor
+        # El botón Adeudado (account_followup) es de Contabilidad: quien no la
+        # tiene ve el resto del encabezado, no ese botón.
+        puede_ver_adeudado = hasattr(partner, "open_follow_up_report") and self.env.user.has_group(
+            "account.group_account_basic"
+        )
+        return {
+            "id": partner.id,
+            "nombre": partner.display_name,
+            "currency_id": partner.currency_id.id,
+            "deuda_ventas": partner.deuda_ventas,
+            "deuda_frio_calor": partner.deuda_frio_calor,
+            "total": total,
+            "adeudado": partner.total_all_due if puede_ver_adeudado else False,
+            "puede_ver_adeudado": puede_ver_adeudado,
+        }
+
+    def action_solicitar_traspaso_saldo(self):
+        """Quien no tiene el grupo "Traspaso de saldo" no lo ejecuta: abre el
+        asistente de actividades ya completo con el contacto, para asignársela
+        a alguien del grupo."""
+        self.ensure_one()
+        tipo = self.env.ref("ivess_partner_custom.mail_activity_type_solicitud_traspaso_saldo")
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Solicitar traspaso de saldo"),
+            "res_model": "mail.activity.schedule",
+            "view_mode": "form",
+            "views": [(False, "form")],
+            "target": "new",
+            "context": {
+                "active_model": "res.partner",
+                "active_id": self.id,
+                "active_ids": self.ids,
+                "default_res_model": "res.partner",
+                "default_activity_type_id": tipo.id,
+                "default_summary": _("Traspaso de saldo: %s", self.display_name),
+            },
+        }
 
     def action_archive(self):
         # Una madre con hijas activas no se archiva directo: se abre la
@@ -419,6 +507,16 @@ class ResPartner(models.Model):
                 "context": {"default_madre_id": self.id},
             }
         return super().action_archive()
+
+    @api.depends("parent_id", "type", "child_ids.type", "child_ids.active")
+    def _compute_condicion(self):
+        for partner in self:
+            if any(child.type == "other" for child in partner.child_ids):
+                partner.condicion = "madre"
+            elif partner.parent_id and partner.type == "other":
+                partner.condicion = "hija"
+            else:
+                partner.condicion = "individual"
 
     def _hijas_activas(self):
         """Cuentas hijas: las que cuelgan de la madre como "other", como las

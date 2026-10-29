@@ -29,16 +29,7 @@ class IvessTalonariosReport(models.Model):
         if not delivery:
             return {"error": "No existe un reparto con el número '%s'." % distribution}
 
-        remittance_sequence = delivery.remittance_sequence_id
-        collection_journal = delivery.collection_journal_id
-        repair_order_sequence = delivery.repair_order_sequence_id
-
         return {
             "distribution": distribution,
-            "rem_next_number": remittance_sequence.number_next_actual if remittance_sequence else None,
-            "rem_prefix": remittance_sequence.prefix if remittance_sequence else None,
-            "rec_next_number": collection_journal.sequence_number_next if collection_journal else None,
-            "rec_prefix": collection_journal.code if collection_journal else None,
-            "or_next_number": repair_order_sequence.number_next_actual if repair_order_sequence else None,
-            "or_prefix": repair_order_sequence.prefix if repair_order_sequence else None,
+            **delivery._get_booklets_data(),
         }

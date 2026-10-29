@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Lista de precios de la plantilla en Clientes por Reparto (lista, mapa y búsqueda). -->
+    <record id="view_partner_distribution_reparto_list_inherit_pricelist" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.list.inherit.pricelist</field>
+        <field name="model">partner.distribution</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_distribution_reparto_list"/>
+        <field name="arch" type="xml">
+            <field name="dia_visita" position="after">
+                <field name="pricelist_id" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_partner_distribution_reparto_map_inherit_pricelist" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.map.inherit.pricelist</field>
+        <field name="model">partner.distribution</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_distribution_reparto_map"/>
+        <field name="arch" type="xml">
+            <field name="dia_visita_txt" position="after">
+                <field name="pricelist_id" string="Lista de Precio"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_partner_distribution_reparto_search_inherit_pricelist" model="ir.ui.view">
+        <field name="name">partner.distribution.reparto.search.inherit.pricelist</field>
+        <field name="model">partner.distribution</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_partner_distribution_reparto_search"/>
+        <field name="arch" type="xml">
+            <field name="distribution" position="after">
+                <field name="pricelist_id"/>
+            </field>
+            <filter name="group_dia" position="after">
+                <filter name="group_pricelist" string="Lista de Precio" context="{'group_by': 'pricelist_id'}"/>
+            </filter>
+        </field>
+    </record>
+
+    <!-- Lista de precios de la plantilla en "Consultar zona". -->
+    <record id="view_zone_consult_wizard_form_inherit_pricelist" model="ir.ui.view">
+        <field name="name">zone.consult.wizard.form.inherit.pricelist</field>
+        <field name="model">zone.consult.wizard</field>
+        <field name="inherit_id" ref="logistic_custom_ivess.view_zone_consult_wizard_form"/>
+        <field name="arch" type="xml">
+            <field name="visit_day" position="after">
+                <field name="pricelist_id"/>
+            </field>
+        </field>
+    </record>
+</odoo>

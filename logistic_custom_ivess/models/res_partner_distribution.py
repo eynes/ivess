@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 
-from odoo import models, fields, api, _
+from odoo import Command, models, fields, api, _
 from odoo.exceptions import ValidationError
 from odoo.tools import SQL
 from odoo.tools.misc import formatLang
@@ -30,6 +30,8 @@ class PartnerDistributions(models.Model):
     _name = 'partner.distribution'
     _inherit = ['visit.schedule.mixin']
     _description = 'Distributions'
+    # El nombre que muestra el mapa de Clientes por Reparto es el del cliente.
+    _rec_name = 'partner_id'
 
     distribution = fields.Many2one('template.delivery.route')
     visit_day = fields.Selection(
@@ -53,9 +55,40 @@ class PartnerDistributions(models.Model):
         compute='_compute_dia_visita',
         store=True,
     )
+    orden = fields.Integer(
+        string='Orden',
+        related='route_line_id.sequence',
+        readonly=False,
+        store=True,
+        help='Orden del cliente en la plantilla del recorrido. Al cambiarlo, los'
+        ' recorridos que se generen después salen con el nuevo orden; los ya'
+        ' generados no se tocan.',
+    )
     partner_street = fields.Char(related='partner_id.street', string='Calle')
     partner_num = fields.Char(related='partner_id.num', string='Número')
     partner_city = fields.Char(related='partner_id.city', string='Ciudad')
+    # Datos de la tarjeta de la vista mapa (el popup muestra el valor tal cual,
+    # por eso las horas y el día van como texto).
+    partner_customer_code = fields.Char(
+        related='partner_id.customer_code',
+        string='Código de Cliente',
+    )
+    direccion_txt = fields.Char(
+        string='Dirección',
+        compute='_compute_direccion_txt',
+    )
+    dia_visita_txt = fields.Char(
+        string='Día',
+        compute='_compute_dia_visita_txt',
+    )
+    hora_promedio_txt = fields.Char(
+        string='Hora Promedio',
+        compute='_compute_horario_txt',
+    )
+    franja_visita_txt = fields.Char(
+        string='Franja de Visita',
+        compute='_compute_horario_txt',
+    )
     frequency = fields.Selection(
         selection=[
             ('weekly', 'Weekly'),
@@ -74,12 +107,54 @@ class PartnerDistributions(models.Model):
         string='Días más cercanos',
         compute='_compute_dias_sugeridos',
     )
+    sugerencia_ids = fields.One2many(
+        'partner.distribution.sugerencia',
+        'distribution_parent_id',
+        string='Opciones más cercanas',
+        compute='_compute_sugerencia_ids',
+    )
 
     @api.depends('distribution.day')
     def _compute_dia_visita(self):
         for rec in self:
             dia = rec.distribution.day
             rec.dia_visita = str(WEEKDAY_MAPPING[dia] + 1) if dia else False
+
+    @api.depends('partner_id.street', 'partner_id.num', 'partner_id.city')
+    def _compute_direccion_txt(self):
+        # La dirección completa del popup estándar sale vacía si al cliente le
+        # falta provincia o país; así se ve siempre calle, número y ciudad.
+        for rec in self:
+            partner = rec.partner_id
+            calle = ' '.join(p for p in (partner.street, partner.num) if p)
+            rec.direccion_txt = ', '.join(p for p in (calle, partner.city) if p) or False
+
+    @api.depends('dia_visita')
+    def _compute_dia_visita_txt(self):
+        etiquetas = dict(self._fields['dia_visita'].selection)
+        for rec in self:
+            rec.dia_visita_txt = etiquetas.get(rec.dia_visita) or False
+
+    @api.depends(
+        'partner_id.average_hour',
+        'partner_id.visit_hour_from',
+        'partner_id.visit_hour_to',
+    )
+    def _compute_horario_txt(self):
+        def hora(valor):
+            horas, minutos = divmod(round(valor * 60), 60)
+            return '%02d:%02d' % (horas, minutos)
+
+        for rec in self:
+            partner = rec.partner_id
+            rec.hora_promedio_txt = hora(partner.average_hour) if partner.average_hour else False
+            desde, hasta = partner.visit_hour_from, partner.visit_hour_to
+            if desde and hasta:
+                rec.franja_visita_txt = '%s a %s' % (hora(desde), hora(hasta))
+            elif desde or hasta:
+                rec.franja_visita_txt = ('desde %s' % hora(desde)) if desde else ('hasta %s' % hora(hasta))
+            else:
+                rec.franja_visita_txt = False
 
     @api.depends('partner_id')
     def _compute_reparto_sugerido(self):
@@ -91,6 +166,69 @@ class PartnerDistributions(models.Model):
         for rec in self:
             rec.dias_sugeridos = rec._sugerir_dias()
 
+    @api.depends('partner_id', 'distribution')
+    def _compute_sugerencia_ids(self):
+        # Como reparto_sugerido: solo al cargar una distribución nueva.
+        for rec in self:
+            opciones = rec._plantillas_cercanas() if not rec._origin.id else []
+            rec.sugerencia_ids = [Command.clear()] + [Command.create(op) for op in opciones]
+
+    @api.onchange('sugerencia_ids')
+    def _onchange_sugerencia_ids(self):
+        elegida = self.sugerencia_ids.filtered('usar')[-1:]
+        if elegida:
+            self.distribution = elegida.plantilla_id
+
+    def _plantillas_cercanas(self, limit=5):
+        """Las plantillas (reparto + día) cuyos clientes están más cerca del
+        cliente, sin repartos técnicos ni días en que ya lo visitan: promedio
+        de las 3 distancias más cortas, como _sugerir_reparto. La franja es la
+        hora promedio de visita (average_hour) de esos clientes cercanos."""
+        self.ensure_one()
+        partner = self.partner_id
+        lat, lon = partner.partner_latitude, partner.partner_longitude
+        if not (lat or lon):
+            return []
+        partner_id = partner._origin.id or 0
+        self.env.cr.execute(SQL(
+            """
+            SELECT tdr.id, rp.partner_latitude, rp.partner_longitude, rp.average_hour
+              FROM delivery_route_line drl
+              JOIN template_delivery_route tdr ON tdr.id = drl.template_route_id
+              JOIN delivery_route_number drn ON drn.id = tdr.delivery_number_id
+              JOIN res_partner rp ON rp.id = drl.client_id
+             WHERE drl.route_id IS NULL
+               AND NOT drn.is_technical_delivery
+               AND rp.active
+               AND rp.id != %s
+               AND (rp.partner_latitude != 0 OR rp.partner_longitude != 0)
+               AND tdr.day NOT IN (
+                       SELECT actual.day
+                         FROM partner_distribution pd
+                         JOIN template_delivery_route actual ON actual.id = pd.distribution
+                        WHERE pd.partner_id = %s)
+            """,
+            partner_id, partner_id,
+        ))
+        por_plantilla = defaultdict(list)
+        for plantilla_id, la, lo, hora in self.env.cr.fetchall():
+            por_plantilla[plantilla_id].append((_distancia_km((lat, lon), (la, lo)), hora))
+        opciones = []
+        for plantilla_id, cercanos in por_plantilla.items():
+            cercanos = sorted(cercanos, key=lambda c: c[0])[:3]
+            horas = [h for _d, h in cercanos if h]
+            promedio = sum(horas) / len(horas) if horas else False
+            opciones.append((sum(d for d, _h in cercanos) / len(cercanos), plantilla_id, promedio))
+        por_id = {p.id: p for p in self.env['template.delivery.route'].browse([o[1] for o in opciones])}
+        return [{
+            'plantilla_id': plantilla_id,
+            'name': '%s %s' % (
+                por_id[plantilla_id].name,
+                DAY_LABELS_ES.get(por_id[plantilla_id].day, por_id[plantilla_id].day).lower()),
+            'distancia': puntaje,
+            'franja': '~%02d:%02d' % (int(hora), round((hora % 1) * 60)) if hora else False,
+        } for puntaje, plantilla_id, hora in sorted(opciones)[:limit]]
+
     def _sugerir_dias(self):
         """Minuta del 01/10/2026 (cambio de día): los 3 días del mismo reparto
         cuyos clientes están más cerca del cliente, sin contar los días en que
@@ -100,7 +238,7 @@ class PartnerDistributions(models.Model):
         partner = self.partner_id
         reparto = self.distribution.delivery_number_id
         lat, lon = partner.partner_latitude, partner.partner_longitude
-        if not reparto or not (lat or lon):
+        if not reparto or reparto.is_technical_delivery or not (lat or lon):
             return False
         partner_id = partner._origin.id or 0
         self.env.cr.execute(SQL(
@@ -156,9 +294,10 @@ class PartnerDistributions(models.Model):
                 SELECT DISTINCT tdr.delivery_number_id, rp.id, rp.partner_latitude, rp.partner_longitude
                   FROM delivery_route_line drl
                   JOIN template_delivery_route tdr ON tdr.id = drl.template_route_id
+                  JOIN delivery_route_number drn ON drn.id = tdr.delivery_number_id
                   JOIN res_partner rp ON rp.id = drl.client_id
                  WHERE drl.route_id IS NULL
-                   AND tdr.delivery_number_id IS NOT NULL
+                   AND NOT drn.is_technical_delivery
                    AND rp.active
                    AND rp.id != %s
                    AND rp.partner_latitude BETWEEN %s AND %s
@@ -350,6 +489,7 @@ class PartnerDistributions(models.Model):
                 continue
             new_line = self.env['delivery.route.line'].create({
                 'client_id': self.partner_id.id,
+                'sequence': self.route_line_id.sequence if self.route_line_id else 10,
                 'origin': 'plantilla',
             })
             route.delivery_route_line_ids = [(4, new_line.id)]

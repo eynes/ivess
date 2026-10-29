@@ -9,7 +9,6 @@ class IvessFcStockInTruck(models.Model):
     default_code = fields.Char(readonly=True)
     location_id = fields.Many2one("stock.location", readonly=True)
     lot_id = fields.Many2one("stock.lot", readonly=True)
-    inventory_quantity = fields.Float(readonly=True)
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -21,8 +20,7 @@ class IvessFcStockInTruck(models.Model):
                     sq.product_id   AS product_id,
                     pt.default_code AS default_code,
                     sq.location_id  AS location_id,
-                    sq.lot_id       AS lot_id,
-                    sq.quantity     AS inventory_quantity
+                    sq.lot_id       AS lot_id
                 FROM stock_quant sq
                 JOIN product_product pp ON pp.id = sq.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
@@ -60,7 +58,7 @@ class IvessFcStockInTruck(models.Model):
             return {"error": "El reparto '%s' no tiene una ubicación de stock asignada." % distribution}
 
         records = self.search([('location_id', '=', delivery_number.location_id.id)])
-        raw_records = records.read(['default_code', 'lot_id', 'inventory_quantity'])
+        raw_records = records.read(['default_code', 'lot_id'])
 
         grouped = {}
         for rec in raw_records:
@@ -68,7 +66,6 @@ class IvessFcStockInTruck(models.Model):
             lot_id = rec['lot_id'][1] if rec['lot_id'] else None
             key = (code, lot_id)
             if key not in grouped:
-                grouped[key] = {'default_code': code, 'lot_id': lot_id, 'quantity': 0.0}
-            grouped[key]['quantity'] += rec['inventory_quantity']
+                grouped[key] = {'default_code': code, 'lot_id': lot_id}
 
         return list(grouped.values())

@@ -11,6 +11,9 @@
                 <setting id="hora_limite_pedidos_setting" help="Los pedidos de visita para el mismo día cargados después de esta hora muestran un aviso. No se bloquean.">
                     <field name="hora_limite_pedidos" widget="float_time"/>
                 </setting>
+                <setting id="zona_radio_metros_setting" help="Radio con el que arranca la búsqueda de &quot;Consultar zona&quot;. Se puede cambiar en cada consulta.">
+                    <field name="zona_radio_metros"/>
+                </setting>
             </xpath>
         </field>
     </record>

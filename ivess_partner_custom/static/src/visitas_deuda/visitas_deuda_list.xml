@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="ivess_partner_custom.VisitasDeudaListView" t-inherit="web.ListView" t-inherit-mode="primary">
+        <xpath expr="//t[@t-component='props.Renderer']" position="before">
+            <div t-if="deuda.datos" class="o_visitas_deuda d-flex flex-wrap align-items-center gap-4 px-3 py-2 border-bottom bg-view">
+                <span class="fw-bold" t-esc="deuda.datos.nombre"/>
+                <span>Deuda por ventas: <b t-esc="formatear(deuda.datos.deuda_ventas)"/></span>
+                <span>Deuda por frío/calor: <b t-esc="formatear(deuda.datos.deuda_frio_calor)"/></span>
+                <span>Total: <b t-esc="formatear(deuda.datos.total)"/></span>
+                <button t-if="deuda.datos.puede_ver_adeudado" type="button" class="btn btn-secondary" t-on-click="verAdeudado">
+                    Adeudado: <b t-esc="formatear(deuda.datos.adeudado)"/>
+                </button>
+            </div>
+        </xpath>
+    </t>
+</templates>

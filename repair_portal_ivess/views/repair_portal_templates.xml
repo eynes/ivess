@@ -415,6 +415,8 @@
                 </a>
             </div>
 
+            <div t-if="aviso" class="alert alert-success mt-3" t-esc="aviso"/>
+
             <t t-if="not repairs">
                 <div class="alert alert-warning mt-3">
                     No hay órdenes de reparación disponibles.
@@ -729,6 +731,16 @@
                                 </form>
                             </div>
                         </t>
+                        <!-- Embolsado: cancela la orden y pasa el equipo a expedición -->
+                        <t t-if="repair.can_embolsado_a_expedicion">
+                            <form t-attf-action="/my/repairs/#{repair.id}/embolsado_a_expedicion" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-secondary btn-sm"
+                                        onclick="return confirm('Se cancela la orden y el equipo pasa a AC/EQUIPOS FC REPARADOS. ¿Continuar?')">
+                                    <i class="fa fa-shopping-bag me-1"/> Embolsado: pasar a expedición
+                                </button>
+                            </form>
+                        </t>
                         <!-- Enviar a Descarte: desde cualquier etapa excepto finalizado y descarte -->
                         <t t-if="repair.frio_calor_stage not in ('finalizado', 'descarte') and repair.state not in ('cancel', 'done')">
                             <form t-attf-action="/my/repairs/#{repair.id}/send_to_descarte" method="post">
@@ -828,6 +840,10 @@
                                 </tbody>
                             </table>
                         </div>
+                    </t>
+
+                    <t t-if="add_error and add_error != 'no_product'">
+                        <div class="alert alert-danger mx-3 mt-3 mb-0" role="alert" t-esc="add_error"/>
                     </t>
 
                     <!-- Formulario agregar parte a retirar -->

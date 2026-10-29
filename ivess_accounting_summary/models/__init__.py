@@ -5,3 +5,7 @@ from . import account_move_line
 from . import account_payment_order
 from . import account_tax
 from . import retention_concept
+from . import summary_engine
+from . import summary_job
+from . import account_full_reconcile
+from . import res_partner
