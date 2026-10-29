@@ -9,7 +9,6 @@ class ProductCategory(models.Model):
         string='New Product Sequence', # Es buena práctica agregar el string
         help='Sequence to use for new products.', # Texto plano, sin _()
         copy=False,
-        required=True,
     )
 
     repaired_sequence_id = fields.Many2one(
@@ -17,5 +16,4 @@ class ProductCategory(models.Model):
         string='Repaired Product Sequence',
         help='Sequence to use for repaired products', # Texto plano, sin _()
         copy=False,
-        required=True,
     )
