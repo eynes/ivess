@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="l10n_ar_eynes.account_tax_subjournal_menu" model="ir.ui.menu">
+        <field name="name">Subdiario de IVA en Excel</field>
+    </record>
+    <record id="l10n_ar_eynes.account_tax_subjournal_menu" model="ir.ui.menu" context="{'lang': 'es_AR'}">
+        <field name="name">Subdiario de IVA en Excel</field>
+    </record>
+
+    <record id="l10n_ar_eynes.account_tax_subjournal_apportionable_vat_menu" model="ir.ui.menu">
+        <field name="name">Subdiario de IVA en PDF</field>
+    </record>
+    <record id="l10n_ar_eynes.account_tax_subjournal_apportionable_vat_menu" model="ir.ui.menu" context="{'lang': 'es_AR'}">
+        <field name="name">Subdiario de IVA en PDF</field>
+    </record>
+
+    <record id="l10n_ar_eynes.purchase_vat_exporter_menu" model="ir.ui.menu">
+        <field name="name">Resumen de IVA Compras con Prorrateo</field>
+    </record>
+    <record id="l10n_ar_eynes.purchase_vat_exporter_menu" model="ir.ui.menu" context="{'lang': 'es_AR'}">
+        <field name="name">Resumen de IVA Compras con Prorrateo</field>
+    </record>
+
+    <record id="l10n_ar_eynes.sale_vat_exporter_menu" model="ir.ui.menu">
+        <field name="name">Resumen de IVA Ventas con Prorrateo</field>
+    </record>
+    <record id="l10n_ar_eynes.sale_vat_exporter_menu" model="ir.ui.menu" context="{'lang': 'es_AR'}">
+        <field name="name">Resumen de IVA Ventas con Prorrateo</field>
+    </record>
+</odoo>
