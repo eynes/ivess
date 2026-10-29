@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+
+    <record id="account_invoice_report_view_search_fiscal_credit_ivess" model="ir.ui.view">
+        <field name="name">account.invoice.report.search.fiscal.credit.ivess</field>
+        <field name="model">account.invoice.report</field>
+        <field
+      name="inherit_id"
+      ref="logistic_custom_ivess.account_invoice_report_view_search_ivess"
+    />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='iva_compras_tax_id']" position="after">
+                <field name="fiscal_credit" />
+            </xpath>
+            <xpath expr="//filter[@name='group_by_iva_compras_tax']" position="after">
+                <filter
+          string="Crédito Fiscal"
+          name="group_by_fiscal_credit"
+          context="{'group_by': 'fiscal_credit'}"
+        />
+            </xpath>
+        </field>
+    </record>
+
+    <record id="account_invoice_report_view_tree_fiscal_credit_ivess" model="ir.ui.view">
+        <field name="name">account.invoice.report.view.list.fiscal.credit.ivess</field>
+        <field name="model">account.invoice.report</field>
+        <field name="inherit_id" ref="account.account_invoice_report_view_tree" />
+        <field name="arch" type="xml">
+            <field name="product_id" position="after">
+                <field name="fiscal_credit" optional="show" />
+            </field>
+        </field>
+    </record>
+
+</odoo>
