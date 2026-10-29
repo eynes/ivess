@@ -1,6 +1,6 @@
 {
     "name": "Ivess Accounting Summary",
-    "version": "19.0.0.0.2",
+    "version": "19.0.0.0.3",
     "summary": "Contabilidad Resumida (Diarios Espejo) y Foliación Legal",
     "description": """
         Contabilidad Resumida (Diarios Espejo). Los diarios operativos
@@ -20,6 +20,14 @@
             x_closed_by_summary_move_id.
           - account.move.line: x_origin_document_id y x_summary_move_id
             (trazabilidad y anti-duplicación del cierre mensual).
+
+        - Cierres grandes en segundo plano: el asistente encola el cierre
+          cuando tiene más de ivess_accounting_summary.sync_line_limit
+          apuntes (1000 por defecto) y un cron (ivess.accounting.summary.job)
+          lo procesa por tandas de ivess_accounting_summary.chunk_lines
+          apuntes (500), cada una en su transacción. Si falla, queda el motivo
+          y se reintenta desde Contabilidad > Cierre > Cierres Mensuales en
+          Proceso sin repetir lo ya hecho.
 
         - Fase 2 - Asistente de Cierre Mensual (Contabilidad > Cierre):
           dado un período y los diarios operativos a resumir, en una
@@ -59,19 +67,27 @@
         "account_reports",
         "account_financial_report",
         "l10n_ar_eynes",
+        "l10n_ar_reconciliation",
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/ir_cron.xml",
         "views/account_account_views.xml",
         "views/account_journal_views.xml",
         "views/account_move_views.xml",
         "wizard/account_summary_closing_wizard_views.xml",
+        "views/account_summary_job_views.xml",
         "wizard/legal_folio_renumber_wizard_views.xml",
         "wizard/journal_ledger_wizard_views.xml",
         "wizard/general_ledger_wizard_views.xml",
         "report/journal_ledger_templates.xml",
     ],
     "demo": [],
+    "assets": {
+        "web.assets_backend": [
+            "ivess_accounting_summary/static/src/js/summary_job_form.js",
+        ],
+    },
     "post_init_hook": "post_init_hook",
     "installable": True,
     "auto_install": False,

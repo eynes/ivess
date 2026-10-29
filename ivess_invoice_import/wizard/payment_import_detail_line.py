@@ -35,5 +35,17 @@ class IvessPaymentImportDetailLine(models.TransientModel):
     importe_movimiento_moneda_local = fields.Float(
         string="Importe del movimiento en moneda local (origen)"
     )
+    is_check = fields.Boolean(string="Cheque")
+    nro_cheque = fields.Char(string="Nº de cheque")
+    check_type = fields.Selection(
+        [("common", "Común"), ("deferred", "Diferido")], string="Tipo de cheque"
+    )
+    check_format = fields.Selection(
+        [("physical", "Físico"), ("echeq", "Echeq")], string="Formato"
+    )
+    reception_date = fields.Date(string="Fecha de recepción")
+    issue_date = fields.Date(string="Fecha de emisión")
+    payment_date = fields.Date(string="Fecha de vencimiento")
+    bank_id = fields.Many2one("res.bank", string="Banco del cheque")
     has_error = fields.Boolean(string="Con error")
     error_message = fields.Char(string="Detalle del error")

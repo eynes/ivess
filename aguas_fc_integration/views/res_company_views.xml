@@ -15,6 +15,7 @@
                 <field name="aguas_fc_salida_picking_type_id"/>
                 <field name="aguas_fc_no_normalizado_location_id"/>
                 <field name="aguas_fc_no_normalizado_picking_type_id"/>
+                <field name="aguas_fc_embolsado_picking_type_id"/>
             </xpath>
         </field>
     </record>

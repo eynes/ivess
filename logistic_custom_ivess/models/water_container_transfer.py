@@ -120,6 +120,11 @@ class WaterContainerTransfer(models.Model):
                 rec.delivery_picking_type_id.default_location_src_id,
                 rec.dest_partner_id.property_stock_customer,
             )
+            # El remito ya se validó (y creó la línea del historial) antes de
+            # quedar enlazado al traslado.
+            self.env['fc.equipment.history'].search(
+                [('delivery_picking_id', '=', rec.delivery_picking_id.id)]
+            ).write({'reason': 'traslado'})
             rec.state = 'done'
             for partner in rec.origin_partner_id | rec.dest_partner_id:
                 partner.message_post(body=_('%(traslado)s: %(cantidad)s x %(producto)s.') % {

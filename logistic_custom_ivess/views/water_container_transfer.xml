@@ -69,7 +69,7 @@
 
     <menuitem id="menu_water_container_transfer"
               name="Traslados de Envases"
-              parent="crm.crm_menu_config"
+              parent="menu_envases_equipos_root"
               sequence="21"
               action="action_water_container_transfer"/>
 </odoo>

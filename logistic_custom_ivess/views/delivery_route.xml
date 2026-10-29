@@ -44,6 +44,7 @@
                             <field name="delivery_route_line_ids" readonly="state in ('closed')">
                                 <list editable="bottom" delete="false" class="tree-view-auto-columns" decoration-warning="is_vacation">
                                     <field name="sequence" widget="handle" column_invisible="parent.allow_reordering == False"/>
+                                    <field name="template_order" optional="show"/>
                                     <field name="client_id" widget="many2one_link" optional="show" domain="[('id', 'in', allowed_client)]"/>
                                     <field name="customer_code" style="width:5% !important;" optional="show" force_save="1"/>
                                     <field name="client_address"  optional="show"/>
@@ -144,6 +145,7 @@
                 <field name="cobranza_ids" string="Cobranzas" widget="many2many_tags"/>
                 <button name="action_ver_cobranzas" type="object" icon="fa-external-link"
                         title="Abrir las cobranzas" invisible="not cobranza_ids"/>
+                <field name="total_cobrado" string="Total cobrado" sum="Total cobrado"/>
             </list>
         </field>
     </record>

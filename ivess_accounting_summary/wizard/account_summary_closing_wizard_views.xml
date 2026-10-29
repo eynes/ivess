@@ -4,6 +4,12 @@
         <field name="model">ivess.accounting.summary.wizard</field>
         <field name="arch" type="xml">
             <form string="Asistente de Cierre Mensual (Contabilidad Resumida)">
+                <div class="alert alert-info" role="alert" invisible="summary_move_id">
+                    Un cierre con muchos apuntes (más de 1000 por defecto) se procesa en segundo plano,
+                    por tandas, y no se queda esperando acá: se sigue desde Cierres Mensuales en Proceso
+                    y se avisa al terminar. También se puede elegir «Procesar en segundo plano»
+                    para un cierre chico: abre la pantalla de avance en lugar de esperar acá.
+                </div>
                 <group>
                     <group>
                         <field name="company_id" groups="base.group_multi_company" />
@@ -15,6 +21,7 @@
                         <field name="legal_journal_id" />
                         <field name="summary_move_date" placeholder="Fecha Hasta" />
                         <field name="summary_move_ref" placeholder="Refundición Mensual &lt;período&gt;" />
+                        <field name="run_in_background" invisible="summary_move_id" />
                     </group>
                 </group>
                 <group invisible="not summary_move_id" string="Resultado">
