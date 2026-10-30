@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Aguas FC Integration',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'author': 'Eynes',
     'category': 'Inventory',
     'summary': 'Integración Odoo ↔ Loop para equipos de frío-calor',

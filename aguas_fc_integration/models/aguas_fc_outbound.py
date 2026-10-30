@@ -8,10 +8,18 @@ subió al camión. El stock se mueve en el momento de la llamada.
 import hashlib
 import logging
 
-from odoo import SUPERUSER_ID, api, models
+from odoo import SUPERUSER_ID, api, fields, models
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
+
+
+class _ReemplazoFallido(Exception):
+    """Corta el savepoint del reemplazo y lleva la respuesta de error."""
+
+    def __init__(self, respuesta):
+        super().__init__(respuesta.get('error'))
+        self.respuesta = respuesta
 
 
 class AguasFCOutbound(models.AbstractModel):
@@ -302,6 +310,257 @@ class AguasFCOutbound(models.AbstractModel):
             'seriales_procesados': len(lots),
             'origin': origin,
             'referencia_externa': referencia_externa,
+        }
+
+    # ------------------------------------------------------------------
+    # S5 — Anular una carga al reparto (devuelve el stock a expedición)
+    # ------------------------------------------------------------------
+    @api.model
+    def _carga_activa(self, referencia_externa):
+        return self.env['stock.picking'].search(
+            [('aguas_fc_ref_externa', '=', referencia_externa)], limit=1
+        )
+
+    @api.model
+    def anular_salida(self, referencia_externa):
+        """Anula una carga: mueve de vuelta a expedición las series que
+        siguen en el reparto y libera la referencia externa.
+
+        Valida todo antes de mover: o se anula la carga entera o no se toca
+        nada. Un reintento sobre una carga ya anulada responde ya_anulado.
+        """
+        self = self.with_user(SUPERUSER_ID)
+        Picking = self.env['stock.picking']
+
+        original = self._carga_activa(referencia_externa)
+        if not original:
+            anulada = Picking.search(
+                [('aguas_fc_ref_externa_anulada', '=', referencia_externa)],
+                order='id desc', limit=1,
+            )
+            if not anulada:
+                return {
+                    'success': False,
+                    'error': f'No existe ninguna carga con referencia_externa={referencia_externa}',
+                }
+            return {
+                'success': True,
+                'ya_anulado': True,
+                'picking_id': anulada.id,
+                'picking_name': anulada.name,
+                'anulacion_picking_id': anulada.aguas_fc_anulacion_id.id,
+                'anulacion_picking_name': anulada.aguas_fc_anulacion_id.name,
+                'referencia_externa': referencia_externa,
+            }
+
+        company = self._get_company(original.location_dest_id)
+        self._check_config(company)
+
+        if original.state != 'done':
+            return {
+                'success': False,
+                'error': f'La carga {original.name} está en estado {original.state}, no se puede anular',
+            }
+
+        product = company.aguas_fc_product_id
+        reparto = original.location_dest_id
+        expedicion = original.location_id
+        lines = original.move_line_ids.filtered(lambda ml: ml.lot_id and ml.quantity > 0)
+
+        # Validación previa: todo o nada.
+        errores = []
+        Quant = self.env['stock.quant']
+        for line in lines:
+            quant = Quant.search([
+                ('lot_id', '=', line.lot_id.id),
+                ('product_id', '=', product.id),
+                ('location_id', '=', reparto.id),
+                ('quantity', '>', 0),
+            ], limit=1)
+            if not quant:
+                errores.append({
+                    'serie': line.lot_id.name,
+                    'motivo': f'La serie ya no está en el reparto {reparto.complete_name}',
+                })
+            elif quant.reserved_quantity > 0:
+                errores.append({
+                    'serie': line.lot_id.name,
+                    'motivo': 'La serie está reservada por otra operación',
+                })
+        if not lines:
+            return {
+                'success': False,
+                'error': f'La carga {original.name} no tiene series para devolver',
+            }
+        if errores:
+            return {
+                'success': False,
+                'error': 'No se puede anular la carga',
+                'detalle': errores,
+            }
+
+        picking_type = original.picking_type_id.return_picking_type_id or original.picking_type_id
+        devolucion = Picking.with_company(company).create({
+            'picking_type_id': picking_type.id,
+            'location_id': reparto.id,
+            'location_dest_id': expedicion.id,
+            'origin': f'Anulación de {original.name}',
+            'return_id': original.id,
+            'company_id': company.id,
+        })
+        pares = []
+        for move in original.move_ids.filtered(lambda m: m.move_line_ids.lot_id):
+            move_dev = self.env['stock.move'].with_company(company).create({
+                'picking_id': devolucion.id,
+                'product_id': move.product_id.id,
+                'product_uom_qty': sum(move.move_line_ids.filtered('lot_id').mapped('quantity')),
+                'product_uom': move.product_uom.id,
+                'location_id': reparto.id,
+                'location_dest_id': expedicion.id,
+                'origin_returned_move_id': move.id,
+                'company_id': company.id,
+            })
+            pares.append((move, move_dev))
+
+        devolucion.action_confirm()
+        # Las series a devolver se asignan a mano abajo; si el tipo de operación
+        # reserva al confirmar, se descarta esa reserva automática.
+        devolucion.do_unreserve()
+
+        for move, move_dev in pares:
+            for line in move.move_line_ids.filtered('lot_id'):
+                self.env['stock.move.line'].with_company(company).create({
+                    'move_id': move_dev.id,
+                    'picking_id': devolucion.id,
+                    'product_id': line.product_id.id,
+                    'lot_id': line.lot_id.id,
+                    'quantity': line.quantity,
+                    'location_id': reparto.id,
+                    'location_dest_id': expedicion.id,
+                    'company_id': company.id,
+                })
+
+        devolucion.with_context(
+            skip_sanity_check=True,
+            picking_ids_not_to_backorder=devolucion.ids,
+        ).button_validate()
+
+        if devolucion.state != 'done':
+            raise UserError(
+                f'El traslado {devolucion.name} quedó en estado {devolucion.state} en lugar de Hecho.'
+            )
+
+        original.write({
+            'aguas_fc_ref_externa': False,
+            'aguas_fc_ref_externa_anulada': referencia_externa,
+            'aguas_fc_anulacion_id': devolucion.id,
+        })
+
+        _logger.info(
+            'Aguas FC: carga %s anulada con %s. Referencia=%s, seriales=%s',
+            original.name, devolucion.name, referencia_externa,
+            lines.lot_id.mapped('name'),
+        )
+
+        return {
+            'success': True,
+            'ya_anulado': False,
+            'picking_id': original.id,
+            'picking_name': original.name,
+            'anulacion_picking_id': devolucion.id,
+            'anulacion_picking_name': devolucion.name,
+            'seriales_anulados': len(lines),
+            'referencia_externa': referencia_externa,
+        }
+
+    # ------------------------------------------------------------------
+    # S6 — Reemplazar una carga: anular + registrar la nueva
+    # ------------------------------------------------------------------
+    @api.model
+    def reemplazar_salida(self, referencia_externa, equipos, idreparto=None,
+                          fecha=None, referencia_externa_nueva=None):
+        """Anula la carga y registra una nueva en una sola operación.
+
+        Por defecto la carga nueva va al mismo reparto y conserva la misma
+        referencia externa. Si la nueva no se puede registrar, la anulación
+        se deshace (savepoint) y la carga original queda intacta.
+        """
+        self = self.with_user(SUPERUSER_ID)
+        Picking = self.env['stock.picking']
+
+        original = self._carga_activa(referencia_externa)
+        if original:
+            # Reintento: la carga activa con esa referencia ya salió de un reemplazo.
+            if Picking.search_count([('aguas_fc_reemplazo_id', '=', original.id)]):
+                return {
+                    'success': True,
+                    'ya_registrado': True,
+                    'picking_id': original.id,
+                    'picking_name': original.name,
+                    'seriales_procesados': len(original.move_line_ids),
+                    'origin': original.origin,
+                    'referencia_externa': referencia_externa,
+                }
+        else:
+            anulada = Picking.search(
+                [('aguas_fc_ref_externa_anulada', '=', referencia_externa)],
+                order='id desc', limit=1,
+            )
+            if not anulada:
+                return {
+                    'success': False,
+                    'error': f'No existe ninguna carga con referencia_externa={referencia_externa}',
+                }
+            nueva = anulada.aguas_fc_reemplazo_id
+            if nueva:
+                return {
+                    'success': True,
+                    'ya_registrado': True,
+                    'picking_id': nueva.id,
+                    'picking_name': nueva.name,
+                    'seriales_procesados': len(nueva.move_line_ids),
+                    'origin': nueva.origin,
+                    'referencia_externa': nueva.aguas_fc_ref_externa,
+                }
+            return {
+                'success': False,
+                'error': f'La carga {anulada.name} ya fue anulada y no tiene reemplazo',
+            }
+
+        reparto = original.location_dest_id
+        idreparto = idreparto or reparto.aguas_idreparto
+        fecha = fecha or fields.Date.context_today(self)
+        nueva_ref = referencia_externa_nueva or referencia_externa
+
+        try:
+            with self.env.cr.savepoint():
+                anulacion = self.anular_salida(referencia_externa)
+                if not anulacion.get('success'):
+                    raise _ReemplazoFallido(anulacion)
+                nueva = self.process_salida(
+                    idreparto=idreparto,
+                    equipos=equipos,
+                    fecha=fecha,
+                    referencia_externa=nueva_ref,
+                )
+                if not nueva.get('success'):
+                    raise _ReemplazoFallido(nueva)
+                original.aguas_fc_reemplazo_id = nueva['picking_id']
+        except _ReemplazoFallido as e:
+            self.env.invalidate_all()
+            return e.respuesta
+
+        return {
+            'success': True,
+            'ya_registrado': False,
+            'anulacion_picking_id': anulacion['anulacion_picking_id'],
+            'anulacion_picking_name': anulacion['anulacion_picking_name'],
+            'seriales_anulados': anulacion['seriales_anulados'],
+            'picking_id': nueva['picking_id'],
+            'picking_name': nueva['picking_name'],
+            'seriales_procesados': nueva['seriales_procesados'],
+            'origin': nueva['origin'],
+            'referencia_externa': nueva['referencia_externa'],
         }
 
     # ------------------------------------------------------------------
