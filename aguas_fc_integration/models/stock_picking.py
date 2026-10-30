@@ -13,6 +13,29 @@ class StockPicking(models.Model):
              'reintento del mismo pedido duplique el movimiento de stock.',
     )
 
+    aguas_fc_ref_externa_anulada = fields.Char(
+        string='Referencia externa anulada',
+        index=True,
+        copy=False,
+        readonly=True,
+        help='Referencia de Loop que tenía la carga cuando se anuló. Al anular '
+             'se libera aguas_fc_ref_externa para poder reusarla.',
+    )
+    aguas_fc_anulacion_id = fields.Many2one(
+        'stock.picking',
+        string='Anulada por',
+        copy=False,
+        readonly=True,
+        help='Traslado de devolución (reparto -> expedición) que anuló esta carga.',
+    )
+    aguas_fc_reemplazo_id = fields.Many2one(
+        'stock.picking',
+        string='Reemplazada por',
+        copy=False,
+        readonly=True,
+        help='Carga nueva que reemplazó a esta.',
+    )
+
     _sql_constraints = [
         ('aguas_fc_ref_externa_uniq',
          'unique(aguas_fc_ref_externa)',

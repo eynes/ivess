@@ -265,6 +265,66 @@ class AguasFCController(http.Controller):
             return {"success": False, "error": str(e)}
 
     @http.route(
+        "/api/v1/salida/anular",
+        type="json",
+        auth="none",
+        methods=["POST"],
+        csrf=False,
+    )
+    def anular_salida(self, **kwargs):
+        error = self._check_api_key()
+        if error:
+            return error
+
+        error = self._check_required(kwargs, ["referencia_externa"])
+        if error:
+            return error
+
+        try:
+            return (
+                request.env["aguas.fc.outbound"]
+                .sudo()
+                .anular_salida(referencia_externa=kwargs["referencia_externa"])
+            )
+        except Exception as e:
+            request.env.cr.rollback()
+            _logger.exception("Error en /api/v1/salida/anular")
+            return {"success": False, "error": str(e)}
+
+    @http.route(
+        "/api/v1/salida/reemplazar",
+        type="json",
+        auth="none",
+        methods=["POST"],
+        csrf=False,
+    )
+    def reemplazar_salida(self, **kwargs):
+        error = self._check_api_key()
+        if error:
+            return error
+
+        error = self._check_required(kwargs, ["referencia_externa", "equipos"])
+        if error:
+            return error
+
+        try:
+            return (
+                request.env["aguas.fc.outbound"]
+                .sudo()
+                .reemplazar_salida(
+                    referencia_externa=kwargs["referencia_externa"],
+                    equipos=self._as_list(kwargs["equipos"]),
+                    idreparto=kwargs.get("idreparto"),
+                    fecha=kwargs.get("fecha"),
+                    referencia_externa_nueva=kwargs.get("referencia_externa_nueva"),
+                )
+            )
+        except Exception as e:
+            request.env.cr.rollback()
+            _logger.exception("Error en /api/v1/salida/reemplazar")
+            return {"success": False, "error": str(e)}
+
+    @http.route(
         "/api/v1/repartos/listar",
         type="json",
         auth="none",
