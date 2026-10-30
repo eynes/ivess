@@ -25,13 +25,13 @@ SALE_SCHEMA = {
     "item_venta": list,
 }
 SALE_ITEM_SCHEMA = {
-    "codigo_producto": str,
-    "cantidad": (int, float),
-    "precio_venta": (int, float),
+    "venta_cod_producto": str,
+    "venta_cantidad": (int, float),
+    "venta_precio": (int, float),
 }
-SALE_ITEM_OPTIONAL = {"tipo_venta", "series"}
+SALE_ITEM_OPTIONAL = {"venta_tipo_envase", "venta_series"}
 
-# Retiro de envases: se combina con una venta o con un motivo de no compra, o va solo.
+# Retiro de envases: se combina con una venta o con un motivo de no compra; nunca va solo.
 WITHDRAWAL_SCHEMA = {
     "item_retiro": list,
 }
@@ -39,7 +39,7 @@ WITHDRAWAL_ITEM_SCHEMA = {
     "retiro_cod_producto": str,
     "retiro_cantidad": (int, float),
 }
-WITHDRAWAL_ITEM_OPTIONAL = {"retiro_tipo", "retiro_series"}
+WITHDRAWAL_ITEM_OPTIONAL = {"retiro_tipo_envase", "retiro_series"}
 
 CONTAINER_STATE = {
     "V": "en_comodato",
@@ -65,19 +65,19 @@ class ItemSpec:
 
 SALE_ITEMS = ItemSpec(
     "item_venta", 
-    "codigo_producto", 
-    "cantidad", 
-    "tipo_venta", 
-    "series",
+    "venta_cod_producto", 
+    "venta_cantidad", 
+    "venta_tipo_envase", 
+    "venta_series",
     SALE_ITEM_SCHEMA, 
     SALE_ITEM_OPTIONAL, 
-    price="precio_venta",
+    price="venta_precio",
 )
 WITHDRAWAL_ITEMS = ItemSpec(
     "item_retiro", 
     "retiro_cod_producto", 
     "retiro_cantidad", 
-    "retiro_tipo", 
+    "retiro_tipo_envase", 
     "retiro_series",
     WITHDRAWAL_ITEM_SCHEMA, 
     WITHDRAWAL_ITEM_OPTIONAL, 
@@ -119,7 +119,7 @@ class ParamErrors:
 
 
 def requires_container_state(product):
-    """El estado de envase (tipo_venta) solo aplica a retornables que no son frio/calor."""
+    """El estado de envase (venta_tipo_envase / retiro_tipo_envase) solo aplica a retornables que no son frio/calor."""
     return product.is_returnable and not product.is_frio_calor
 
 
@@ -159,16 +159,13 @@ def case_param_names(params):
 
 def validate_case_params(params):
     """Fase 2: parametros propios del caso (item_venta, item_retiro y cada item).
-    Una visita sin motivo de no compra necesita venta, retiro o ambos."""
+    Sin motivo de no compra la visita es una venta: item_venta es obligatorio.
+    item_retiro acompana a una venta o a una no compra; nunca va solo."""
     errors = ParamErrors()
-    # item_venta / item_retiro en null equivalen a ausente; una lista vacia es faltante.
-    has_sale = params.get(SALE_ITEMS.list_key) is not None
-    has_withdrawal = params.get(WITHDRAWAL_ITEMS.list_key) is not None
-    if params["motivo_no_compra"] == 0 and not has_sale and not has_withdrawal:
-        errors.add("missing", "%s o %s" % (SALE_ITEMS.list_key, WITHDRAWAL_ITEMS.list_key))
-    if has_sale:
+    if params["motivo_no_compra"] == 0:
         check_schema(params, SALE_SCHEMA, errors)
-    if has_withdrawal:
+    # item_retiro en null equivale a ausente; una lista vacia es faltante.
+    if params.get(WITHDRAWAL_ITEMS.list_key) is not None:
         check_schema(params, WITHDRAWAL_SCHEMA, errors)
     for spec in (SALE_ITEMS, WITHDRAWAL_ITEMS):
         validate_items(params, spec, errors)
@@ -214,7 +211,7 @@ def validate_items(params, spec, errors):
 
 
 def validate_tipo(items, products_by_code, spec=SALE_ITEMS):
-    """tipo (tipo_venta / retiro_tipo): obligatorio solo en productos que requieren estado de envase.
+    """tipo (venta_tipo_envase / retiro_tipo_envase): obligatorio solo en productos que requieren estado de envase.
     En la venta se acepta tambien en retornables frio/calor; en el retiro (strict_tipo) no:
     el frio/calor se identifica por serie."""
     errors = ParamErrors()

@@ -9,6 +9,7 @@ import pytz
 from ..utils.delivery_params import (
     BASIC_HEADER_SCHEMA,
     CONTAINER_STATE,
+    SALE_ITEMS,
     WITHDRAWAL_ITEMS,
     WithdrawalAvailability,
     case_param_names,
@@ -62,8 +63,8 @@ class IvessOperationDelivery(models.AbstractModel):
 
     @api.model
     def send_operation(self, **kwargs):
-        """Registra la visita de un reparto: con venta, con motivo de no compra
-        o con retiro de envases (solo o combinado).
+        """Registra la visita de un reparto: con venta o con motivo de no compra,
+        y en ambos casos con o sin retiro de envases (el retiro nunca va solo).
 
         Fases: validar parametros -> resolver registros (ubicacion, reparto,
         cliente, recorrido) y la linea de la visita (un reintento responde sin
@@ -104,8 +105,8 @@ class IvessOperationDelivery(models.AbstractModel):
         latitud = kwargs["latitud"]
         metros = kwargs["metros"]
         fuera_ruta = kwargs["fuera_ruta"]
-        item_venta = kwargs.get("item_venta") or []
-        item_retiro = kwargs.get("item_retiro") or []
+        item_venta = kwargs.get(SALE_ITEMS.list_key) or []
+        item_retiro = kwargs.get(WITHDRAWAL_ITEMS.list_key) or []
 
         # Fase 3: resolver registros (ubicacion, reparto, cliente, motivo,
         # recorrido) y la linea de la visita. Un reintento responde sin escribir.
@@ -154,7 +155,7 @@ class IvessOperationDelivery(models.AbstractModel):
         products_by_code = {}
         duplicated_codes = {}
         if item_venta:
-            codes = {item["codigo_producto"] for item in item_venta}
+            codes = {item[SALE_ITEMS.code] for item in item_venta}
             products = self.env["product.product"].search([
                 ("default_code", "in", list(codes)),
                 ("product_tmpl_id.show_in_app", "=", True),
@@ -335,15 +336,17 @@ class IvessOperationDelivery(models.AbstractModel):
 
     def _group_withdrawal_items(self, item_retiro, products_by_code):
         """Agrupa los items por (producto, estado de envase): los repetidos se
-        suman, y action_confirm no los fusiona por su cuenta.
+        suman en un solo move. Moves del mismo producto con distinto estado
+        quedan separados porque logistic_custom_ivess agrega container_state a
+        los campos que impiden la fusion en action_confirm.
         Devuelve {(product_id, estado): {"product", "qty", "series"}}."""
         wanted = {}
         for item in item_retiro:
-            product = products_by_code[item["retiro_cod_producto"]]
-            state = CONTAINER_STATE[item["retiro_tipo"]] if requires_container_state(product) else False
+            product = products_by_code[item[WITHDRAWAL_ITEMS.code]]
+            state = CONTAINER_STATE[item[WITHDRAWAL_ITEMS.tipo]] if requires_container_state(product) else False
             entry = wanted.setdefault((product.id, state), {"product": product, "qty": 0, "series": []})
-            entry["qty"] += item["retiro_cantidad"]
-            entry["series"] += item.get("retiro_series") or []
+            entry["qty"] += item[WITHDRAWAL_ITEMS.qty]
+            entry["series"] += item.get(WITHDRAWAL_ITEMS.series) or []
         return wanted
 
     def _describe_withdrawal(self, wanted):
@@ -466,17 +469,17 @@ class IvessOperationDelivery(models.AbstractModel):
         # pricelist_custom aplique el descuento del cliente encima.
         order_lines = []
         for item in item_venta:
-            product = products_by_code[item["codigo_producto"]]
+            product = products_by_code[item[SALE_ITEMS.code]]
             container_state = False
             if requires_container_state(product):
-                container_state = CONTAINER_STATE[item["tipo_venta"]]
+                container_state = CONTAINER_STATE[item[SALE_ITEMS.tipo]]
             order_lines.append(Command.create({
                 "product_id": product.id,
-                "product_uom_qty": item["cantidad"],
-                "price_unit": item["precio_venta"],
+                "product_uom_qty": item[SALE_ITEMS.qty],
+                "price_unit": item[SALE_ITEMS.price],
                 "discount": 0.0,
                 "container_state": container_state,
-                "serial_lot_ids": [Command.set([lot_by_key[(product.id, serie)].id for serie in item.get("series") or []])],
+                "serial_lot_ids": [Command.set([lot_by_key[(product.id, serie)].id for serie in item.get(SALE_ITEMS.series) or []])],
             }))
         order = self.env["sale.order"].create({
             "partner_id": cliente.id,
@@ -581,7 +584,7 @@ class IvessOperationDelivery(models.AbstractModel):
     def _build_retry_response(self, linea):
         """Respuesta de un reintento, armada con el estado actual de la linea:
         mismas claves que la original, sin warning."""
-        result = {"success": True, "route_line_id": linea.id}
+        result = {"success": True, "retry": True, "route_line_id": linea.id}
         if linea.sale_order_id:
             result["sale_order_id"] = linea.sale_order_id.id
             result["sale_order_confirmed"] = linea.sale_order_id.state == "sale"
