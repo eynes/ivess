@@ -273,9 +273,12 @@ class DeliveryRoute(models.Model):
         if not template or not self.delivery_date:
             return
 
+        visited_clients = self.env['res.partner']
         for line in self.delivery_route_line_ids:
-            if line.origin == 'rastrillo' or line.is_vacation:
+            # Un cliente puede tener varias visitas en el recorrido: se procesa una vez.
+            if line.origin == 'rastrillo' or line.is_vacation or line.client_id in visited_clients:
                 continue
+            visited_clients |= line.client_id
 
             dist = line.client_id.distributions_ids.filtered(
                 lambda d: d.distribution.id == template.id
@@ -626,7 +629,13 @@ class DeliveryRouteLine(models.Model):
     )
     stock_picking_id = fields.Many2one(
         'stock.picking',
-        string='Remito Relacionado',
+        string='Remito de venta',
+        help='Picking de salida con los productos que el repartidor vendio al cliente en esta visita.'
+    )
+    withdrawal_picking_id = fields.Many2one(
+        'stock.picking',
+        string='Remito de retiro',
+        help='Picking de entrada con los envases que el repartidor retiro del cliente en esta visita.',
     )
     delivery_date = fields.Date(
         string='Fecha de Visita',
@@ -910,6 +919,7 @@ class DeliveryRouteLine(models.Model):
                 'effective_visit_hour': rec.effective_visit_hour,
                 'sale_order_id': rec.sale_order_id.id,
                 'stock_picking_id': rec.stock_picking_id.id,
+                'withdrawal_picking_id': rec.withdrawal_picking_id.id,
                 'origin': 'rastrillo',
             }])
 

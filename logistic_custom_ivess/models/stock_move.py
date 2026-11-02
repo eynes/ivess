@@ -28,6 +28,12 @@ class StockMove(models.Model):
     def _onchange_water_container_id(self):
         self.container_state = self.water_container_id.state if self.water_container_id else False
 
+    @api.model
+    def _prepare_merge_moves_distinct_fields(self):
+        # Moves del mismo producto con distinto estado de envase no se fusionan:
+        # _sync_water_containers usa el estado de cada move para elegir el envase.
+        return super()._prepare_merge_moves_distinct_fields() + ['container_state']
+
     def _action_assign(self, force_qty=False):
         res = super()._action_assign(force_qty=force_qty)
         
