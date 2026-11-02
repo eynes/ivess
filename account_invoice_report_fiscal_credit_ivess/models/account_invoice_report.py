@@ -21,6 +21,9 @@ class AccountInvoiceReport(models.Model):
         readonly=True,
     )
 
+    # Fecha contable de la factura (account.move.date).
+    date = fields.Date(string="Fecha contable", readonly=True)
+
     # _depends es un atributo de clase plano (no se mergea al heredar, ver
     # odoo/orm/models.py): gana el de la última clase cargada. Como
     # logistic_custom_ivess ya lo reconstruye sobre el del core, se parte del
@@ -31,15 +34,21 @@ class AccountInvoiceReport(models.Model):
             *LogisticAccountInvoiceReport._depends.get("account.move.line", ()),
             "fiscal_credit",
         ],
+        "account.move": [
+            *LogisticAccountInvoiceReport._depends.get("account.move", ()),
+            "date",
+        ],
     }
 
     @api.model
     def _select(self) -> SQL:
         # fiscal_credit es una columna almacenada de account_move_line (alias
-        # "line" en el _from() del core): alcanza con sumarla al SELECT.
+        # "line" en el _from() del core) y date es la fecha contable del
+        # asiento (alias "move"): alcanza con sumarlas al SELECT.
         return SQL(
             """%s,
-                line.fiscal_credit AS fiscal_credit
+                line.fiscal_credit AS fiscal_credit,
+                move.date AS date
             """,
             super()._select(),
         )

@@ -1,4 +1,4 @@
-from odoo import models, fields, api, tools
+from odoo import models, fields, api, tools, _
 
 class IvessDeliveryAndAssignedRouteReport(models.Model):
     _name = "ivess.delivery.and.assigned.route.report"
@@ -96,6 +96,11 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
         records = self.search([('route_id', '=', route.id)])
         if not records:
             return {"error": "No hay clientes asignados al recorrido vigente de la distribución '%s'." % distribution}
+
+        # La app descargó el recorrido: queda sincronizado (T17813).
+        if route.state == 'draft':
+            route.action_set_synchronized()
+            route.message_post(body=_("Recorrido sincronizado desde el servicio get_delivery_and_assigned_route_report."))
 
         delivery_number_fields = [
             'delivery_number_id',
