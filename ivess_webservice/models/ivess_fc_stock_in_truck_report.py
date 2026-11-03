@@ -24,7 +24,7 @@ class IvessFcStockInTruck(models.Model):
                 FROM stock_quant sq
                 JOIN product_product pp ON pp.id = sq.product_id
                 JOIN product_template pt ON pt.id = pp.product_tmpl_id
-                WHERE pt.is_frio_calor = TRUE
+                WHERE pt.is_frio_calor = TRUE AND sq.quantity > 0
             )
             """.format(table=self._table)
         )
@@ -63,9 +63,15 @@ class IvessFcStockInTruck(models.Model):
         grouped = {}
         for rec in raw_records:
             code = rec['default_code']
-            lot_id = rec['lot_id'][1] if rec['lot_id'] else None
+            lot_id, serial_number = rec['lot_id'] or (False, False)
             key = (code, lot_id)
             if key not in grouped:
-                grouped[key] = {'default_code': code, 'lot_id': lot_id}
+                grouped[key] = {
+                    'default_code': code,
+                    'other_attributes': {
+                        'serial_number': serial_number,
+                        'lot_id': lot_id,
+                    },
+                }
 
         return list(grouped.values())
