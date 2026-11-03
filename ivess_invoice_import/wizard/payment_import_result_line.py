@@ -60,6 +60,11 @@ class IvessPaymentImportResultLine(models.TransientModel):
     )
     has_error = fields.Boolean(string="Con error")
     error_message = fields.Text(string="Detalle del error")
+    warning_message = fields.Text(
+        string="Advertencias",
+        help="No impiden importar el cobro (ej. comprobante informado que no"
+        " existe en Odoo: el cobro queda sin imputar).",
+    )
     resultado = fields.Selection(
         [
             ("pending", "Pendiente"),
