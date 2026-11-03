@@ -67,6 +67,11 @@
                         <field name="detail_count" />
                         <field name="has_error" invisible="1" />
                         <field name="error_message" optional="show" />
+                        <field
+              name="warning_message"
+              optional="show"
+              decoration-warning="warning_message"
+            />
                         <field name="odoo_payment_order_id" optional="show" />
                     </list>
                     <form string="Cobro">
@@ -81,6 +86,11 @@
                             <field name="odoo_payment_order_id" />
                         </group>
                         <field name="error_message" invisible="not has_error" />
+                        <field
+              name="warning_message"
+              invisible="not warning_message"
+              decoration-warning="warning_message"
+            />
                         <field name="detail_line_ids">
                             <list>
                                 <field name="tipo_compr_asoc" />
