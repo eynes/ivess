@@ -159,14 +159,21 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             for order in delivery._get_booklets_data()['repair_orders']
         ]
         result['minutos_x_convertir_factura'] = minutos_x_convertir_factura
+        result['max_final_consumer_amount'] = self.env.user.company_id.fcons_max_amount
 
         for field in route_fields:
             key = 'template_delivery_route_code' if field == 'template_delivery_route_id' else field
             result[key] = _value(route_and_distribution_fields, field)
 
-        # Una entrada por cada delivery.route.line del recorrido
+        # Una entrada por cliente: un cliente revisitado tiene varias
+        # delivery.route.line, pero sus datos son los mismos en todas.
         clients = []
+        seen_partners = set()
         for rec in raw_records:
+            partner_id = _value(rec, 'partner_id')
+            if partner_id in seen_partners:
+                continue
+            seen_partners.add(partner_id)
             client = {}
             for field in client_fields:
                 client[field] = _value(rec, field)
