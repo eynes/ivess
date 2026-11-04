@@ -92,29 +92,31 @@
               decoration-warning="warning_message"
             />
                         <field name="detail_line_ids">
-                            <list>
-                                <field name="tipo_compr_asoc" />
-                                <field name="letra_asoc" />
-                                <field name="pto_venta_asoc" />
-                                <field name="numero_compr_asoc" />
-                                <field name="invoice_id" />
-                                <field name="importe" />
-                                <field name="payment_mode_id" optional="show" />
-                                <field name="medio_pago" optional="show" />
-                                <field name="caja" optional="show" />
-                                <field name="moneda" optional="hide" />
-                                <field name="tipo_cambio" optional="hide" />
-                                <field name="cod_bco" optional="hide" />
-                                <field name="sucursal_bco" optional="hide" />
-                                <field name="nro_cheque" optional="show" />
-                                <field name="check_type" optional="show" />
-                                <field name="check_format" optional="show" />
-                                <field name="bank_id" optional="show" />
-                                <field name="reception_date" optional="hide" />
-                                <field name="issue_date" optional="hide" />
-                                <field name="payment_date" optional="show" />
-                                <field name="has_error" invisible="1" />
+                            <list editable="bottom" create="0" delete="0">
+                                <field name="candidate_invoice_ids" column_invisible="1" />
+                                <field name="tipo_compr_asoc" readonly="1" />
+                                <field readonly="1" name="letra_asoc" />
+                                <field readonly="1" name="pto_venta_asoc" />
+                                <field readonly="1" name="numero_compr_asoc" />
+                                <field name="invoice_id" readonly="not candidate_invoice_ids" options="{'no_create': True, 'no_open': True}" />
+                                <field readonly="1" name="importe" />
+                                <field readonly="1" name="payment_mode_id" optional="show" />
+                                <field readonly="1" name="medio_pago" optional="show" />
+                                <field readonly="1" name="caja" optional="show" />
+                                <field readonly="1" name="moneda" optional="hide" />
+                                <field readonly="1" name="tipo_cambio" optional="hide" />
+                                <field readonly="1" name="cod_bco" optional="hide" />
+                                <field readonly="1" name="sucursal_bco" optional="hide" />
+                                <field readonly="1" name="nro_cheque" optional="show" />
+                                <field readonly="1" name="check_type" optional="show" />
+                                <field readonly="1" name="check_format" optional="show" />
+                                <field readonly="1" name="bank_id" optional="show" />
+                                <field readonly="1" name="reception_date" optional="hide" />
+                                <field readonly="1" name="issue_date" optional="hide" />
+                                <field readonly="1" name="payment_date" optional="show" />
+                                <field readonly="1" name="has_error" invisible="1" />
                                 <field
+                  readonly="1"
                   name="error_message"
                   decoration-danger="has_error"
                 />

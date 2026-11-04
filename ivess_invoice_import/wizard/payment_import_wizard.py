@@ -138,6 +138,15 @@ def group_payment_rows(rows):
     return ordered_groups
 
 
+class _InvoiceIndex(dict):
+    """ref -> factura, más las facturas candidatas de las claves sin
+    coincidencia exacta (ref -> recordset)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.candidates = {}
+
+
 class IvessPaymentImportWizard(models.TransientModel):
     _name = "ivess.payment.import.wizard"
     _description = "Importador de cobros de clientes desde archivo Excel"
@@ -455,6 +464,92 @@ class IvessPaymentImportWizard(models.TransientModel):
     # un puñado de búsquedas en lote sobre todo el archivo.
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _name_candidates(ref):
+        """Nombres posibles en Odoo de la factura cuya clave es `ref`
+        (letra + pto 4 dígitos + número 8 dígitos)."""
+        letra, pto, num = ref[:-12], ref[-12:-8], ref[-8:]
+        pto_int = str(int(pto)) if pto.isdigit() else pto
+        pts = {pto_int, pto, pto.zfill(5)}
+        names = set()
+        for p in pts:
+            names.add("%s-%s" % (p, num))
+            if letra:
+                names.add("%s %s-%s" % (letra, p, num))
+                names.add("%s%s-%s" % (letra, p, num))
+        return names
+
+    def _complete_invoices_by_name(self, invoice_refs, invoice_by_ref):
+        """Segundo intento para las claves sin coincidencia por `ref`: las
+        facturas que no vienen del importador de facturas (ej. creadas desde
+        una venta) tienen `ref` vacío, pero sí el número en su nombre."""
+        pending = {ref: self._name_candidates(ref) for ref in invoice_refs
+                   if ref not in invoice_by_ref}
+        if not pending:
+            return
+        all_names = set().union(*pending.values())
+        moves = self.env["account.move"].search(
+            [
+                ("move_type", "=", "out_invoice"),
+                ("name", "in", list(all_names)),
+                ("company_id", "=", self.env.company.id),
+            ]
+        )
+        by_name = {}
+        for move in moves:
+            by_name.setdefault(move.name, []).append(move)
+        for ref, names in pending.items():
+            letra = ref[:-12]
+            found = self.env["account.move"]
+            for name in names:
+                for move in by_name.get(name, []):
+                    if letra and not self._move_has_letter(move, letra):
+                        continue
+                    found |= move
+            # Solo si es inequívoco; si hay más de una, no se adivina: se
+            # ofrecen como candidatas para que el usuario elija.
+            if len(found) == 1:
+                invoice_by_ref[ref] = found
+            elif found:
+                invoice_by_ref.candidates[ref] = found
+
+    def _collect_candidates(self, invoice_refs, invoice_by_ref):
+        """Facturas posibles para las claves que siguen sin resolverse: mismo
+        número de comprobante (cualquier punto de venta/letra). El usuario
+        elige una en la previsualización."""
+        Move = self.env["account.move"]
+        unresolved = [r for r in sorted(invoice_refs) if r not in invoice_by_ref]
+        for ref in unresolved[:100]:
+            found = invoice_by_ref.candidates.get(ref, Move)
+            if not found:
+                found = Move.search(
+                    [
+                        ("move_type", "=", "out_invoice"),
+                        ("state", "=", "posted"),
+                        ("company_id", "=", self.env.company.id),
+                        ("name", "=like", "%%-%s" % ref[-8:]),
+                    ],
+                    limit=20,
+                )
+            if found:
+                invoice_by_ref.candidates[ref] = found
+
+    @staticmethod
+    def _move_has_letter(move, letra):
+        """True si el nombre o el diario/tipo de documento indican la letra;
+        si no hay ningún dato de letra, no se descarta."""
+        name = move.name or ""
+        if name[:1].isalpha():
+            return name[:1].upper() == letra.upper()
+        doc_type = getattr(move, "l10n_latam_document_type_id", False)
+        doc_letter = getattr(doc_type, "l10n_ar_letter", False) if doc_type else False
+        if doc_letter:
+            return doc_letter.upper() == letra.upper()
+        code = (move.journal_id.code or "").upper()
+        if code[:1].isalpha():
+            return code[:1] == letra.upper()
+        return True
+
     def _build_preview_cache(self, groups):
         invoice_refs = set()
         for group in groups:
@@ -470,12 +565,14 @@ class IvessPaymentImportWizard(models.TransientModel):
                         )
                     )
 
-        invoice_by_ref = {}
+        invoice_by_ref = _InvoiceIndex()
         if invoice_refs:
             for move in self.env["account.move"].search(
                 [("move_type", "=", "out_invoice"), ("ref", "in", list(invoice_refs))]
             ):
                 invoice_by_ref.setdefault(move.ref, move)
+            self._complete_invoices_by_name(invoice_refs, invoice_by_ref)
+            self._collect_candidates(invoice_refs, invoice_by_ref)
 
         payment_mode_by_key = {}
         for mapping in self.env["ivess.payment.import.payment.method.code"].search(
@@ -1268,6 +1365,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                     line_errors.append(_("Importe inválido: '%s'.") % line["importe"])
 
             invoice = self.env["account.move"]
+            candidates = self.env["account.move"]
             if on_account:
                 pass
             elif line["tipo_compr_asoc"] != "FC":
@@ -1278,6 +1376,9 @@ class IvessPaymentImportWizard(models.TransientModel):
             else:
                 invoice = invoice_by_ref.get(invoice_ref, self.env["account.move"])
                 if not invoice:
+                    candidates = getattr(invoice_by_ref, "candidates", {}).get(
+                        invoice_ref, self.env["account.move"]
+                    )
                     # El importe de la fila se cuenta como cobrado, pero sin
                     # imputar a ninguna factura. Si otra fila sin comprobante
                     # ya trae este mismo movimiento, no se suma de nuevo.
@@ -1287,7 +1388,8 @@ class IvessPaymentImportWizard(models.TransientModel):
                     warnings.append(
                         _(
                             "No se encontró la factura '%s': el cobro se importa"
-                            " sin imputar a ese comprobante."
+                            " sin imputar a ese comprobante (podés elegir una"
+                            " factura candidata en el detalle del cobro)."
                         )
                         % invoice_ref
                     )
@@ -1372,6 +1474,9 @@ class IvessPaymentImportWizard(models.TransientModel):
                         "pto_venta_asoc": line["pto_venta_asoc"],
                         "numero_compr_asoc": line["numero_compr_asoc"],
                         "invoice_id": invoice.id if invoice else False,
+                        "candidate_invoice_ids": [
+                            (6, 0, candidates.ids if candidates else [])
+                        ],
                         "importe": importe,
                         "payment_mode_id": payment_mode.id if payment_mode else False,
                         "medio_pago": line["medio_pago"],
