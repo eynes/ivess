@@ -138,6 +138,15 @@ def group_payment_rows(rows):
     return ordered_groups
 
 
+class _InvoiceIndex(dict):
+    """ref -> factura, más las facturas candidatas de las claves sin
+    coincidencia exacta (ref -> recordset)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.candidates = {}
+
+
 class IvessPaymentImportWizard(models.TransientModel):
     _name = "ivess.payment.import.wizard"
     _description = "Importador de cobros de clientes desde archivo Excel"
@@ -532,7 +541,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                         )
                     )
 
-        invoice_by_ref = {}
+        invoice_by_ref = _InvoiceIndex()
         if invoice_refs:
             for move in self.env["account.move"].search(
                 [("move_type", "=", "out_invoice"), ("ref", "in", list(invoice_refs))]
@@ -1331,6 +1340,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                     line_errors.append(_("Importe inválido: '%s'.") % line["importe"])
 
             invoice = self.env["account.move"]
+            candidates = self.env["account.move"]
             if on_account:
                 pass
             elif line["tipo_compr_asoc"] != "FC":
@@ -1341,6 +1351,9 @@ class IvessPaymentImportWizard(models.TransientModel):
             else:
                 invoice = invoice_by_ref.get(invoice_ref, self.env["account.move"])
                 if not invoice:
+                    candidates = getattr(invoice_by_ref, "candidates", {}).get(
+                        invoice_ref, self.env["account.move"]
+                    )
                     # El importe de la fila se cuenta como cobrado, pero sin
                     # imputar a ninguna factura. Si otra fila sin comprobante
                     # ya trae este mismo movimiento, no se suma de nuevo.
@@ -1350,7 +1363,8 @@ class IvessPaymentImportWizard(models.TransientModel):
                     warnings.append(
                         _(
                             "No se encontró la factura '%s': el cobro se importa"
-                            " sin imputar a ese comprobante."
+                            " sin imputar a ese comprobante (podés elegir una"
+                            " factura candidata en el detalle del cobro)."
                         )
                         % invoice_ref
                     )
@@ -1435,6 +1449,9 @@ class IvessPaymentImportWizard(models.TransientModel):
                         "pto_venta_asoc": line["pto_venta_asoc"],
                         "numero_compr_asoc": line["numero_compr_asoc"],
                         "invoice_id": invoice.id if invoice else False,
+                        "candidate_invoice_ids": [
+                            (6, 0, candidates.ids if candidates else [])
+                        ],
                         "importe": importe,
                         "payment_mode_id": payment_mode.id if payment_mode else False,
                         "medio_pago": line["medio_pago"],
