@@ -50,3 +50,7 @@
 	path = server-auth
 	url = https://github.com/OCA/server-auth.git
 	branch = 19.0
+[submodule "account-reconcile"]
+	path = account-reconcile
+	url = https://github.com/OCA/account-reconcile.git
+	branch = 19.0
