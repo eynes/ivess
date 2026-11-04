@@ -455,6 +455,68 @@ class IvessPaymentImportWizard(models.TransientModel):
     # un puñado de búsquedas en lote sobre todo el archivo.
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _name_candidates(ref):
+        """Nombres posibles en Odoo de la factura cuya clave es `ref`
+        (letra + pto 4 dígitos + número 8 dígitos)."""
+        letra, pto, num = ref[:-12], ref[-12:-8], ref[-8:]
+        pto_int = str(int(pto)) if pto.isdigit() else pto
+        pts = {pto_int, pto, pto.zfill(5)}
+        names = set()
+        for p in pts:
+            names.add("%s-%s" % (p, num))
+            if letra:
+                names.add("%s %s-%s" % (letra, p, num))
+                names.add("%s%s-%s" % (letra, p, num))
+        return names
+
+    def _complete_invoices_by_name(self, invoice_refs, invoice_by_ref):
+        """Segundo intento para las claves sin coincidencia por `ref`: las
+        facturas que no vienen del importador de facturas (ej. creadas desde
+        una venta) tienen `ref` vacío, pero sí el número en su nombre."""
+        pending = {ref: self._name_candidates(ref) for ref in invoice_refs
+                   if ref not in invoice_by_ref}
+        if not pending:
+            return
+        all_names = set().union(*pending.values())
+        moves = self.env["account.move"].search(
+            [
+                ("move_type", "=", "out_invoice"),
+                ("name", "in", list(all_names)),
+                ("company_id", "=", self.env.company.id),
+            ]
+        )
+        by_name = {}
+        for move in moves:
+            by_name.setdefault(move.name, []).append(move)
+        for ref, names in pending.items():
+            letra = ref[:-12]
+            found = self.env["account.move"]
+            for name in names:
+                for move in by_name.get(name, []):
+                    if letra and not self._move_has_letter(move, letra):
+                        continue
+                    found |= move
+            # Solo si es inequívoco; si hay más de una, no se adivina.
+            if len(found) == 1:
+                invoice_by_ref[ref] = found
+
+    @staticmethod
+    def _move_has_letter(move, letra):
+        """True si el nombre o el diario/tipo de documento indican la letra;
+        si no hay ningún dato de letra, no se descarta."""
+        name = move.name or ""
+        if name[:1].isalpha():
+            return name[:1].upper() == letra.upper()
+        doc_type = getattr(move, "l10n_latam_document_type_id", False)
+        doc_letter = getattr(doc_type, "l10n_ar_letter", False) if doc_type else False
+        if doc_letter:
+            return doc_letter.upper() == letra.upper()
+        code = (move.journal_id.code or "").upper()
+        if code[:1].isalpha():
+            return code[:1] == letra.upper()
+        return True
+
     def _build_preview_cache(self, groups):
         invoice_refs = set()
         for group in groups:
@@ -476,6 +538,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                 [("move_type", "=", "out_invoice"), ("ref", "in", list(invoice_refs))]
             ):
                 invoice_by_ref.setdefault(move.ref, move)
+            self._complete_invoices_by_name(invoice_refs, invoice_by_ref)
 
         payment_mode_by_key = {}
         for mapping in self.env["ivess.payment.import.payment.method.code"].search(
