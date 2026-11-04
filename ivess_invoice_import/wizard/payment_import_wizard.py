@@ -506,9 +506,33 @@ class IvessPaymentImportWizard(models.TransientModel):
                     if letra and not self._move_has_letter(move, letra):
                         continue
                     found |= move
-            # Solo si es inequívoco; si hay más de una, no se adivina.
+            # Solo si es inequívoco; si hay más de una, no se adivina: se
+            # ofrecen como candidatas para que el usuario elija.
             if len(found) == 1:
                 invoice_by_ref[ref] = found
+            elif found:
+                invoice_by_ref.candidates[ref] = found
+
+    def _collect_candidates(self, invoice_refs, invoice_by_ref):
+        """Facturas posibles para las claves que siguen sin resolverse: mismo
+        número de comprobante (cualquier punto de venta/letra). El usuario
+        elige una en la previsualización."""
+        Move = self.env["account.move"]
+        unresolved = [r for r in sorted(invoice_refs) if r not in invoice_by_ref]
+        for ref in unresolved[:100]:
+            found = invoice_by_ref.candidates.get(ref, Move)
+            if not found:
+                found = Move.search(
+                    [
+                        ("move_type", "=", "out_invoice"),
+                        ("state", "=", "posted"),
+                        ("company_id", "=", self.env.company.id),
+                        ("name", "=like", "%%-%s" % ref[-8:]),
+                    ],
+                    limit=20,
+                )
+            if found:
+                invoice_by_ref.candidates[ref] = found
 
     @staticmethod
     def _move_has_letter(move, letra):
@@ -548,6 +572,7 @@ class IvessPaymentImportWizard(models.TransientModel):
             ):
                 invoice_by_ref.setdefault(move.ref, move)
             self._complete_invoices_by_name(invoice_refs, invoice_by_ref)
+            self._collect_candidates(invoice_refs, invoice_by_ref)
 
         payment_mode_by_key = {}
         for mapping in self.env["ivess.payment.import.payment.method.code"].search(
