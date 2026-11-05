@@ -33,7 +33,7 @@ class IvessTalonariosReport(models.Model):
 
         for sequence in delivery.remittance_sequence_ids:
             talonarios.append({
-                "id": sequence.id,
+                "talonario_id": sequence.id,
                 "type": "remito",
                 "prefix": sequence.prefix,
                 "next_number": sequence.number_next_actual,
@@ -41,7 +41,7 @@ class IvessTalonariosReport(models.Model):
 
         for journal in delivery.collection_journal_ids:
             talonarios.append({
-                "id": journal.id,
+                "talonario_id": journal.id,
                 "type": "recibo",
                 "prefix": journal.code,
                 "next_number": journal.sequence_number_next,
@@ -49,7 +49,7 @@ class IvessTalonariosReport(models.Model):
 
         for sequence in delivery.repair_order_sequence_ids:
             talonarios.append({
-                "id": sequence.id,
+                "talonario_id": sequence.id,
                 "type": "orden_reparacion",
                 "prefix": sequence.prefix,
                 "next_number": sequence.number_next_actual,
