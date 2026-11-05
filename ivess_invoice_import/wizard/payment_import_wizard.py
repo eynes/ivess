@@ -138,6 +138,15 @@ def group_payment_rows(rows):
     return ordered_groups
 
 
+class _InvoiceIndex(dict):
+    """ref -> factura, más las facturas candidatas de las claves sin
+    coincidencia exacta (ref -> recordset)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.candidates = {}
+
+
 class IvessPaymentImportWizard(models.TransientModel):
     _name = "ivess.payment.import.wizard"
     _description = "Importador de cobros de clientes desde archivo Excel"
@@ -455,6 +464,92 @@ class IvessPaymentImportWizard(models.TransientModel):
     # un puñado de búsquedas en lote sobre todo el archivo.
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _name_candidates(ref):
+        """Nombres posibles en Odoo de la factura cuya clave es `ref`
+        (letra + pto 4 dígitos + número 8 dígitos)."""
+        letra, pto, num = ref[:-12], ref[-12:-8], ref[-8:]
+        pto_int = str(int(pto)) if pto.isdigit() else pto
+        pts = {pto_int, pto, pto.zfill(5)}
+        names = set()
+        for p in pts:
+            names.add("%s-%s" % (p, num))
+            if letra:
+                names.add("%s %s-%s" % (letra, p, num))
+                names.add("%s%s-%s" % (letra, p, num))
+        return names
+
+    def _complete_invoices_by_name(self, invoice_refs, invoice_by_ref):
+        """Segundo intento para las claves sin coincidencia por `ref`: las
+        facturas que no vienen del importador de facturas (ej. creadas desde
+        una venta) tienen `ref` vacío, pero sí el número en su nombre."""
+        pending = {ref: self._name_candidates(ref) for ref in invoice_refs
+                   if ref not in invoice_by_ref}
+        if not pending:
+            return
+        all_names = set().union(*pending.values())
+        moves = self.env["account.move"].search(
+            [
+                ("move_type", "=", "out_invoice"),
+                ("name", "in", list(all_names)),
+                ("company_id", "=", self.env.company.id),
+            ]
+        )
+        by_name = {}
+        for move in moves:
+            by_name.setdefault(move.name, []).append(move)
+        for ref, names in pending.items():
+            letra = ref[:-12]
+            found = self.env["account.move"]
+            for name in names:
+                for move in by_name.get(name, []):
+                    if letra and not self._move_has_letter(move, letra):
+                        continue
+                    found |= move
+            # Solo si es inequívoco; si hay más de una, no se adivina: se
+            # ofrecen como candidatas para que el usuario elija.
+            if len(found) == 1:
+                invoice_by_ref[ref] = found
+            elif found:
+                invoice_by_ref.candidates[ref] = found
+
+    def _collect_candidates(self, invoice_refs, invoice_by_ref):
+        """Facturas posibles para las claves que siguen sin resolverse: mismo
+        número de comprobante (cualquier punto de venta/letra). El usuario
+        elige una en la previsualización."""
+        Move = self.env["account.move"]
+        unresolved = [r for r in sorted(invoice_refs) if r not in invoice_by_ref]
+        for ref in unresolved[:100]:
+            found = invoice_by_ref.candidates.get(ref, Move)
+            if not found:
+                found = Move.search(
+                    [
+                        ("move_type", "=", "out_invoice"),
+                        ("state", "=", "posted"),
+                        ("company_id", "=", self.env.company.id),
+                        ("name", "=like", "%%-%s" % ref[-8:]),
+                    ],
+                    limit=20,
+                )
+            if found:
+                invoice_by_ref.candidates[ref] = found
+
+    @staticmethod
+    def _move_has_letter(move, letra):
+        """True si el nombre o el diario/tipo de documento indican la letra;
+        si no hay ningún dato de letra, no se descarta."""
+        name = move.name or ""
+        if name[:1].isalpha():
+            return name[:1].upper() == letra.upper()
+        doc_type = getattr(move, "l10n_latam_document_type_id", False)
+        doc_letter = getattr(doc_type, "l10n_ar_letter", False) if doc_type else False
+        if doc_letter:
+            return doc_letter.upper() == letra.upper()
+        code = (move.journal_id.code or "").upper()
+        if code[:1].isalpha():
+            return code[:1] == letra.upper()
+        return True
+
     def _build_preview_cache(self, groups):
         invoice_refs = set()
         for group in groups:
@@ -470,12 +565,14 @@ class IvessPaymentImportWizard(models.TransientModel):
                         )
                     )
 
-        invoice_by_ref = {}
+        invoice_by_ref = _InvoiceIndex()
         if invoice_refs:
             for move in self.env["account.move"].search(
                 [("move_type", "=", "out_invoice"), ("ref", "in", list(invoice_refs))]
             ):
                 invoice_by_ref.setdefault(move.ref, move)
+            self._complete_invoices_by_name(invoice_refs, invoice_by_ref)
+            self._collect_candidates(invoice_refs, invoice_by_ref)
 
         payment_mode_by_key = {}
         for mapping in self.env["ivess.payment.import.payment.method.code"].search(
@@ -528,7 +625,11 @@ class IvessPaymentImportWizard(models.TransientModel):
             if group.get("error"):
                 continue
             detail_results[index] = self._resolve_detail_lines(
-                group["lines"], invoice_by_ref, payment_mode_by_key, check_ctx
+                group["lines"],
+                invoice_by_ref,
+                payment_mode_by_key,
+                check_ctx,
+                expected_total=self._expected_applied_total(group),
             )
 
         partner_results = {}
@@ -645,9 +746,13 @@ class IvessPaymentImportWizard(models.TransientModel):
             if period_error:
                 errors.append(period_error)
 
-        detail_vals, detail_errors, _matched_partners, applied_total = cache[
-            "detail_results"
-        ][index]
+        (
+            detail_vals,
+            detail_errors,
+            _matched_partners,
+            applied_total,
+            warnings,
+        ) = cache["detail_results"][index]
         errors.extend(detail_errors)
 
         partner, partner_error = cache["partner_results"][index]
@@ -667,6 +772,13 @@ class IvessPaymentImportWizard(models.TransientModel):
         on_account = not any(
             not self._is_on_account_line(line) for line in group["lines"]
         )
+        if on_account:
+            warnings.append(
+                _(
+                    "El cobro no informa comprobantes asociados: se importa sin"
+                    " imputar a ninguna factura."
+                )
+            )
         expected_total = applied_total + (retention_total if on_account else 0.0)
         if not errors and abs(expected_total - importe_total) > 0.01:
             errors.append(
@@ -706,6 +818,7 @@ class IvessPaymentImportWizard(models.TransientModel):
             "journal_id": journal.id if journal else False,
             "has_error": bool(errors),
             "error_message": "\n".join(errors) if errors else False,
+            "warning_message": "\n".join(warnings) if warnings else False,
             "detail_line_ids": detail_vals,
             "retention_line_ids": retention_vals,
         }
@@ -868,15 +981,10 @@ class IvessPaymentImportWizard(models.TransientModel):
 
         :return: tupla (cliente o False, mensaje de error o None).
         """
-        has_invoice_lines = any(
-            not self._is_on_account_line(line) for line in group["lines"]
-        )
-        if has_invoice_lines:
-            if not matched_partners:
-                return False, _(
-                    "No se pudo determinar el cliente: ninguna factura"
-                    " aplicada pudo resolverse."
-                )
+        # Si ninguna factura informada se encontró en Odoo, el cobro se
+        # importa igual sin imputar (ver _resolve_detail_lines) y el cliente
+        # sale del código de cliente, como en un recibo a cuenta.
+        if matched_partners:
             if len(matched_partners) > 1:
                 return False, _(
                     "El recibo aplica a facturas de más de un cliente"
@@ -1089,21 +1197,146 @@ class IvessPaymentImportWizard(models.TransientModel):
             )
         return vals, errors
 
+    @staticmethod
+    def _expected_applied_total(group):
+        """Importe que deben sumar las líneas del recibo: el total, menos las
+        retenciones si es un recibo a cuenta (el movimiento ya es el neto
+        cobrado). Tolerante: si algún monto es inválido devuelve None y se
+        informa después en la previsualización."""
+        try:
+            total = IvessPaymentImportWizard._to_float(group["importe_total"])
+            retentions = sum(
+                IvessPaymentImportWizard._to_float(amount)
+                for _code, amount in group.get("retenciones") or []
+                if amount not in (None, "")
+            )
+        except (TypeError, ValueError):
+            return None
+        on_account = all(
+            IvessPaymentImportWizard._is_on_account_line(line)
+            for line in group["lines"]
+        )
+        return total - (retentions if on_account else 0.0)
+
+    @staticmethod
+    def _movement_key(line):
+        """Identifica el movimiento de pago de una línea: el mismo cheque, o
+        el mismo medio/caja/banco/importe."""
+        return (
+            line["medio_pago"],
+            line["caja"],
+            line["cod_bco"],
+            line["sucursal_bco"],
+            line["nro_cheque"],
+            line["importe_movimiento_moneda_local"]
+            if line["importe_movimiento_moneda_local"] is not None
+            else line["importe_movimiento"],
+        )
+
+    def _is_absorbed(self, line, blank_keys, invoice_by_ref):
+        """Fila con un comprobante que no existe en Odoo y el mismo
+        movimiento de pago que otra fila sin comprobante: el movimiento ya
+        está cubierto por esa fila, así que acá solo queda la advertencia."""
+        if self._is_on_account_line(line) or line["tipo_compr_asoc"] != "FC":
+            return False
+        ref = IvessInvoiceImportWizard._comprobante_ref(
+            line["letra_asoc"], line["pto_venta_asoc"], line["numero_compr_asoc"]
+        )
+        return (
+            not invoice_by_ref.get(ref) and self._movement_key(line) in blank_keys
+        )
+
+    def _collapse_repeated_movements(self, lines, expected_total, invoice_by_ref):
+        """Cuando el archivo repite el mismo movimiento de pago en varias
+        filas sin comprobante asociado (el pago se informa una vez por cada
+        comprobante que cancelaba y acá esos datos vinieron vacíos), el
+        movimiento es uno solo. Solo se unifica si con eso la suma pasa a
+        coincidir con el total del recibo: así dos cobros iguales pero
+        distintos (ej. dos pagos en efectivo del mismo monto) no se pierden."""
+        on_account = [line for line in lines if self._is_on_account_line(line)]
+        if expected_total is None or len(on_account) < 2:
+            return lines
+
+        def amount(line):
+            try:
+                return self._to_float(
+                    line["importe_movimiento_moneda_local"]
+                    if line["importe_movimiento_moneda_local"] is not None
+                    else line["importe_movimiento"]
+                )
+            except (TypeError, ValueError):
+                return 0.0
+
+        blank_keys = {self._movement_key(line) for line in on_account}
+        others = sum(
+            self._safe_amount(line)
+            for line in lines
+            if not self._is_on_account_line(line)
+            and not self._is_absorbed(line, blank_keys, invoice_by_ref)
+        )
+        if abs(others + sum(amount(line) for line in on_account) - expected_total) < 0.01:
+            return lines
+        unique = {}
+        for line in on_account:
+            unique.setdefault(self._movement_key(line), line)
+        collapsed = list(unique.values())
+        if abs(others + sum(amount(line) for line in collapsed) - expected_total) >= 0.01:
+            return lines
+        kept = {id(line) for line in collapsed}
+        return [
+            line
+            for line in lines
+            if not self._is_on_account_line(line) or id(line) in kept
+        ]
+
+    def _safe_amount(self, line):
+        try:
+            return self._to_float(line["importe"])
+        except (TypeError, ValueError):
+            return 0.0
+
     def _resolve_detail_lines(
-        self, lines, invoice_by_ref, payment_mode_by_key, check_ctx=None
+        self,
+        lines,
+        invoice_by_ref,
+        payment_mode_by_key,
+        check_ctx=None,
+        expected_total=None,
     ):
         detail_vals = []
         errors = []
+        warnings = []
         matched_partners = set()
         applied_total = 0.0
+        # Importe ya aplicado por factura en este recibo (una misma factura
+        # puede venir en más de una fila, ej. con medios de pago distintos).
+        applied_by_invoice = {}
 
         if not lines:
             errors.append(_("El recibo no tiene líneas."))
-            return detail_vals, errors, matched_partners, applied_total
+            return detail_vals, errors, matched_partners, applied_total, warnings
+
+        lines = self._collapse_repeated_movements(
+            lines, expected_total, invoice_by_ref
+        )
+        blank_keys = {
+            self._movement_key(line)
+            for line in lines
+            if self._is_on_account_line(line)
+        }
 
         for line in lines:
             line_errors = []
             on_account = self._is_on_account_line(line)
+            # Comprobante informado pero que no existe en Odoo: el cobro se
+            # importa igual, sin imputar, y se avisa en la previsualización.
+            invoice_ref = None
+            if not on_account and line["tipo_compr_asoc"] == "FC":
+                invoice_ref = IvessInvoiceImportWizard._comprobante_ref(
+                    line["letra_asoc"],
+                    line["pto_venta_asoc"],
+                    line["numero_compr_asoc"],
+                )
 
             if on_account:
                 # Recibo sin factura asociada (pago a cuenta): no hay
@@ -1132,6 +1365,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                     line_errors.append(_("Importe inválido: '%s'.") % line["importe"])
 
             invoice = self.env["account.move"]
+            candidates = self.env["account.move"]
             if on_account:
                 pass
             elif line["tipo_compr_asoc"] != "FC":
@@ -1140,15 +1374,23 @@ class IvessPaymentImportWizard(models.TransientModel):
                     % line["tipo_compr_asoc"]
                 )
             else:
-                invoice_ref = IvessInvoiceImportWizard._comprobante_ref(
-                    line["letra_asoc"],
-                    line["pto_venta_asoc"],
-                    line["numero_compr_asoc"],
-                )
                 invoice = invoice_by_ref.get(invoice_ref, self.env["account.move"])
                 if not invoice:
-                    line_errors.append(
-                        _("No se encontró la factura '%s' para conciliar.")
+                    candidates = getattr(invoice_by_ref, "candidates", {}).get(
+                        invoice_ref, self.env["account.move"]
+                    )
+                    # El importe de la fila se cuenta como cobrado, pero sin
+                    # imputar a ninguna factura. Si otra fila sin comprobante
+                    # ya trae este mismo movimiento, no se suma de nuevo.
+                    if self._is_absorbed(line, blank_keys, invoice_by_ref):
+                        importe = 0.0
+                    applied_total += importe
+                    warnings.append(
+                        _(
+                            "No se encontró la factura '%s': el cobro se importa"
+                            " sin imputar a ese comprobante (podés elegir una"
+                            " factura candidata en el detalle del cobro)."
+                        )
                         % invoice_ref
                     )
                 elif invoice.state != "posted":
@@ -1156,7 +1398,11 @@ class IvessPaymentImportWizard(models.TransientModel):
                         _("La factura '%s' no está confirmada (estado: %s).")
                         % (invoice_ref, invoice.state)
                     )
-                elif importe - invoice.amount_residual > 0.01:
+                elif (
+                    applied_by_invoice.get(invoice, 0.0) + importe
+                    - invoice.amount_residual
+                    > 0.01
+                ):
                     # account.payment.order.line._check_amount_over_original()
                     # (l10n_ar_eynes) rechaza con un error genérico en inglés
                     # si el importe supera el saldo pendiente: se valida acá
@@ -1172,6 +1418,9 @@ class IvessPaymentImportWizard(models.TransientModel):
                 else:
                     matched_partners.add(invoice.partner_id)
                     applied_total += importe
+                    applied_by_invoice[invoice] = (
+                        applied_by_invoice.get(invoice, 0.0) + importe
+                    )
 
             payment_mode = None
             check_vals = {}
@@ -1225,6 +1474,9 @@ class IvessPaymentImportWizard(models.TransientModel):
                         "pto_venta_asoc": line["pto_venta_asoc"],
                         "numero_compr_asoc": line["numero_compr_asoc"],
                         "invoice_id": invoice.id if invoice else False,
+                        "candidate_invoice_ids": [
+                            (6, 0, candidates.ids if candidates else [])
+                        ],
                         "importe": importe,
                         "payment_mode_id": payment_mode.id if payment_mode else False,
                         "medio_pago": line["medio_pago"],
@@ -1247,7 +1499,7 @@ class IvessPaymentImportWizard(models.TransientModel):
             )
             errors.extend(line_errors)
 
-        return detail_vals, errors, matched_partners, applied_total
+        return detail_vals, errors, matched_partners, applied_total, warnings
 
     # ------------------------------------------------------------------
     # Paso 2 -> 3: crear los cobros que no tengan error
@@ -1729,7 +1981,14 @@ class IvessPaymentImportWizard(models.TransientModel):
         # Solo si el recibo aplica a facturas: en un recibo a cuenta el
         # importe del movimiento ya es el neto cobrado.
         to_deduct = 0.0
-        if result_line.detail_line_ids.filtered("invoice_id"):
+        # (también cuando el comprobante informado no se encontró: el
+        # importe de la fila sigue siendo el bruto del comprobante).
+        if result_line.detail_line_ids.filtered(
+            lambda d: d.tipo_compr_asoc
+            or d.letra_asoc
+            or d.pto_venta_asoc
+            or d.numero_compr_asoc
+        ):
             to_deduct = sum(result_line.retention_line_ids.mapped("importe"))
         for amounts in (mode_amounts, check_amounts):
             for key in amounts:
@@ -1809,6 +2068,12 @@ class IvessPaymentImportWizard(models.TransientModel):
                     )
                     % invoice.display_name
                 )
+            # Una misma factura en más de una fila (ej. medios de pago
+            # distintos): una sola línea de aplicación con el importe sumado.
+            same_invoice = [v for v in income_vals if v["invoice_id"] == invoice.id]
+            if same_invoice:
+                same_invoice[0]["amount"] += detail.importe
+                continue
             income_vals.append(
                 {
                     "invoice_id": invoice.id,

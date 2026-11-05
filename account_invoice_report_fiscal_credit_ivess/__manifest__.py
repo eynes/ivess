@@ -12,7 +12,7 @@
     "author": "Eynes SRL",
     "website": "http://www.eynes.com.ar",
     "category": "Accounting/Accounting",
-    "summary": "Agrega el campo Crédito Fiscal al reporte Análisis de facturas",
+    "summary": "Agrega los campos Crédito Fiscal y Fecha contable al reporte Análisis de facturas",
     "description": """
         Agrega el campo "Crédito Fiscal" (fiscal_credit) al reporte
         "Análisis de facturas" (account.invoice.report). El valor se toma de
@@ -22,6 +22,9 @@
 
         Se puede usar para filtrar y agrupar (junto a "Rubro Crédito Fiscal"
         e "IVA Compras") y como columna en la vista lista.
+
+        También agrega "Fecha contable" (date, de account.move.date) como
+        campo, columna de la lista, filtro y agrupación.
     """,
     "depends": [
         "account",

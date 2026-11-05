@@ -1,15 +1,22 @@
 import base64
 import csv
 import io
+import logging
+import threading
+import time
 from datetime import datetime
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.modules.registry import Registry
+from odoo.service.server import cron_database_list
 
 try:
     import openpyxl
 except ImportError:  # pragma: no cover
     openpyxl = None
+
+_logger = logging.getLogger(__name__)
 
 EXPECTED_HEADERS = [
     "tipo de comprobante",
@@ -168,9 +175,25 @@ class IvessInvoiceImportWizard(models.TransientModel):
         [
             ("upload", "Subir archivo"),
             ("preview", "Previsualización"),
+            ("processing", "Procesando"),
             ("done", "Resultado"),
         ],
         default="upload",
+    )
+    company_id = fields.Many2one(
+        "res.company",
+        string="Compañía",
+        default=lambda self: self.env.company,
+        readonly=True,
+        help="Compañía con la que se importa. El proceso en segundo plano no"
+        " tiene compañía activa de navegador, por eso se guarda acá.",
+    )
+    progress_total = fields.Integer(string="Facturas a procesar", readonly=True)
+    progress_done = fields.Integer(string="Facturas procesadas", readonly=True)
+    last_heartbeat = fields.Datetime(
+        string="Última señal de vida",
+        readonly=True,
+        help="Última vez que el proceso en segundo plano informó su avance.",
     )
     result_line_ids = fields.One2many(
         "ivess.invoice.import.result.line",
@@ -321,13 +344,27 @@ class IvessInvoiceImportWizard(models.TransientModel):
         return buffer.getvalue().encode("utf-8-sig")
 
     def _reopen(self):
-        return {
+        action = {
             "type": "ir.actions.act_window",
             "res_model": self._name,
             "res_id": self.id,
             "view_mode": "form",
             "target": "new",
         }
+        if self.state == "processing":
+            # Vista liviana, sin la lista de facturas: la barra de progreso
+            # la recarga cada pocos segundos.
+            view = self.env.ref(
+                "ivess_invoice_import.view_ivess_invoice_import_wizard_progress"
+            )
+            action["views"] = [(view.id, "form")]
+        return action
+
+    def action_reopen(self):
+        """Lo llama la barra de progreso cuando la carga terminó, para
+        volver a la vista completa."""
+        self.ensure_one()
+        return self._reopen()
 
     # ------------------------------------------------------------------
     # Lectura y parseo del Excel
@@ -1335,39 +1372,245 @@ class IvessInvoiceImportWizard(models.TransientModel):
     # es rápido; seguir partiendo no ahorraría nada).
     _CONFIRM_MIN_BISECT_SIZE = 10
 
-    def action_confirm(self):
-        self.ensure_one()
-        # tracking_disable evita que cada create()/write() de account.move
-        # disloque el mecanismo de chatter de mail.thread (seguidores,
-        # tracking de cambios, mensaje de "creado"): no aporta nada en una
-        # importación histórica y es una porción medible del tiempo por
-        # factura (medido con cProfile contra un archivo real).
-        self = self.with_context(tracking_disable=True)
+    # Tiempo máximo (segundos) que una corrida del cron procesa tandas antes
+    # de hacer commit y volver a dispararse. El cron también tiene límite de
+    # tiempo en Odoo.sh: no se procesa todo de una sola vez.
+    _CRON_TIME_BUDGET = 300
 
+    def action_confirm(self):
+        """Deja la importación lista y la delega al cron: la petición no
+        espera a que se creen las facturas (miles pueden tardar más que el
+        límite de tiempo del worker HTTP), la pantalla muestra una barra de
+        progreso."""
+        self.ensure_one()
+        if self.state != "preview":
+            raise UserError(_("La importación ya fue confirmada."))
         for result_line in self.result_line_ids.filtered("has_error"):
             result_line.resultado = "error"
-
-        pending_lines = self.result_line_ids.filtered(lambda r: not r.has_error)
-        for start in range(0, len(pending_lines), self._CONFIRM_CHUNK_SIZE):
-            chunk = pending_lines[start : start + self._CONFIRM_CHUNK_SIZE]
-            self._confirm_chunk(chunk)
-            # Se confirma cada tanda por separado en vez de dejar TODO el
-            # import en una única transacción: si el proceso se corta a
-            # mitad de camino (timeout del navegador/proxy, reinicio), lo
-            # que ya se procesó queda guardado en vez de perderse entero
-            # (encontrado en un import real: la transacción completa tardó
-            # >10 minutos sin que nada quedara visible hasta el final).
-            # pylint: disable=invalid-commit
-            self.env.cr.commit()
-
-        self.ok_count = len(
-            self.result_line_ids.filtered(lambda r: r.resultado == "ok")
+        pending = self.result_line_ids.filtered(
+            lambda r: not r.has_error and r.resultado == "pending"
         )
-        self.error_count = len(
-            self.result_line_ids.filtered(lambda r: r.resultado == "error")
+        self.write(
+            {
+                "state": "processing",
+                "progress_total": len(pending),
+                "progress_done": 0,
+                "last_heartbeat": fields.Datetime.now(),
+            }
         )
-        self.state = "done"
+        # El cron lee el wizard desde otra transacción: debe estar guardado
+        # antes de dispararlo.
+        self.env.cr.commit()  # pylint: disable=invalid-commit
+        self._launch_processing()
         return self._reopen()
+
+    def _launch_processing(self):
+        """Arranca el procesamiento en segundo plano: dispara el cron si
+        atiende esta base; si no (base restaurada para pruebas o stage con
+        db_name fijo), procesa en un hilo del propio servidor."""
+        self.ensure_one()
+        dbname = self.env.cr.dbname
+        if dbname in cron_database_list():
+            self.env.ref("ivess_invoice_import.ir_cron_invoice_import")._trigger()
+            return
+        threading.Thread(
+            target=self._process_in_thread,
+            args=(dbname, self.id),
+            name="ivess-invoice-import-%s" % self.id,
+            daemon=True,
+        ).start()
+
+    @api.model
+    def _process_in_thread(self, dbname, wizard_id):
+        try:
+            with Registry(dbname).cursor() as cr:
+                env = api.Environment(cr, api.SUPERUSER_ID, {})
+                wizard = env["ivess.invoice.import.wizard"].browse(wizard_id)
+                # Sin cron no hay quien retome: en el hilo se procesa todo.
+                while wizard.exists() and wizard.state == "processing":
+                    wizard._run_pending(time_budget=None)
+        except Exception:  # pylint: disable=broad-except # noqa: BLE001
+            _logger.exception(
+                "Importación de facturas %s: falló el proceso en segundo plano",
+                wizard_id,
+            )
+
+    @api.model
+    def _cron_process_pending(self):
+        """Cron: procesa las importaciones confirmadas. Como cada línea
+        guarda su resultado y la factura creada, se puede retomar donde
+        quedó después de un corte o un reinicio (el cron corre cada pocos
+        minutos y levanta lo que haya en 'processing')."""
+        for wizard in self.search([("state", "=", "processing")]):
+            wizard._run_pending(time_budget=self._CRON_TIME_BUDGET)
+
+    # hash() de str no es estable entre procesos: clave fija.
+    _ADVISORY_LOCK_KEY = 1769183702
+
+    def _try_lock(self):
+        """Lock de sesión de Postgres sobre el wizard. Se usa en vez de
+        SELECT ... FOR UPDATE porque se hace commit después de cada tanda y
+        eso soltaría el lock de fila. Evita dos procesos a la vez sobre el
+        mismo wizard (cron + hilo, o dos corridas del cron)."""
+        self.env.cr.execute(
+            "SELECT pg_try_advisory_lock(%s, %s)",
+            (self._ADVISORY_LOCK_KEY, self.id),
+        )
+        return self.env.cr.fetchone()[0]
+
+    def _unlock(self):
+        self.env.cr.execute(
+            "SELECT pg_advisory_unlock(%s, %s)",
+            (self._ADVISORY_LOCK_KEY, self.id),
+        )
+
+    def _run_pending(self, time_budget=None):
+        """Procesa tandas de líneas pendientes hasta terminar o hasta
+        agotar time_budget (segundos); en ese caso reprograma el cron."""
+        self.ensure_one()
+        if not self._try_lock():
+            return
+        try:
+            self.invalidate_recordset()
+            if self.state != "processing":
+                return
+            wizard = self.with_user(self.create_uid).with_company(self.company_id)
+            try:
+                finished = wizard._process_confirm(time_budget)
+            except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001
+                # Se deja en 'processing': las líneas ya procesadas están
+                # guardadas y el próximo disparo del cron retoma el resto.
+                self.env.cr.rollback()
+                self.env.invalidate_all()
+                _logger.exception(
+                    "Importación de facturas %s: falló una corrida", self.id
+                )
+                finished = None
+                if time_budget is None:
+                    raise
+            if finished is False and time_budget is not None:
+                self.env.ref("ivess_invoice_import.ir_cron_invoice_import")._trigger()
+        finally:
+            self._unlock()
+
+    def _pending_lines(self, limit=None):
+        return self.env["ivess.invoice.import.result.line"].search(
+            [
+                ("wizard_id", "=", self.id),
+                ("resultado", "=", "pending"),
+                ("has_error", "=", False),
+                ("odoo_move_id", "=", False),
+            ],
+            order="id",
+            limit=limit,
+        )
+
+    def _process_confirm(self, time_budget=None):
+        """Procesa tandas hasta que no queden pendientes o se agote el
+        tiempo. :return: True si terminó; False si quedan pendientes."""
+        self.ensure_one()
+        # tracking_disable evita que cada create()/write() de account.move
+        # dispare el mecanismo de chatter de mail.thread: no aporta nada en
+        # una importación histórica y es una porción medible del tiempo por
+        # factura (medido con cProfile contra un archivo real).
+        self = self.with_context(tracking_disable=True)
+        start = time.monotonic()
+        while True:
+            chunk = self._pending_lines(limit=self._CONFIRM_CHUNK_SIZE)
+            if not chunk:
+                break
+            chunk = self._mark_existing_as_ok(chunk)
+            if chunk:
+                self._confirm_chunk(chunk)
+            # Se confirma cada tanda por separado: si el proceso se corta, lo
+            # ya procesado queda guardado y se retoma desde acá.
+            self.write(
+                {
+                    "progress_done": self.progress_total
+                    - len(self._pending_lines()),
+                    "last_heartbeat": fields.Datetime.now(),
+                }
+            )
+            self.env.cr.commit()  # pylint: disable=invalid-commit
+            if time_budget is not None and time.monotonic() - start > time_budget:
+                if self._pending_lines(limit=1):
+                    return False
+        self.write(
+            {
+                "ok_count": self.env["ivess.invoice.import.result.line"].search_count(
+                    [("wizard_id", "=", self.id), ("resultado", "=", "ok")]
+                ),
+                "error_count": self.env[
+                    "ivess.invoice.import.result.line"
+                ].search_count(
+                    [("wizard_id", "=", self.id), ("resultado", "=", "error")]
+                ),
+                "progress_done": self.progress_total,
+                "last_heartbeat": fields.Datetime.now(),
+                "state": "done",
+            }
+        )
+        self._notify_user(
+            _(
+                "Importación finalizada: %(ok)s facturas creadas y %(err)s con"
+                " error."
+            )
+            % {"ok": self.ok_count, "err": self.error_count},
+            "warning" if self.error_count else "success",
+        )
+        self.env.cr.commit()  # pylint: disable=invalid-commit
+        return True
+
+    def _mark_existing_as_ok(self, chunk):
+        """Reintento idempotente: las líneas cuya factura ya existe en
+        account.move (misma ref, diario, tipo y compañía; típico de una
+        corrida anterior que se cortó antes de guardar el resultado) se
+        marcan 'ok' con esa factura en vez de intentar crearlas de nuevo.
+
+        :return: las líneas que sí hay que crear.
+        """
+        moves = self.env["account.move"].search(
+            [
+                ("ref", "in", chunk.mapped("comprobante_ref")),
+                ("journal_id", "in", chunk.journal_id.ids),
+                ("move_type", "in", ["out_invoice", "out_refund"]),
+                ("company_id", "=", self.env.company.id),
+            ]
+        )
+        by_key = {(m.ref, m.journal_id.id, m.move_type): m for m in moves}
+        to_create = chunk.browse()
+        for result_line in chunk:
+            is_refund = result_line.tipo_comprobante == "NC"
+            move_type = "out_refund" if is_refund else "out_invoice"
+            move = by_key.get(
+                (result_line.comprobante_ref, result_line.journal_id.id, move_type)
+            )
+            if move:
+                result_line.write({"resultado": "ok", "odoo_move_id": move.id})
+            else:
+                to_create |= result_line
+        return to_create
+
+    def _notify_user(self, message, notification_type):
+        """Avisa al usuario que confirmó la importación (notificación
+        emergente por bus), aunque ya haya salido de la pantalla. Es solo un
+        aviso: si falla no debe afectar a la importación."""
+        self.ensure_one()
+        try:
+            self.create_uid._bus_send(
+                "simple_notification",
+                {
+                    "title": _("Importación de facturas"),
+                    "message": message,
+                    "type": notification_type,
+                    "sticky": True,
+                },
+            )
+        except Exception:  # pylint: disable=broad-except # noqa: BLE001
+            _logger.exception(
+                "Importación de facturas %s: no se pudo enviar la notificación",
+                self.id,
+            )
 
     def _confirm_chunk(self, chunk):
         """Intenta el camino rápido (_confirm_chunk_fast) para la tanda

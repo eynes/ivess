@@ -228,6 +228,33 @@
         </field>
     </record>
 
+    <!-- Vista liviana mientras se procesa: sin la lista de facturas, para
+         poder recargarla cada pocos segundos. -->
+    <record id="view_ivess_invoice_import_wizard_progress" model="ir.ui.view">
+        <field name="name">ivess.invoice.import.wizard.progress</field>
+        <field name="model">ivess.invoice.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Importando facturas...">
+                <field name="state" invisible="1"/>
+                <field name="progress_total" invisible="1"/>
+                <div class="text-center py-4">
+                    <h3>Importando facturas…</h3>
+                    <p class="text-muted">
+                        Podés cerrar esta ventana: la importación sigue en segundo plano.
+                    </p>
+                    <field
+                        name="progress_done"
+                        widget="ivess_import_progressbar"
+                        options="{'max_value': 'progress_total'}"
+                    />
+                </div>
+                <footer>
+                    <button string="Cerrar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
     <record id="action_ivess_invoice_import_wizard" model="ir.actions.act_window">
         <field name="name">Importar facturas de clientes (Excel)</field>
         <field name="res_model">ivess.invoice.import.wizard</field>

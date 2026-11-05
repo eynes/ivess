@@ -11,12 +11,18 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='iva_compras_tax_id']" position="after">
                 <field name="fiscal_credit" />
+                <field name="date" />
             </xpath>
             <xpath expr="//filter[@name='group_by_iva_compras_tax']" position="after">
                 <filter
           string="Crédito Fiscal"
           name="group_by_fiscal_credit"
           context="{'group_by': 'fiscal_credit'}"
+        />
+                <filter
+          string="Fecha contable"
+          name="group_by_accounting_date"
+          context="{'group_by': 'date'}"
         />
             </xpath>
         </field>
@@ -29,6 +35,7 @@
         <field name="arch" type="xml">
             <field name="product_id" position="after">
                 <field name="fiscal_credit" optional="show" />
+                <field name="date" optional="show" />
             </field>
         </field>
     </record>
