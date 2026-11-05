@@ -29,7 +29,30 @@ class IvessTalonariosReport(models.Model):
         if not delivery:
             return {"error": "No existe un reparto con el número '%s'." % distribution}
 
-        return {
-            "distribution": distribution,
-            **delivery._get_booklets_data(),
-        }
+        talonarios = []
+
+        for sequence in delivery.remittance_sequence_ids:
+            talonarios.append({
+                "talonario_id": sequence.id,
+                "type": "remito",
+                "prefix": sequence.prefix,
+                "next_number": sequence.number_next_actual,
+            })
+
+        for journal in delivery.collection_journal_ids:
+            talonarios.append({
+                "talonario_id": journal.id,
+                "type": "recibo",
+                "prefix": journal.code,
+                "next_number": journal.sequence_number_next,
+            })
+
+        for sequence in delivery.repair_order_sequence_ids:
+            talonarios.append({
+                "talonario_id": sequence.id,
+                "type": "orden_reparacion",
+                "prefix": sequence.prefix,
+                "next_number": sequence.number_next_actual,
+            })
+
+        return {"distribution": distribution, "talonarios": talonarios}
