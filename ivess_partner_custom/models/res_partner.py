@@ -29,6 +29,7 @@ class ResPartner(models.Model):
     requiere_comprobante = fields.Boolean(
         string="Requiere Factura",
     )
+    birthdate = fields.Date(string="Fecha de nacimiento")
     neighborhood_id = fields.Many2one(
         "res.city.neighborhood",
         string="Barrio",
