@@ -65,6 +65,7 @@
                 </group>
             </xpath>
             <xpath expr="//field[@name='category_id']" position="after">
+                <field name="birthdate" invisible="not is_customer"/>
                 <field name="total_invoiced"/>
                 <field name="unbilled_balance"/>
                 <field name="final_balance"/>
