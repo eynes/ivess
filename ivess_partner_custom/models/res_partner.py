@@ -29,6 +29,7 @@ class ResPartner(models.Model):
     requiere_comprobante = fields.Boolean(
         string="Requiere Factura",
     )
+    birthdate = fields.Date(string="Fecha de nacimiento")
     _customer_code_uniq = models.Constraint(
         "unique(customer_code)",
         "El código de cliente ya existe. No se puede repetir, tampoco el de una cuenta dada de baja.",
