@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from . import res_company
+from . import res_city_neighborhood
 from . import baja_madre
 from . import desvincular_hija
 from . import partner_distribution

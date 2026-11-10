@@ -151,6 +151,15 @@ class IvessPaymentImportWizard(models.TransientModel):
     _name = "ivess.payment.import.wizard"
     _description = "Importador de cobros de clientes desde archivo Excel"
 
+    company_id = fields.Many2one(
+        "res.company",
+        string="Compañía",
+        default=lambda self: self.env.company,
+        readonly=True,
+        help="Compañía con la que se importa. El proceso en segundo plano no"
+        " tiene compañía activa de navegador, por eso se guarda acá.",
+    )
+
     # Código de "medio de pago" que identifica efectivo/caja en el Excel.
     _CASH_MEDIO_PAGO = "1"
     # Código de "medio de pago" que identifica cheque de terceros.
@@ -1629,7 +1638,7 @@ class IvessPaymentImportWizard(models.TransientModel):
         # Se procesa con el usuario que confirmó la importación (autor y
         # permisos de los recibos, igual que cuando se hacía en la misma
         # petición).
-        wizard = self.with_user(self.create_uid)
+        wizard = self.with_user(self.create_uid).with_company(self.company_id)
         try:
             wizard._process_confirm()
         except Exception as exc:  # pylint: disable=broad-except # noqa: BLE001

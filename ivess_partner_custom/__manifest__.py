@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Ivess Partner Custom",
-    "version": "19.0.0.0.25",
+    "version": "19.0.0.0.27",
     "description": "",
     "author": "Eynes",
     "category": "Contacts",
@@ -22,6 +22,7 @@
         "views/desvincular_hija_views.xml",
         "views/traspaso_saldo_views.xml",
         "views/visita_fuera_ruta_views.xml",
+        "views/res_city_neighborhood_views.xml",
         "views/res_partner.xml",
         "views/menu_views.xml",
     ],
