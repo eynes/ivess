@@ -3,7 +3,7 @@
         <field name="name">delivery.route.form</field>
         <field name="model">delivery.route</field>
         <field name="arch" type="xml">
-            <form string="Recorrido">
+            <form string="Recorrido" delete="false">
                 <header>
                     <button name="action_set_synchronized" type="object" string="Sincronizar" invisible="state not in ('draft')" class="btn-primary"/>
                     <button name="action_set_in_progress" type="object" string="In Progress" invisible="state not in ('sincronizado')" class="btn-primary"/>
@@ -107,7 +107,7 @@
         <field name="name">delivery.route.tree</field>
         <field name="model">delivery.route</field>
         <field name="arch" type="xml">
-            <list string="Recorridos"> <field name="name"/>
+            <list string="Recorridos" delete="false"> <field name="name"/>
                 <field name="truck_id"/>
                 <field name="supervisor_id"/>
                 <field name="conductor_id"/>

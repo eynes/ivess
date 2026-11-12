@@ -104,3 +104,13 @@ class TestAccountInvoiceReportFiscalCredit(TransactionCase):
         rows = self.report.search([("move_id", "=", bill.id)])
         self.assertEqual(len(rows), 1)
         self.assertFalse(rows.fiscal_credit)
+
+    def test_report_exposes_accounting_date(self):
+        """El reporte trae la fecha contable (account.move.date), que puede
+        diferir de la fecha de la factura."""
+        bill = self._create_bill("in_invoice", ["direct_taxed"])
+        bill.date = "2026-10-15"
+        rows = self.report.search([("move_id", "=", bill.id)])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(str(rows.date), "2026-10-15")
+        self.assertEqual(str(rows.invoice_date), "2026-10-01")

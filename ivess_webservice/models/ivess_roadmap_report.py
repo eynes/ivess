@@ -1,4 +1,9 @@
-from odoo import api, fields, models, tools
+import logging
+
+from odoo import _, api, fields, models, tools
+from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 def _format_float_time(value):
@@ -116,6 +121,32 @@ class IvessRoadmapReport(models.Model):
         )
 
     @api.model
+    def _start_synchronized_route(self, template_routes):
+        """Al pedir la hoja de ruta de una distribución, el recorrido vigente
+        pasa a En progreso (igual que el botón), si ya estaba sincronizado y no
+        hay otro en progreso (T17813)."""
+        Route = self.env["delivery.route"]
+        if Route.search_count([
+            ("template_delivery_route_id", "in", template_routes.ids),
+            ("state", "=", "in_progress"),
+        ]):
+            return
+        route = Route.search([
+            ("template_delivery_route_id", "in", template_routes.ids),
+            ("state", "=", "sincronizado"),
+            ("delivery_date", ">=", fields.Date.today()),
+        ], order="delivery_date asc", limit=1)
+        if not route:
+            return
+        try:
+            route.action_set_in_progress()
+        except UserError as error:
+            # No se corta la hoja de ruta por esto; queda registrado.
+            _logger.warning("No se pudo pasar a En progreso el recorrido %s: %s", route.name, error)
+            return
+        route.message_post(body=_("Recorrido en progreso desde el servicio get_roadmap."))
+
+    @api.model
     def get_roadmap(self, **kwargs):
         allowed_params = {"customer_code", "distribution"}
         unknown_params = set(kwargs) - allowed_params
@@ -158,6 +189,9 @@ class IvessRoadmapReport(models.Model):
                 ("template_route_id", "in", template_routes.ids)
             ]).ids
             domain = [("id", "in", route_line_ids)] if route_line_ids else [("id", "=", False)]
+
+        if distribution:
+            self._start_synchronized_route(template_routes)
 
         records = self.search(domain, order="customer_code").read([
             "customer_code",

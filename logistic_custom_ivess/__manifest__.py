@@ -1,6 +1,6 @@
 {
     "name": "Sale Custom Ivess",
-    "version": "19.0.0.0.31",
+    "version": "19.0.0.0.32",
     "description": """
     """,
     "author": "Eynes",

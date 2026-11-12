@@ -1,4 +1,4 @@
-from odoo import models, fields, api, tools
+from odoo import models, fields, api, tools, _
 
 class IvessDeliveryAndAssignedRouteReport(models.Model):
     _name = "ivess.delivery.and.assigned.route.report"
@@ -97,6 +97,11 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
         if not records:
             return {"error": "No hay clientes asignados al recorrido vigente de la distribución '%s'." % distribution}
 
+        # La app descargó el recorrido: queda sincronizado (T17813).
+        if route.state == 'draft':
+            route.action_set_synchronized()
+            route.message_post(body=_("Recorrido sincronizado desde el servicio get_delivery_and_assigned_route_report."))
+
         delivery_number_fields = [
             'delivery_number_id',
             'allow_price_editing',
@@ -154,14 +159,21 @@ class IvessDeliveryAndAssignedRouteReport(models.Model):
             for order in delivery._get_booklets_data()['repair_orders']
         ]
         result['minutos_x_convertir_factura'] = minutos_x_convertir_factura
+        result['max_final_consumer_amount'] = self.env.user.company_id.fcons_max_amount
 
         for field in route_fields:
             key = 'template_delivery_route_code' if field == 'template_delivery_route_id' else field
             result[key] = _value(route_and_distribution_fields, field)
 
-        # Una entrada por cada delivery.route.line del recorrido
+        # Una entrada por cliente: un cliente revisitado tiene varias
+        # delivery.route.line, pero sus datos son los mismos en todas.
         clients = []
+        seen_partners = set()
         for rec in raw_records:
+            partner_id = _value(rec, 'partner_id')
+            if partner_id in seen_partners:
+                continue
+            seen_partners.add(partner_id)
             client = {}
             for field in client_fields:
                 client[field] = _value(rec, field)

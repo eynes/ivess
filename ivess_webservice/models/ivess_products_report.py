@@ -42,6 +42,7 @@ class IvessProductsReport(models.Model):
                         })
 
             tax = product.taxes_id.filtered(lambda t: t.group_type == "internals")[:1]
+            vat = product.taxes_id.filtered(lambda t: t.group_type == "vat")[:1]
 
             final_records.append({
                 "product_id": product.id,
@@ -57,6 +58,7 @@ class IvessProductsReport(models.Model):
                 "type": product.type,
                 "order": product.order,
                 "tax_amount": tax.amount if tax else 0,
+                "vat_amount": vat.amount if vat else 0,
                 "components": components,
             })
         return final_records

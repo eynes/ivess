@@ -11,4 +11,17 @@
         <field name="interval_type">days</field>
         <field name="active" eval="True" />
     </record>
+
+    <!-- Procesa las importaciones de facturas confirmadas. Lo dispara el
+         botón "Confirmar importación" (ir.cron._trigger); el intervalo de 5
+         minutos solo sirve para retomar una carga cortada por un reinicio. -->
+    <record id="ir_cron_invoice_import" model="ir.cron">
+        <field name="name">Importación de facturas: procesar confirmadas</field>
+        <field name="model_id" ref="model_ivess_invoice_import_wizard" />
+        <field name="state">code</field>
+        <field name="code">model._cron_process_pending()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True" />
+    </record>
 </odoo>
