@@ -8,3 +8,4 @@ from . import test_retention_summarized_debt
 from . import test_translation_repair
 from . import test_summary_job
 from . import test_summary_performance
+from . import test_undo_summary_closing
