@@ -34,10 +34,12 @@ export class ImportProgressBarField extends ProgressBarField {
         this.polling = true;
         try {
             const { resModel, resId } = this.props.record;
-            const [wizard] = await this.orm.read(resModel, [resId], [
-                "state",
-                "is_stalled",
-            ]);
+            // is_stalled solo existe en el wizard de cobros.
+            const readFields = ["state"];
+            if ("is_stalled" in this.props.record.fields) {
+                readFields.push("is_stalled");
+            }
+            const [wizard] = await this.orm.read(resModel, [resId], readFields);
             if (wizard.state !== "processing" || wizard.is_stalled) {
                 clearInterval(this.timer);
                 await this.actionService.doActionButton({

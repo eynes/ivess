@@ -243,6 +243,9 @@ class DeliveryRoute(models.Model):
     #         return user not in self.truck_id.user_assigned_ids
     #     return False
 
+    def unlink(self):
+        raise UserError(_('Los recorridos no se pueden eliminar.'))
+
     def action_set_synchronized(self):
         self.state = 'sincronizado'
 
@@ -797,8 +800,84 @@ class DeliveryRouteLine(models.Model):
             )
             rec.frequency = dist[:1].frequency if dist else False
 
+    @api.constrains('sequence', 'template_route_id', 'route_id')
+    def _check_template_sequence_unique(self):
+        """El orden de una plantilla no puede repetirse (T17813). Solo aplica a
+        las líneas de plantilla: en un recorrido se puede ordenar a mano y
+        'Ordenar por cercanía' reasigna posiciones sin esta restricción."""
+        if self.env.context.get('defer_template_sequence_check'):
+            # Escritura desde la plantilla (p. ej. arrastrar filas): el orden
+            # pasa por estados intermedios repetidos; se valida al terminar.
+            return
+        template_lines = self.filtered(lambda l: l.template_route_id and not l.route_id)
+        if not template_lines:
+            return
+        self.env['delivery.route.line'].flush_model(['sequence', 'template_route_id', 'route_id'])
+        self.env.cr.execute("""
+            SELECT t.name, drl.sequence, count(*)
+              FROM delivery_route_line drl
+              JOIN template_delivery_route t ON t.id = drl.template_route_id
+             WHERE drl.route_id IS NULL
+               AND drl.template_route_id IN %s
+             GROUP BY t.name, drl.template_route_id, drl.sequence
+            HAVING count(*) > 1
+             ORDER BY t.name, drl.sequence
+             LIMIT 5
+        """, (tuple(template_lines.template_route_id.ids),))
+        repeated = self.env.cr.fetchall()
+        if repeated:
+            detail = ', '.join(
+                _('%(template)s: orden %(seq)s (%(n)s clientes)', template=name, seq=seq, n=n)
+                for name, seq, n in repeated
+            )
+            raise ValidationError(_(
+                'El orden de los clientes no puede repetirse dentro de una plantilla. %s',
+                detail,
+            ))
+
+    @api.model
+    def _renumber_template_lines(self, templates):
+        """Deja el orden de cada plantilla consecutivo (1, 2, 3...) sin cambiar
+        el orden relativo. Se usa al borrar clientes, para no dejar huecos
+        (T17813)."""
+        lines = self.search(
+            [('template_route_id', 'in', templates.ids), ('route_id', '=', False)],
+            order='template_route_id, sequence, id',
+        )
+        position = {}
+        for line in lines:
+            tid = line.template_route_id.id
+            position[tid] = position.get(tid, 0) + 1
+            if line.sequence != position[tid]:
+                # Se renumera en pasos intermedios con repetidos transitorios.
+                line.with_context(defer_template_sequence_check=True).sequence = position[tid]
+
+    @api.model
+    def _assign_template_sequences(self, vals_list):
+        """Las líneas de plantilla nuevas sin orden propio (o con el 10 por
+        defecto ya ocupado) toman el siguiente libre de su plantilla, que
+        arranca en 1. Evita que todas queden en 10 (T17813)."""
+        default = self._fields['sequence'].default(self)
+        next_by_template = {}
+        for vals in vals_list:
+            template_id = vals.get('template_route_id')
+            if not template_id or vals.get('route_id'):
+                continue
+            if template_id not in next_by_template:
+                self.env.cr.execute(
+                    "SELECT COALESCE(MAX(sequence), 0) FROM delivery_route_line"
+                    " WHERE template_route_id = %s AND route_id IS NULL", (template_id,))
+                next_by_template[template_id] = self.env.cr.fetchone()[0]
+            if vals.get('sequence') in (None, False, default):
+                next_by_template[template_id] += 1
+                vals['sequence'] = next_by_template[template_id]
+            else:
+                next_by_template[template_id] = max(next_by_template[template_id], vals['sequence'])
+        return vals_list
+
     @api.model_create_multi
     def create(self, vals_list):
+        vals_list = self._assign_template_sequences([dict(vals) for vals in vals_list])
         recs = super().create(vals_list)
 
         for rec, vals in zip(recs, vals_list):
@@ -924,6 +1003,13 @@ class DeliveryRouteLine(models.Model):
             }])
 
     def unlink(self):
+        templates = self.filtered(lambda l: l.template_route_id and not l.route_id).template_route_id
+        res = self._unlink_route_lines()
+        if templates and not self.env.context.get('defer_template_sequence_check'):
+            self.env['delivery.route.line']._renumber_template_lines(templates)
+        return res
+
+    def _unlink_route_lines(self):
         for rec in self:
             reason = rec.reason_customer_withdrawal
 

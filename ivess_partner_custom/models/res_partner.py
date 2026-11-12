@@ -29,6 +29,12 @@ class ResPartner(models.Model):
     requiere_comprobante = fields.Boolean(
         string="Requiere Factura",
     )
+    birthdate = fields.Date(string="Fecha de nacimiento")
+    neighborhood_id = fields.Many2one(
+        "res.city.neighborhood",
+        string="Barrio",
+        domain="[('city_id', '=?', city_id)]",
+    )
     _customer_code_uniq = models.Constraint(
         "unique(customer_code)",
         "El código de cliente ya existe. No se puede repetir, tampoco el de una cuenta dada de baja.",

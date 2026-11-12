@@ -84,6 +84,23 @@ class TemplateDeliveryRoute(models.Model):
         tracking=True,
         # help="Reflects the cash‑sale setting of the associated delivery number."
     )
+    @api.model_create_multi
+    def create(self, vals_list):
+        deferred = self.with_context(defer_template_sequence_check=True)
+        templates = super(TemplateDeliveryRoute, deferred).create(vals_list)
+        templates.delivery_route_line_ids._check_template_sequence_unique()
+        self.env['delivery.route.line']._renumber_template_lines(templates)
+        return templates
+
+    def write(self, vals):
+        if 'delivery_route_line_ids' not in vals:
+            return super().write(vals)
+        deferred = self.with_context(defer_template_sequence_check=True)
+        res = super(TemplateDeliveryRoute, deferred).write(vals)
+        self.delivery_route_line_ids._check_template_sequence_unique()
+        self.env['delivery.route.line']._renumber_template_lines(self)
+        return res
+
     @api.depends(
         'day',
         'delivery_number_id',
