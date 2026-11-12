@@ -1,0 +1,30 @@
+<odoo>
+    <record id="view_ivess_undo_summary_closing_wizard_form" model="ir.ui.view">
+        <field name="name">ivess.undo.summary.closing.wizard.form</field>
+        <field name="model">ivess.undo.summary.closing.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Deshacer Cierre Mensual">
+                <p>
+                    Se va a deshacer el cierre del asiento
+                    <field name="move_id" readonly="1" class="oe_inline" />:
+                    se eliminan el asiento resumen y los neteos de los diarios
+                    operativos, y los comprobantes quedan disponibles para un
+                    nuevo cierre.
+                </p>
+                <group>
+                    <field name="closed_count" />
+                    <field name="netting_count" />
+                </group>
+                <footer>
+                    <button
+            name="action_confirm"
+            type="object"
+            string="Deshacer cierre"
+            class="btn-primary"
+          />
+                    <button string="Cancelar" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

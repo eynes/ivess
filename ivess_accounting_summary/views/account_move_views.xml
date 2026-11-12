@@ -4,6 +4,16 @@
         <field name="model">account.move</field>
         <field name="inherit_id" ref="account.view_move_form" />
         <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <field name="x_is_legal_summary_entry" invisible="1" />
+                <button
+          name="action_undo_summary_closing"
+          type="object"
+          string="Deshacer cierre"
+          groups="account.group_account_manager"
+          invisible="not x_is_legal_summary_entry or x_folio_legal or not x_summarized_move_count"
+        />
+            </xpath>
             <xpath expr="//div[@name='button_box']" position="inside">
                 <button
           name="action_view_summarized_moves"

@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import RedirectWarning, UserError
 
 
 class AccountMove(models.Model):
@@ -43,6 +43,10 @@ class AccountMove(models.Model):
             "campo solo indica en qué cierre mensual quedó resumido (su "
             "importe fue a la cuenta puente, sin línea propia por partner)."
         ),
+    )
+    x_is_legal_summary_entry = fields.Boolean(
+        string="Es Asiento Resumen Legal",
+        compute="_compute_x_is_legal_summary_entry",
     )
     x_summarized_move_count = fields.Integer(
         string="Comprobantes Resumidos",
@@ -91,6 +95,171 @@ class AccountMove(models.Model):
                 )
             )
         return super().button_draft()
+
+    # ------------------------------------------------------------------
+    # Deshacer un Cierre Mensual
+    # ------------------------------------------------------------------
+    @api.depends("x_is_summary_entry", "journal_id.x_is_legal_journal")
+    def _compute_x_is_legal_summary_entry(self):
+        for move in self:
+            move.x_is_legal_summary_entry = bool(
+                move.x_is_summary_entry and move.journal_id.x_is_legal_journal
+            )
+
+    def _ivess_is_legal_summary_move(self):
+        self.ensure_one()
+        return bool(self.x_is_summary_entry and self.journal_id.x_is_legal_journal)
+
+    def _ivess_summary_closed_moves(self):
+        """Comprobantes que este asiento resumen legal absorbió."""
+        self.ensure_one()
+        return self.with_context(active_test=False).search(
+            [("x_closed_by_summary_move_id", "=", self.id)]
+        )
+
+    def _ivess_summary_netting_moves(self):
+        """Asientos de neteo (diarios operativos) de este cierre.
+
+        El asiento legal no los referencia: se llega a ellos desde los
+        apuntes de los comprobantes cerrados, que quedaron marcados con el
+        neteo que los procesó (x_summary_move_id)."""
+        self.ensure_one()
+        lines = self.env["account.move.line"].search(
+            [
+                ("move_id", "in", self._ivess_summary_closed_moves().ids),
+                ("x_summary_move_id", "!=", False),
+            ]
+        )
+        return lines.x_summary_move_id
+
+    def _ivess_check_can_undo_summary(self):
+        self.ensure_one()
+        if self.x_folio_legal:
+            raise UserError(
+                _(
+                    "No se puede deshacer el cierre: el asiento %s ya tiene "
+                    "folio legal asignado (%s). Eliminarlo dejaría un hueco "
+                    "en la numeración correlativa del libro diario.",
+                    self.display_name,
+                    self.x_folio_legal,
+                )
+            )
+        if self.line_ids.matched_debit_ids or self.line_ids.matched_credit_ids:
+            raise UserError(
+                _(
+                    "No se puede deshacer el cierre: el asiento %s tiene "
+                    "cobros o pagos aplicados sobre sus líneas de deuda. "
+                    "Desconciliá esos pagos primero.",
+                    self.display_name,
+                )
+            )
+
+    def _ivess_undo_summary_netting(self, netting_moves, closed_moves):
+        """Deja los comprobantes como estaban antes del cierre: desconcilia
+        y elimina los neteos y limpia las marcas que impedían volver a
+        resumirlos."""
+        cr = self.env.cr
+        # Primero las marcas, después la desconciliación: así Odoo recalcula
+        # el estado de pago de los comprobantes ya sin "Cerrado por Resumen".
+        if netting_moves:
+            cr.execute(
+                "UPDATE account_move_line SET x_summary_move_id = NULL "
+                "WHERE x_summary_move_id = ANY(%s)",
+                [netting_moves.ids],
+            )
+        if closed_moves:
+            cr.execute(
+                "UPDATE account_move SET x_closed_by_summary_move_id = NULL "
+                "WHERE id = ANY(%s)",
+                [closed_moves.ids],
+            )
+        self.env["account.move.line"].invalidate_model(["x_summary_move_id"])
+        self.env["account.move"].invalidate_model(["x_closed_by_summary_move_id"])
+        if netting_moves:
+            netting_moves.line_ids.remove_move_reconcile()
+            netting_moves.filtered(lambda m: m.state == "posted").button_draft()
+            netting_moves.unlink()
+
+    def _ivess_undo_summary_closing(self):
+        for move in self:
+            move._ivess_check_can_undo_summary()
+            move._ivess_undo_summary_netting(
+                move._ivess_summary_netting_moves(),
+                move._ivess_summary_closed_moves(),
+            )
+
+    @api.model
+    def _ivess_orphan_summary_netting_moves(self):
+        """Neteos de cierres cuyo asiento resumen legal ya no existe (se
+        borró antes de que el borrado deshiciera el cierre): sus comprobantes
+        quedaron sin 'Cerrado por Resumen' pero con el neteo vigente."""
+        netting = self.search(
+            [
+                ("x_is_summary_entry", "=", True),
+                ("journal_id.x_is_legal_journal", "=", False),
+            ]
+        )
+        orphans = self.browse()
+        Line = self.env["account.move.line"]
+        for move in netting:
+            marked = Line.search([("x_summary_move_id", "=", move.id)])
+            if not marked.move_id.x_closed_by_summary_move_id:
+                orphans |= move
+        return orphans
+
+    @api.model
+    def _ivess_undo_orphan_summary_closings(self):
+        orphans = self._ivess_orphan_summary_netting_moves()
+        self._ivess_undo_summary_netting(orphans, self.browse())
+        return orphans.ids
+
+    def _ivess_undo_summary_wizard_action(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Deshacer Cierre Mensual"),
+            "res_model": "ivess.undo.summary.closing.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {"default_move_id": self.id},
+        }
+
+    def action_undo_summary_closing(self):
+        """Abre la confirmación con la cantidad de comprobantes y neteos que
+        se van a revertir."""
+        self.ensure_one()
+        if not self._ivess_is_legal_summary_move():
+            raise UserError(_("Solo se puede deshacer un asiento resumen del Diario Legal."))
+        self._ivess_check_can_undo_summary()
+        return self._ivess_undo_summary_wizard_action()
+
+    def unlink(self):
+        # Borrar el asiento resumen deshace el cierre: sin esto los
+        # comprobantes quedan marcados como neteados y no se pueden volver
+        # a resumir. Desde la pantalla se pasa por la confirmación con las
+        # cantidades (RedirectWarning); el contexto ivess_undo_confirmed
+        # indica que ya se confirmó.
+        legal = self.filtered(lambda m: m._ivess_is_legal_summary_move())
+        if (
+            len(legal) == 1
+            and not self.env.context.get("ivess_undo_confirmed")
+            and (legal._ivess_summary_closed_moves() or legal._ivess_summary_netting_moves())
+        ):
+            legal._ivess_check_can_undo_summary()
+            raise RedirectWarning(
+                _(
+                    "Eliminar el asiento %(move)s deshace el Cierre Mensual: se "
+                    "revierten %(closed)s comprobantes y %(netting)s neteos de los "
+                    "diarios operativos. Confirmá con «Deshacer cierre».",
+                    move=legal.display_name,
+                    closed=len(legal._ivess_summary_closed_moves()),
+                    netting=len(legal._ivess_summary_netting_moves()),
+                ),
+                legal._ivess_undo_summary_wizard_action(),
+                _("Deshacer cierre"),
+            )
+        legal._ivess_undo_summary_closing()
+        return super().unlink()
 
     def action_view_summarized_moves(self):
         self.ensure_one()
