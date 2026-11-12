@@ -1,6 +1,6 @@
 {
     "name": "Ivess Accounting Summary",
-    "version": "19.0.0.0.3",
+    "version": "19.0.0.0.4",
     "summary": "Contabilidad Resumida (Diarios Espejo) y Foliación Legal",
     "description": """
         Contabilidad Resumida (Diarios Espejo). Los diarios operativos
@@ -28,6 +28,14 @@
           apuntes (500), cada una en su transacción. Si falla, queda el motivo
           y se reintenta desde Contabilidad > Cierre > Cierres Mensuales en
           Proceso sin repetir lo ya hecho.
+
+        - Deshacer Cierre Mensual: borrar el asiento resumen del Diario
+          Legal (o usar el botón "Deshacer cierre", con confirmación que
+          muestra cuántos comprobantes y neteos se revierten) desconcilia y
+          elimina los neteos de los diarios operativos y limpia las marcas
+          de los comprobantes, que vuelven a poder resumirse. Se bloquea si
+          el asiento tiene folio legal o cobros aplicados sobre sus líneas
+          de deuda.
 
         - Fase 2 - Asistente de Cierre Mensual (Contabilidad > Cierre):
           dado un período y los diarios operativos a resumir, en una
@@ -78,6 +86,7 @@
         "wizard/account_summary_closing_wizard_views.xml",
         "views/account_summary_job_views.xml",
         "wizard/legal_folio_renumber_wizard_views.xml",
+        "wizard/undo_summary_closing_wizard_views.xml",
         "wizard/journal_ledger_wizard_views.xml",
         "wizard/general_ledger_wizard_views.xml",
         "report/journal_ledger_templates.xml",
