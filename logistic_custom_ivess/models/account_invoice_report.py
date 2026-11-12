@@ -32,6 +32,19 @@ class AccountInvoiceReport(models.Model):
         string="Monto IVA Compras",
         readonly=True,
     )
+    iva_ventas_tax_id = fields.Many2one(
+        "account.tax",
+        string="IVA Ventas",
+        readonly=True,
+        domain=[
+            ("tax_group_id.group_type", "=", "vat"),
+            ("type_tax_use", "=", "sale"),
+        ],
+    )
+    iva_ventas_amount = fields.Float(
+        string="Monto IVA Ventas",
+        readonly=True,
+    )
 
     # _depends es un atributo de clase plano (no se mergea al heredar, ver
     # odoo/orm/models.py), así que hay que reconstruirlo incluyendo el del
@@ -62,7 +75,8 @@ class AccountInvoiceReport(models.Model):
         # mucho un IVA de compras, así que el LIMIT 1 de ese JOIN es seguro.
         # El monto se calcula igual que price_subtotal_to_PDF en
         # l10n_ar_eynes (base * alícuota/100): todo el IVA argentino
-        # cargado es de tipo "percent".
+        # cargado es de tipo "percent". IVA Ventas es el espejo para
+        # impuestos de tipo "sale" (facturas de cliente).
         return SQL(
             """%s,
                 template.area_id                   AS area_id,
@@ -70,7 +84,11 @@ class AccountInvoiceReport(models.Model):
                 iva_compras_tax.tax_id              AS iva_compras_tax_id,
                 -line.balance * account_currency_table.rate
                     * COALESCE(iva_compras_tax.tax_amount, 0.0) / 100
-                                                    AS iva_compras_amount
+                                                    AS iva_compras_amount,
+                iva_ventas_tax.tax_id               AS iva_ventas_tax_id,
+                -line.balance * account_currency_table.rate
+                    * COALESCE(iva_ventas_tax.tax_amount, 0.0) / 100
+                                                    AS iva_ventas_amount
             """,
             super()._select(),
         )
@@ -89,6 +107,16 @@ class AccountInvoiceReport(models.Model):
                         AND tax.type_tax_use = 'purchase'
                     LIMIT 1
                 ) iva_compras_tax ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT tax.id AS tax_id, tax.amount AS tax_amount
+                    FROM account_move_line_account_tax_rel rel
+                    JOIN account_tax tax ON tax.id = rel.account_tax_id
+                    JOIN account_tax_group tax_group ON tax_group.id = tax.tax_group_id
+                    WHERE rel.account_move_line_id = line.id
+                        AND tax_group.group_type = 'vat'
+                        AND tax.type_tax_use = 'sale'
+                    LIMIT 1
+                ) iva_ventas_tax ON TRUE
             """,
             super()._from(),
         )
