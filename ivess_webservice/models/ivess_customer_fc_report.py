@@ -74,7 +74,7 @@ class IvessCustomerFcReport(models.Model):
             if code not in grouped:
                 grouped[code] = {"customer_code": code, "equipment": []}
             grouped[code]["equipment"].append({
-                "lot_id": rec["lot_id"],
+                "lot_number": rec["lot_id"],
                 "default_code": rec["default_code"],
             })
         return list(grouped.values())

@@ -69,7 +69,7 @@ class IvessFcStockInTruck(models.Model):
                 grouped[key] = {
                     'default_code': code,
                     'other_attributes': {
-                        'lot_id': lot_id,
+                        'lot_number': lot_id,
                     },
                 }
 
