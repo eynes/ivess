@@ -639,6 +639,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                 payment_mode_by_key,
                 check_ctx,
                 expected_total=self._expected_applied_total(group),
+                retention_only=self._is_retention_only(group),
             )
 
         partner_results = {}
@@ -767,6 +768,26 @@ class IvessPaymentImportWizard(models.TransientModel):
         partner, partner_error = cache["partner_results"][index]
         if partner_error:
             errors.append(partner_error)
+
+        if self._is_retention_only(group) and not importe_total:
+            # El sistema origen informa total 0 en los recibos de solo
+            # retenciones: el total del recibo es la suma de las retenciones.
+            try:
+                importe_total = sum(
+                    self._to_float(amount)
+                    for _code, amount in group.get("retenciones") or []
+                    if amount not in (None, "")
+                )
+            except (TypeError, ValueError):
+                importe_total = 0.0
+            else:
+                warnings.append(
+                    _(
+                        "El recibo informa importe total 0: se toma la suma de"
+                        " las retenciones (%.2f) como total."
+                    )
+                    % importe_total
+                )
 
         retention_vals, retention_errors = self._resolve_retentions(
             group, cache, importe_total
@@ -1228,6 +1249,36 @@ class IvessPaymentImportWizard(models.TransientModel):
         return total - (retentions if on_account else 0.0)
 
     @staticmethod
+    def _is_retention_only(group):
+        """Recibo cuyo total son solo retenciones: sin comprobantes
+        asociados, sin medio de pago y sin importe del movimiento. No
+        necesita medio de pago (no se cobró nada fuera de las retenciones)."""
+        lines = group["lines"]
+        retentions = group.get("retenciones") or []
+        if not lines or not any(
+            amount not in (None, "") for _code, amount in retentions
+        ):
+            return False
+        return all(
+            IvessPaymentImportWizard._is_on_account_line(line)
+            and not line["medio_pago"]
+            and not IvessPaymentImportWizard._safe_amount_of(line)
+            for line in lines
+        )
+
+    @staticmethod
+    def _safe_amount_of(line):
+        cell = (
+            line["importe_movimiento_moneda_local"]
+            if line["importe_movimiento_moneda_local"] is not None
+            else line["importe_movimiento"]
+        )
+        try:
+            return IvessPaymentImportWizard._to_float(cell)
+        except (TypeError, ValueError):
+            return 0.0
+
+    @staticmethod
     def _movement_key(line):
         """Identifica el movimiento de pago de una línea: el mismo cheque, o
         el mismo medio/caja/banco/importe."""
@@ -1311,6 +1362,7 @@ class IvessPaymentImportWizard(models.TransientModel):
         payment_mode_by_key,
         check_ctx=None,
         expected_total=None,
+        retention_only=False,
     ):
         detail_vals = []
         errors = []
@@ -1347,7 +1399,11 @@ class IvessPaymentImportWizard(models.TransientModel):
                     line["numero_compr_asoc"],
                 )
 
-            if on_account:
+            if retention_only:
+                # Recibo de solo retenciones: no hay medio de pago ni importe
+                # del movimiento; el total lo cubren las retenciones.
+                importe = 0.0
+            elif on_account:
                 # Recibo sin factura asociada (pago a cuenta): no hay
                 # columna "importe" aplicado, el monto es el del movimiento
                 # (en moneda local).
@@ -1407,24 +1463,30 @@ class IvessPaymentImportWizard(models.TransientModel):
                         _("La factura '%s' no está confirmada (estado: %s).")
                         % (invoice_ref, invoice.state)
                     )
-                elif (
-                    applied_by_invoice.get(invoice, 0.0) + importe
-                    - invoice.amount_residual
-                    > 0.01
-                ):
-                    # account.payment.order.line._check_amount_over_original()
-                    # (l10n_ar_eynes) rechaza con un error genérico en inglés
-                    # si el importe supera el saldo pendiente: se valida acá
-                    # antes para dar un error claro en la previsualización en
-                    # vez de que reviente recién al confirmar.
-                    line_errors.append(
-                        _(
-                            "El importe aplicado (%.2f) supera el saldo"
-                            " pendiente de la factura '%s' (%.2f)."
-                        )
-                        % (importe, invoice_ref, invoice.amount_residual)
-                    )
                 else:
+                    # Si el importe supera el saldo pendiente de la factura
+                    # no es un error: se imputa solo el saldo (ver
+                    # _prepare_income_line_vals) y el resto queda a cuenta
+                    # del cliente (el recibo deja la diferencia abierta).
+                    excess = (
+                        applied_by_invoice.get(invoice, 0.0)
+                        + importe
+                        - invoice.amount_residual
+                    )
+                    if excess > 0.01:
+                        warnings.append(
+                            _(
+                                "El importe (%.2f) supera el saldo pendiente de"
+                                " la factura '%s' (%.2f): se imputa el saldo y"
+                                " el resto (%.2f) queda a cuenta."
+                            )
+                            % (
+                                importe,
+                                invoice_ref,
+                                invoice.amount_residual,
+                                min(excess, importe),
+                            )
+                        )
                     matched_partners.add(invoice.partner_id)
                     applied_total += importe
                     applied_by_invoice[invoice] = (
@@ -1443,7 +1505,9 @@ class IvessPaymentImportWizard(models.TransientModel):
                 line_errors.extend(check_errors)
             elif line["medio_pago"]:
                 payment_mode = self._lookup_payment_mode(payment_mode_by_key, line)
-            if not line["medio_pago"]:
+            if retention_only:
+                pass
+            elif not line["medio_pago"]:
                 line_errors.append(_("El recibo no informa medio de pago."))
             elif not is_check and not payment_mode:
                 line_errors.append(
@@ -1925,15 +1989,20 @@ class IvessPaymentImportWizard(models.TransientModel):
     @staticmethod
     def _prepare_retention_line_vals(result_line):
         """Una account.payment.order.retention.line por cada retención del
-        Excel (monto tal cual, la base es el importe total del recibo)."""
+        Excel: monto tal cual, base = el mismo monto de la retención (el
+        Excel no informa la base imponible) y número de certificado = número
+        del recibo."""
         return [
             {
                 "retention_id": retention.tax_id.id,
                 "name": retention.tax_id.name,
                 "account_id": retention.tax_id.get_retention_account().id,
                 "amount": retention.importe,
-                "base": result_line.importe_total,
-                "base_amount": result_line.importe_total,
+                "base": retention.importe,
+                "base_amount": retention.importe,
+                "certificate_no": IvessPaymentImportWizard._receipt_number(
+                    result_line
+                ),
                 "date": result_line.fecha,
             }
             for retention in result_line.retention_line_ids
@@ -1979,7 +2048,7 @@ class IvessPaymentImportWizard(models.TransientModel):
                 key = (detail.nro_cheque, detail.bank_id.id)
                 check_amounts[key] = check_amounts.get(key, 0.0) + detail.importe
                 check_detail.setdefault(key, detail)
-            else:
+            elif detail.payment_mode_id:
                 journal = detail.payment_mode_id
                 mode_amounts[journal] = mode_amounts.get(journal, 0.0) + detail.importe
 
@@ -2089,9 +2158,18 @@ class IvessPaymentImportWizard(models.TransientModel):
                     "move_line_id": move_line.id,
                     "account_id": move_line.account_id.id,
                     "amount": detail.importe,
+                    "_residual": move_line.amount_residual,
                     "type": "income",
                     "currency_id": currency.id,
                     "original_currency_id": company.currency_id.id,
                 }
             )
-        return income_vals
+        # Se imputa como máximo el saldo pendiente de la factura; lo que
+        # sobre queda a cuenta del cliente (diferencia abierta del recibo).
+        result = []
+        for vals in income_vals:
+            residual = vals.pop("_residual")
+            vals["amount"] = min(vals["amount"], residual)
+            if vals["amount"] > 0.005:
+                result.append(vals)
+        return result
