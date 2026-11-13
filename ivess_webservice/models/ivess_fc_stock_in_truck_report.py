@@ -63,14 +63,13 @@ class IvessFcStockInTruck(models.Model):
         grouped = {}
         for rec in raw_records:
             code = rec['default_code']
-            lot_id, serial_number = rec['lot_id'] or (False, False)
+            lot_id = rec['lot_id'][1] if rec['lot_id'] else False
             key = (code, lot_id)
             if key not in grouped:
                 grouped[key] = {
                     'default_code': code,
                     'other_attributes': {
-                        'serial_number': serial_number,
-                        'lot_id': lot_id,
+                        'lot_number': lot_id,
                     },
                 }
 
