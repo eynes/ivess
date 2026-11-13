@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Maintenance Portal - Ivess',
-    'version': '19.0.0.0.0',
+    'version': '19.0.0.0.1',
     'author': 'Eynes',
     'category': 'Maintenance',
     'summary': 'Vista portal para órdenes de mantenimiento',
