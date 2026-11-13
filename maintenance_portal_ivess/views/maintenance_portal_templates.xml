@@ -884,12 +884,12 @@
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">Fecha programada</label>
                                 <input type="datetime-local" name="schedule_date" class="form-control"
-                                       t-att-value="maint_request.schedule_date.strftime('%Y-%m-%dT%H:%M') if maint_request.schedule_date else ''"/>
+                                       t-att-value="utc_to_local_input(maint_request.schedule_date)"/>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">Finalización programada</label>
                                 <input type="datetime-local" name="schedule_end" class="form-control"
-                                       t-att-value="maint_request.schedule_end.strftime('%Y-%m-%dT%H:%M') if maint_request.schedule_end else ''"/>
+                                       t-att-value="utc_to_local_input(maint_request.schedule_end)"/>
                             </div>
                         </div>
 
@@ -1908,12 +1908,12 @@
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">Fecha programada</label>
                                 <input type="datetime-local" name="schedule_date" class="form-control"
-                                       t-att-value="maint_request.schedule_date.strftime('%Y-%m-%dT%H:%M') if maint_request.schedule_date else ''"/>
+                                       t-att-value="utc_to_local_input(maint_request.schedule_date)"/>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">Fin programado</label>
                                 <input type="datetime-local" name="schedule_end" class="form-control"
-                                       t-att-value="maint_request.schedule_end.strftime('%Y-%m-%dT%H:%M') if maint_request.schedule_end else ''"/>
+                                       t-att-value="utc_to_local_input(maint_request.schedule_end)"/>
                             </div>
                         </div>
 

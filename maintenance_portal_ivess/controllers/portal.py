@@ -3,6 +3,8 @@ import json
 import logging
 import re
 from datetime import datetime as _dt
+
+import pytz
 from odoo import http
 from odoo.http import request
 from odoo.addons.portal.controllers.portal import CustomerPortal, pager as portal_pager
@@ -104,6 +106,7 @@ class MaintenancePortalController(CustomerPortal):
             'priority_options': _PRIORITY_OPTIONS,
             'kanban_state_options': _KANBAN_STATE_OPTIONS,
             'maintenance_for_options': [('equipment', 'Equipo'), ('workcenter', 'Centro de trabajo')],
+            'utc_to_local_input': self._maint_utc_to_local_input,
         }
 
     def _maint_cast_int(self, raw):
@@ -116,6 +119,30 @@ class MaintenancePortalController(CustomerPortal):
         except ValueError:
             return None
         return val or None
+
+    def _maint_user_tz(self):
+        """Zona horaria del usuario del portal (fallback: Argentina)."""
+        tz_name = request.env.user.tz or request.env.context.get('tz') or 'America/Argentina/Buenos_Aires'
+        try:
+            return pytz.timezone(tz_name)
+        except pytz.UnknownTimeZoneError:
+            return pytz.timezone('America/Argentina/Buenos_Aires')
+
+    def _maint_local_to_utc(self, raw):
+        """'YYYY-MM-DDTHH:MM' (hora local del usuario, como la manda el input
+        datetime-local) -> datetime naive en UTC, que es como Odoo guarda los Datetime.
+        Lanza ValueError si el formato no es válido."""
+        local_naive = _dt.strptime(raw, '%Y-%m-%dT%H:%M')
+        local_aware = self._maint_user_tz().localize(local_naive, is_dst=False)
+        return local_aware.astimezone(pytz.utc).replace(tzinfo=None)
+
+    def _maint_utc_to_local_input(self, value):
+        """datetime naive en UTC -> 'YYYY-MM-DDTHH:MM' en hora local, para el value
+        del input datetime-local. '' si no hay valor."""
+        if not value:
+            return ''
+        local = pytz.utc.localize(value).astimezone(self._maint_user_tz())
+        return local.strftime('%Y-%m-%dT%H:%M')
 
     def _maint_parse_date(self, raw):
         """'YYYY-MM-DD' -> date, o None. Mismo estilo try/except que ya usa el archivo
@@ -343,7 +370,7 @@ class MaintenancePortalController(CustomerPortal):
             raw = (post.get(field) or '').strip()
             if raw:
                 try:
-                    vals[field] = _dt.strptime(raw, '%Y-%m-%dT%H:%M')
+                    vals[field] = self._maint_local_to_utc(raw)
                 except ValueError:
                     pass
             else:
@@ -448,7 +475,7 @@ class MaintenancePortalController(CustomerPortal):
             raw = (post.get(field) or '').strip()
             if raw:
                 try:
-                    vals[field] = _dt.strptime(raw, '%Y-%m-%dT%H:%M')
+                    vals[field] = self._maint_local_to_utc(raw)
                 except ValueError:
                     pass
 
