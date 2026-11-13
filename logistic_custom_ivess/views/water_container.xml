@@ -10,6 +10,7 @@
                 <field name="company_id" groups="base.group_multi_company" optional="show"/>
                 <field name="product_id"/>
                 <field name="quantity"/>
+                <field name="lot_id" optional="hide"/>
                 <field name="assignment_date"/>
                 <field name="return_date"/>
                 <field name="state"/>
@@ -45,6 +46,7 @@
                         <field name="company_id" groups="base.group_multi_company"/>
                         <field name="product_id"/>
                         <field name="quantity" readonly="1"/>
+                        <field name="lot_id" optional="hide"/>
                         <field name="assignment_date" required="1"/>
                         <field name="return_date"/>
                         <field name="state" required="1"/>
