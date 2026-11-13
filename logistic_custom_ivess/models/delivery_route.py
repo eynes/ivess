@@ -640,6 +640,21 @@ class DeliveryRouteLine(models.Model):
         string='Remito de retiro',
         help='Picking de entrada con los envases que el repartidor retiro del cliente en esta visita.',
     )
+    replacement_out_picking_id = fields.Many2one(
+        'stock.picking',
+        string='Remito de recambio (entrega)',
+        help='Picking de salida con los envases que el repartidor entrego al cliente en el recambio de esta visita.',
+    )
+    replacement_in_picking_id = fields.Many2one(
+        'stock.picking',
+        string='Remito de recambio (retiro)',
+        help='Picking de entrada con los envases que el repartidor recupero del cliente en el recambio de esta visita.',
+    )
+    replacement_reason_id = fields.Many2one(
+        'replacement.reason',
+        string='Motivo de recambio',
+        help='Motivo del recambio de envases de esta visita. Es uno solo por visita.',
+    )
     delivery_date = fields.Date(
         string='Fecha de Visita',
         related='route_id.delivery_date',
@@ -999,6 +1014,9 @@ class DeliveryRouteLine(models.Model):
                 'sale_order_id': rec.sale_order_id.id,
                 'stock_picking_id': rec.stock_picking_id.id,
                 'withdrawal_picking_id': rec.withdrawal_picking_id.id,
+                'replacement_out_picking_id': rec.replacement_out_picking_id.id,
+                'replacement_in_picking_id': rec.replacement_in_picking_id.id,
+                'replacement_reason_id': rec.replacement_reason_id.id,
                 'origin': 'rastrillo',
             }])
 

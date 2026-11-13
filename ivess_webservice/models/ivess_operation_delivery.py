@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-
 from odoo import Command, api, models
 from odoo.exceptions import UserError
 from odoo.fields import Domain
@@ -9,16 +8,21 @@ import pytz
 from ..utils.delivery_params import (
     BASIC_HEADER_SCHEMA,
     CONTAINER_STATE,
+    REPLACEMENT_ITEMS,
+    REPLACEMENT_REASON_KEY,
     SALE_ITEMS,
     WITHDRAWAL_ITEMS,
-    WithdrawalAvailability,
+    CustomerContainers,
     case_param_names,
     requires_container_state,
+    validate_allows_replacement,
     validate_case_params,
+    validate_customer_availability,
     validate_header,
+    validate_is_container,
     validate_series,
+    validate_series_overlap,
     validate_tipo,
-    validate_withdrawal_availability,
 )
 
 APP_DATETIME_FORMAT = "%Y-%m-%d %H%M"
@@ -34,6 +38,9 @@ ROUTE_LINE_VISIT_FIELDS = (
     "sale_order_id",
     "stock_picking_id",
     "withdrawal_picking_id",
+    "replacement_out_picking_id",
+    "replacement_in_picking_id",
+    "replacement_reason_id",
 )
 
 
@@ -47,14 +54,23 @@ class SaleOutcome:
 
 
 @dataclass
-class WithdrawalOutcome:
-    """Resultado del retiro de envases: picking y errores no fatales.
-    Sin picking y con create_error, no se llego a crear. Con picking y
-    confirm_error, quedo en borrador."""
+class PickingOutcome:
+    """Resultado de un picking de envases (retiro, o un lado del recambio):
+    picking y errores no fatales. Sin picking y con create_error, no se llego
+    a crear. Con picking y confirm_error, quedo en borrador. Con
+    validate_error, quedo sin validar (error al validar o falta de stock)."""
     picking: models.BaseModel
     create_error: str | bool = False
     confirm_error: str | bool = False
     validate_error: str | bool = False
+
+
+@dataclass
+class ReplacementOutcome:
+    """Resultado del recambio de envases: el picking de salida (envase
+    entregado al cliente) y el de entrada (envase recibido del cliente)."""
+    out: PickingOutcome
+    in_: PickingOutcome
 
 
 class IvessOperationDelivery(models.AbstractModel):
@@ -64,13 +80,16 @@ class IvessOperationDelivery(models.AbstractModel):
     @api.model
     def send_operation(self, **kwargs):
         """Registra la visita de un reparto: con venta o con motivo de no compra,
-        y en ambos casos con o sin retiro de envases (el retiro nunca va solo).
+        y en ambos casos con o sin retiro y recambio de envases (ninguno de los
+        dos va solo).
 
         Fases: validar parametros -> resolver registros (ubicacion, reparto,
-        cliente, recorrido) y la linea de la visita (un reintento responde sin
-        escribir) -> validar la venta y el retiro contra productos, series y
-        envases del cliente -> crear y confirmar la venta, preparar y validar su
-        picking -> crear y validar el picking de retiro -> escribir o crear la
+        cliente, motivo de recambio, recorrido) y la linea de la visita (un
+        reintento responde sin escribir) -> validar la venta, el retiro y el
+        recambio contra productos, series y envases del cliente -> crear y
+        confirmar la venta, preparar y validar su picking -> crear y validar el
+        picking de retiro -> crear y validar los pickings del recambio (salida
+        del envase entregado y entrada del recibido) -> escribir o crear la
         linea del recorrido -> responder.
 
         Todas las validaciones van antes de cualquier escritura: un return de
@@ -107,6 +126,8 @@ class IvessOperationDelivery(models.AbstractModel):
         fuera_ruta = kwargs["fuera_ruta"]
         item_venta = kwargs.get(SALE_ITEMS.list_key) or []
         item_retiro = kwargs.get(WITHDRAWAL_ITEMS.list_key) or []
+        item_recambio = kwargs.get(REPLACEMENT_ITEMS.list_key) or []
+        motivo_recambio_id = kwargs.get(REPLACEMENT_REASON_KEY)
 
         # Fase 3: resolver registros (ubicacion, reparto, cliente, motivo,
         # recorrido) y la linea de la visita. Un reintento responde sin escribir.
@@ -132,6 +153,11 @@ class IvessOperationDelivery(models.AbstractModel):
         if not motivo_no_compra and motivo_no_compra_id != 0:
             return {"error": "No existe motivo de no compra con id: %s" % motivo_no_compra_id}
 
+        if item_recambio:
+            motivo_recambio = self.env["replacement.reason"].search([("id", "=", motivo_recambio_id)], limit=1)
+            if not motivo_recambio:
+                return {"error": "No existe motivo de recambio con id: %s" % motivo_recambio_id}
+
         recorrido = self.env["delivery.route"].search([
             ("delivery_number_id", "=", reparto.id),
             ("delivery_date", "=", fecha_operacion),
@@ -147,13 +173,13 @@ class IvessOperationDelivery(models.AbstractModel):
             # Reintento de una visita ya registrada: no se escribe nada.
             return self._build_retry_response(retry_line)
 
-        # Fase 4: validar venta y retiro contra la base (productos, series y
-        # envases del cliente). Solo lee: un error se devuelve sin escribir.
-        if (item_venta or item_retiro) and not ubicacion.warehouse_id:
+        # Fase 4: validar venta, retiro y recambio contra la base (productos,
+        # series y envases del cliente). Solo lee: un error se devuelve sin escribir.
+        if (item_venta or item_retiro or item_recambio) and not ubicacion.warehouse_id:
             return {"error": "La ubicacion del reparto %s no pertenece a ningun almacen." % aguas_idreparto}
 
         products_by_code = {}
-        duplicated_codes = {}
+        sale_series = set()
         if item_venta:
             codes = {item[SALE_ITEMS.code] for item in item_venta}
             products = self.env["product.product"].search([
@@ -162,12 +188,7 @@ class IvessOperationDelivery(models.AbstractModel):
                 ("sale_ok", "=", True),
             ], order="id")
             for product in products:
-                # default_code duplicado: se toma el mas antiguo y se avisa en la orden.
-                code = product.default_code
-                if code not in products_by_code:
-                    products_by_code[code] = product
-                else:
-                    duplicated_codes.setdefault(code, [products_by_code[code]]).append(product)
+                products_by_code.setdefault(product.default_code, product)
 
             missing_codes = codes - set(products_by_code)
             if missing_codes:
@@ -177,50 +198,123 @@ class IvessOperationDelivery(models.AbstractModel):
             if error:
                 return {"error": error}
 
-            series_errors, requested_series = validate_series(item_venta, products_by_code)
+            series_errors, sale_series = validate_series(item_venta, products_by_code)
             error = series_errors.message()
             if error:
                 return {"error": error}
 
-            lot_by_key = {}
-            if requested_series:
-                lots = self.env["stock.lot"].search(Domain.OR(
-                    [("product_id", "=", product_id), ("name", "=", serie)]
-                    for product_id, serie in requested_series
-                ), order="id desc")
-                lot_by_key = {(lot.product_id.id, lot.name): lot for lot in lots}
-                missing_series = requested_series - set(lot_by_key)
-                if missing_series:
-                    code_by_product_id = {product.id: code for code, product in products_by_code.items()}
-                    unknown_series = sorted(
-                        "%s (%s)" % (serie, code_by_product_id[product_id])
-                        for product_id, serie in missing_series
-                    )
-                    return {"error": "No existen numeros de serie: %s" % ", ".join(unknown_series)}
-
-        withdrawal_products = {}
-        withdrawal_lots = {}
-        if item_retiro:
-            codes = {item[WITHDRAWAL_ITEMS.code] for item in item_retiro}
-            withdrawal_products = self._withdrawal_products(codes, cliente)
-            missing_codes = codes - set(withdrawal_products)
+        # Retiro y recambio comparten productos y envases del cliente: se buscan
+        # y validan juntos, porque la demanda sobre el cliente (retiro + recibido) se suma.
+        container_products = {}
+        customer_lots = {}
+        delivered_series = set()
+        if item_retiro or item_recambio:
+            flows = [
+                (spec, items)
+                for spec, items in ((WITHDRAWAL_ITEMS, item_retiro), (REPLACEMENT_ITEMS, item_recambio))
+                if items
+            ]
+            codes = set()
+            for spec, items in flows:
+                for item in items:
+                    codes.add(item[spec.code])
+            container_products = self._withdrawal_products(codes)
+            missing_codes = codes - set(container_products)
             if missing_codes:
-                return {"error": "No existen productos de retiro con los codigos: %s" % ", ".join(sorted(missing_codes))}
+                flow_names = " o ".join(
+                    name for name, items in (("retiro", item_retiro), ("recambio", item_recambio)) if items
+                )
+                return {"error": "No existen productos de %s con los codigos: %s" % (flow_names, ", ".join(sorted(missing_codes)))}
 
-            error = validate_tipo(item_retiro, withdrawal_products, WITHDRAWAL_ITEMS).message()
+            for spec, items in flows:
+                error = (
+                    validate_is_container(items, container_products, spec).message()
+                    or validate_allows_replacement(items, container_products, spec).message()
+                    or validate_tipo(items, container_products, spec).message()
+                )
+                if error:
+                    return {"error": error}
+
+            withdrawal_series, received_series = set(), set()
+            if item_retiro:
+                series_errors, withdrawal_series = validate_series(item_retiro, container_products, WITHDRAWAL_ITEMS)
+                error = series_errors.message()
+                if error:
+                    return {"error": error}
+            if item_recambio:
+                series_errors, delivered_series = validate_series(item_recambio, container_products, REPLACEMENT_ITEMS)
+                error = series_errors.message()
+                if error:
+                    return {"error": error}
+                series_errors, received_series = validate_series(
+                    item_recambio, container_products, REPLACEMENT_ITEMS, REPLACEMENT_ITEMS.series_received,
+                )
+                error = series_errors.message()
+                if error:
+                    return {"error": error}
+
+            # Una serie no puede estar en dos lados de la request a la vez.
+            error = (
+                validate_series_overlap(
+                    delivered_series, received_series,
+                    REPLACEMENT_ITEMS.series, REPLACEMENT_ITEMS.series_received,
+                ).message()
+                or validate_series_overlap(
+                    withdrawal_series, received_series,
+                    WITHDRAWAL_ITEMS.series, REPLACEMENT_ITEMS.series_received,
+                ).message()
+                or validate_series_overlap(
+                    sale_series, delivered_series,
+                    SALE_ITEMS.series, REPLACEMENT_ITEMS.series,
+                ).message()
+            )
             if error:
                 return {"error": error}
 
-            error = validate_series(item_retiro, withdrawal_products, WITHDRAWAL_ITEMS)[0].message()
+            demands = []
+            if item_retiro:
+                demands.append((WITHDRAWAL_ITEMS, WITHDRAWAL_ITEMS.series, item_retiro))
+            if item_recambio:
+                demands.append((REPLACEMENT_ITEMS, REPLACEMENT_ITEMS.series_received, item_recambio))
+            products_to_check = self.env["product.product"].union(*container_products.values()) # recordset de envases involucrados
+            containers = self._customer_containers(cliente, products_to_check)
+            error = validate_customer_availability(demands, container_products, containers).message()
             if error:
                 return {"error": error}
+            customer_lots = containers.lots
 
-            products_to_withdraw = self.env["product.product"].union(*withdrawal_products.values()) # recordset de productos a retirar
-            availability = self._withdrawal_availability(cliente, products_to_withdraw)
-            error = validate_withdrawal_availability(item_retiro, withdrawal_products, availability).message()
-            if error:
-                return {"error": error}
-            withdrawal_lots = availability.lots
+        # Lotes de las series de la venta y del envase entregado: una sola busqueda.
+        lot_by_key = {}
+        requested_series = sale_series | delivered_series
+        if requested_series:
+            lots = self.env["stock.lot"].search(Domain.OR(
+                [("product_id", "=", product_id), ("name", "=", serie)]
+                for product_id, serie in requested_series
+            ), order="id desc")
+            lot_by_key = {(lot.product_id.id, lot.name): lot for lot in lots}
+            missing_series = requested_series - set(lot_by_key)
+            if missing_series:
+                code_by_product_id = {
+                    product.id: code
+                    for code, product in [*products_by_code.items(), *container_products.items()]
+                }
+                unknown_series = sorted(
+                    "%s (%s)" % (serie, code_by_product_id[product_id])
+                    for product_id, serie in missing_series
+                )
+                return {"error": "No existen numeros de serie: %s" % ", ".join(unknown_series)}
+
+        # El envase entregado no puede ser ya de un cliente (incluido este).
+        if delivered_series:
+            assigned = self.env["water.container"].search([
+                ("lot_id", "in", [lot_by_key[key].id for key in delivered_series]),
+                ("quantity", ">", 0),
+            ])
+            if assigned:
+                return {"error": "Series entregadas ya asignadas a un cliente: %s" % ", ".join(sorted(
+                    "%s (%s)" % (container.lot_id.name, container.partner_id.customer_code or container.partner_id.display_name)
+                    for container in assigned
+                ))}
 
         # Fase 5: escribir. Desde aca los fallos ya no cortan el flujo: se
         # informan como warning. Venta, retiro y despues la linea del recorrido.
@@ -237,19 +331,33 @@ class IvessOperationDelivery(models.AbstractModel):
         outcome = SaleOutcome(self.env["sale.order"], self.env["stock.picking"]) # vacio: visita sin venta
         if item_venta:
             outcome = self._process_sale(
-                cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key, duplicated_codes,
+                cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key,
             )
             vals["sale_order_id"] = outcome.order.id
             if outcome.picking:
                 vals["stock_picking_id"] = outcome.picking.id
 
-        withdrawal_outcome = WithdrawalOutcome(self.env["stock.picking"])
+        withdrawal_outcome = PickingOutcome(self.env["stock.picking"])
         if item_retiro:
             withdrawal_outcome = self._process_withdrawal(
-                cliente, reparto, item_retiro, withdrawal_products, withdrawal_lots,
+                cliente, reparto, item_retiro, container_products, customer_lots,
             )
             if withdrawal_outcome.picking:
                 vals["withdrawal_picking_id"] = withdrawal_outcome.picking.id
+
+        # Recambio: despues del retiro. Salida primero, asi lo recibido no tapa la falta de stock del entregado.
+        replacement_outcome = ReplacementOutcome(
+            PickingOutcome(self.env["stock.picking"]), PickingOutcome(self.env["stock.picking"]),
+        )
+        if item_recambio:
+            replacement_outcome = self._process_replacement(
+                cliente, reparto, item_recambio, container_products, customer_lots, lot_by_key,
+            )
+            vals["replacement_reason_id"] = motivo_recambio.id
+            if replacement_outcome.out.picking:
+                vals["replacement_out_picking_id"] = replacement_outcome.out.picking.id
+            if replacement_outcome.in_.picking:
+                vals["replacement_in_picking_id"] = replacement_outcome.in_.picking.id
 
         if linea:
             linea.write(vals)
@@ -263,7 +371,7 @@ class IvessOperationDelivery(models.AbstractModel):
             })
 
         # Fase 6: respuesta
-        return self._build_response(linea, outcome, withdrawal_outcome)
+        return self._build_response(linea, outcome, withdrawal_outcome, replacement_outcome)
 
     def _resolve_route_line(self, recorrido, cliente, fuera_ruta, visit_date_hour):
         """Elige la linea del recorrido para la visita. Devuelve
@@ -278,6 +386,7 @@ class IvessOperationDelivery(models.AbstractModel):
         revisita (tambien de un cliente que entro como fuera de ruta).
         - fuera_ruta=true exige que el cliente no tenga lineas; false, que tenga.
         - Una tercera visita es error."""
+        
         lines = self.env["delivery.route.line"].search([
             ("route_id", "=", recorrido.id),
             ("client_id", "=", cliente.id),
@@ -301,14 +410,17 @@ class IvessOperationDelivery(models.AbstractModel):
             )
         return none, free, False
 
-    def _process_withdrawal(self, cliente, reparto, item_retiro, products_by_code, lot_by_key):
-        """Crea el picking de retiro, lo confirma y lo valida; cada etapa va en
-        su propio savepoint y los fallos se informan como warning sin tumbar la
-        visita. Si falla la creacion no queda picking. Si falla la confirmacion
-        el picking queda en borrador, vinculado a la linea y con una nota con
-        el error y los datos del retiro. Si falla la validacion queda asignado."""
-        outcome = WithdrawalOutcome(self.env["stock.picking"])
-        wanted = self._group_withdrawal_items(item_retiro, products_by_code)
+    def _process_withdrawal(self, cliente, reparto, items, products_by_code, lot_by_key,
+                            spec=WITHDRAWAL_ITEMS, series_key=None, label="retiro"):
+        """Crea el picking de entrada (cliente al camion) del retiro, o del lado
+        recibido del recambio (spec, series_key y label), lo confirma y lo
+        valida; cada etapa va en su propio savepoint y los fallos se informan
+        como warning sin tumbar la visita. Si falla la creacion no queda
+        picking. Si falla la confirmacion el picking queda en borrador,
+        vinculado a la linea y con una nota con el error y los datos. Si falla
+        la validacion queda asignado."""
+        outcome = PickingOutcome(self.env["stock.picking"])
+        wanted = self._group_withdrawal_items(items, products_by_code, spec, series_key)
         try:
             with self.env.cr.savepoint():
                 outcome.picking = self._create_withdrawal_picking(cliente, reparto, wanted)
@@ -322,8 +434,8 @@ class IvessOperationDelivery(models.AbstractModel):
             outcome.confirm_error = str(e)
             # Fuera del savepoint: la nota debe persistir aunque la confirmacion se revierta
             outcome.picking.message_post(
-                body="La confirmacion automatica desde la app fallo y el picking quedo en borrador: %s. Datos del retiro: %s" % (
-                    e, self._describe_withdrawal(wanted),
+                body="La confirmacion automatica desde la app fallo y el picking quedo en borrador: %s. Datos del %s: %s" % (
+                    e, label, self._describe_withdrawal(wanted),
                 )
             )
             return outcome
@@ -334,19 +446,22 @@ class IvessOperationDelivery(models.AbstractModel):
             )
         return outcome
 
-    def _group_withdrawal_items(self, item_retiro, products_by_code):
+    def _group_withdrawal_items(self, items, products_by_code, spec=WITHDRAWAL_ITEMS, series_key=None):
         """Agrupa los items por (producto, estado de envase): los repetidos se
         suman en un solo move. Moves del mismo producto con distinto estado
         quedan separados porque logistic_custom_ivess agrega container_state a
         los campos que impiden la fusion en action_confirm.
+        series_key: que lista de series se toma (por defecto spec.series; el
+        recambio tiene dos, entregado y recibido).
         Devuelve {(product_id, estado): {"product", "qty", "series"}}."""
+        series_key = series_key or spec.series
         wanted = {}
-        for item in item_retiro:
-            product = products_by_code[item[WITHDRAWAL_ITEMS.code]]
-            state = CONTAINER_STATE[item[WITHDRAWAL_ITEMS.tipo]] if requires_container_state(product) else False
+        for item in items:
+            product = products_by_code[item[spec.code]]
+            state = CONTAINER_STATE[item[spec.tipo]] if requires_container_state(product) else False
             entry = wanted.setdefault((product.id, state), {"product": product, "qty": 0, "series": []})
-            entry["qty"] += item[WITHDRAWAL_ITEMS.qty]
-            entry["series"] += item.get(WITHDRAWAL_ITEMS.series) or []
+            entry["qty"] += item[spec.qty]
+            entry["series"] += item.get(series_key) or []
         return wanted
 
     def _describe_withdrawal(self, wanted):
@@ -364,11 +479,18 @@ class IvessOperationDelivery(models.AbstractModel):
     def _create_withdrawal_picking(self, cliente, reparto, wanted):
         """Picking de recepcion del cliente al camion, sin vinculo con la venta,
         en borrador y con un move por (producto, estado). wanted: ver
-        _group_withdrawal_items. Patron de water.container.transfer._create_done_picking."""
-        location_dest = reparto.location_id
-        location = cliente.property_stock_customer
+        _group_withdrawal_items."""
+        return self._create_container_picking(
+            reparto.location_id.warehouse_id.in_type_id,
+            cliente, cliente.property_stock_customer, reparto.location_id, wanted,
+        )
+
+    def _create_container_picking(self, picking_type, cliente, location, location_dest, wanted):
+        """Picking de envases entre location y location_dest, en borrador y con
+        un move por (producto, estado). Patron de
+        water.container.transfer._create_done_picking."""
         picking = self.env["stock.picking"].create({
-            "picking_type_id": location_dest.warehouse_id.in_type_id.id,
+            "picking_type_id": picking_type.id,
             "partner_id": cliente.id,
             "location_id": location.id,
             "location_dest_id": location_dest.id,
@@ -386,7 +508,7 @@ class IvessOperationDelivery(models.AbstractModel):
     def _confirm_withdrawal_picking(self, picking, wanted, lot_by_key):
         """Confirma el picking y fija lotes o cantidades de cada move, dejandolo
         listo para validar. lot_by_key: {(product_template_id, serie): lote},
-        como lo arma _withdrawal_availability."""
+        como lo arma _customer_containers."""
         picking.action_confirm()
         for move in picking.move_ids:
             entry = wanted[(move.product_id.id, move.container_state or False)]
@@ -399,33 +521,129 @@ class IvessOperationDelivery(models.AbstractModel):
                 move.quantity = entry["qty"]
             move.picked = True
 
-    def _withdrawal_products(self, codes, cliente):
-        """Productos a retirar por default_code, sin filtrar show_in_app ni
-        sale_ok: se retira lo que el cliente tiene, aunque ya no se venda.
-        Con codigo duplicado se prefiere el producto del que el cliente tiene
-        envases; entre iguales, el mas antiguo."""
+    def _process_replacement(self, cliente, reparto, item_recambio, products_by_code, customer_lots, lot_by_key):
+        """Recambio de envases: dos pickings por visita. Primero la salida
+        (envase entregado, camion al cliente) y despues la entrada (envase
+        recibido, cliente al camion): asi lo recibido no tapa una falta de
+        stock del entregado. Cada picking falla por separado, sin tumbar al otro.
+        customer_lots: lotes de los envases del cliente (para el recibido);
+        lot_by_key: lotes de las series entregadas."""
+        out = self._process_replacement_out(cliente, reparto, item_recambio, products_by_code, lot_by_key)
+        in_ = self._process_withdrawal(
+            cliente, reparto, item_recambio, products_by_code, customer_lots,
+            spec=REPLACEMENT_ITEMS, series_key=REPLACEMENT_ITEMS.series_received, label="recambio (envase recibido)",
+        )
+        return ReplacementOutcome(out, in_)
+
+    def _process_replacement_out(self, cliente, reparto, item_recambio, products_by_code, lot_by_key):
+        """Picking de salida del recambio. Como el retiro: cada etapa en su
+        savepoint y los fallos son warning. Sin stock del entregado en el
+        camion no se fuerza (allow_sale_without_stock es solo de la venta): el
+        picking queda en borrador, sin confirmar ni reservar, con una nota.
+        Confirmarlo con faltante no sirve: al validar la entrada del recambio,
+        Odoo reserva solo todo move confirmado del mismo producto en el camion
+        (stock.move._trigger_assign) y la salida reservaria el envase recien
+        recibido u otra serie."""
+        outcome = PickingOutcome(self.env["stock.picking"])
+        wanted = self._group_withdrawal_items(
+            item_recambio, products_by_code, REPLACEMENT_ITEMS, REPLACEMENT_ITEMS.series,
+        )
+        try:
+            with self.env.cr.savepoint():
+                outcome.picking = self._create_container_picking(
+                    reparto.location_id.warehouse_id.out_type_id,
+                    cliente, reparto.location_id, cliente.property_stock_customer, wanted,
+                )
+        except UserError as e:
+            outcome.create_error = str(e)
+            return outcome
+        shortage = self._replacement_out_shortage(wanted, lot_by_key, reparto.location_id)
+        if shortage:
+            outcome.validate_error = "Stock insuficiente en la ubicacion del reparto para el envase entregado (%s)" % shortage
+            outcome.picking.message_post(
+                body="Stock insuficiente en la ubicacion del reparto: el picking quedo en borrador, sin reservar. %s. Datos del recambio (envase entregado): %s" % (
+                    shortage, self._describe_withdrawal(wanted),
+                )
+            )
+            return outcome
+        try:
+            with self.env.cr.savepoint():
+                self._reserve_replacement_out_picking(outcome.picking, wanted, lot_by_key)
+        except UserError as e:
+            outcome.confirm_error = str(e)
+            outcome.picking.message_post(
+                body="La confirmacion automatica desde la app fallo y el picking quedo en borrador: %s. Datos del recambio (envase entregado): %s" % (
+                    e, self._describe_withdrawal(wanted),
+                )
+            )
+            return outcome
+        outcome.validate_error = self._validate_picking(outcome.picking)
+        if outcome.validate_error:
+            outcome.picking.message_post(
+                body="La validacion automatica desde la app fallo y el picking quedo sin validar: %s" % outcome.validate_error
+            )
+        return outcome
+
+    def _replacement_out_shortage(self, wanted, lot_by_key, location):
+        """Texto con lo que falta en el camion para entregar lo pedido, o False
+        si alcanza. Con serie se mira cada serie pedida; sin serie, la cantidad
+        por producto (suma de sus estados). Solo lee."""
+        quant = self.env["stock.quant"]
+        missing = []
+        needed = {}  # {product: cantidad}, solo productos sin serie
+        for entry in wanted.values():
+            product = entry["product"]
+            if product.tracking == "serial":
+                for serie in entry["series"]:
+                    if quant._get_available_quantity(product, location, lot_id=lot_by_key[(product.id, serie)]) < 1:
+                        missing.append("%s: la serie %s no esta disponible" % (product.default_code, serie))
+            else:
+                needed[product] = needed.get(product, 0) + entry["qty"]
+        for product, qty in needed.items():
+            available = quant._get_available_quantity(product, location)
+            if available < qty:
+                missing.append("%s: se entregan %s y hay %s" % (product.default_code, qty, available))
+        return "; ".join(missing)
+
+    def _reserve_replacement_out_picking(self, picking, wanted, lot_by_key):
+        """Confirma el picking y reserva en la ubicacion del camion, dejandolo
+        listo para validar. Con serie fija cada unidad pedida por su lote:
+        action_assign reserva cualquier serie del camion (como
+        logistic_custom_ivess.StockMove._action_assign corrige en la venta).
+        Solo se llama con stock suficiente (_replacement_out_shortage); si aun
+        asi algun move no queda reservado, UserError y el savepoint del
+        llamador lo deja en borrador. lot_by_key: {(product_id, serie): lote}."""
+        picking.action_confirm()
+        picking.action_assign()
+        for move in picking.move_ids.filtered(lambda m: m.has_tracking == "serial"):
+            entry = wanted[(move.product_id.id, move.container_state or False)]
+            requested = self.env["stock.lot"].browse([lot_by_key[(move.product_id.id, serie)].id for serie in entry["series"]])
+            # Series pedidas con stock libre en el camion, mas las que el move ya reservo
+            free_quants = self.env["stock.quant"]._gather(move.product_id, move.location_id).filtered(
+                lambda q: q.lot_id in requested and q.available_quantity > 0
+            )
+            available = free_quants.lot_id | (requested & move.move_line_ids.lot_id)
+            if set(available.ids) != set(move.lot_ids.ids):
+                move.lot_ids = available
+            # Se suelta la reserva de una serie que no se pidio
+            move.move_line_ids.filtered(lambda ml: ml.lot_id not in requested).unlink()
+            move._recompute_state()
+        not_assigned = picking.move_ids.filtered(lambda m: m.state != "assigned")
+        if not_assigned:
+            raise UserError("No se pudo reservar en el camion: %s" % ", ".join(not_assigned.product_id.mapped("default_code")))
+        picking.move_ids.picked = True
+
+    def _withdrawal_products(self, codes):
+        """Productos de retiro y recambio por default_code, sin filtrar show_in_app
+        ni sale_ok: se retira lo que el cliente tiene, aunque ya no se venda.
+        Se asume default_code unico; si hubiera duplicados se toma el mas antiguo."""
         candidates = self.env["product.product"].search([("default_code", "in", list(codes))], order="id")
-        held_templates = set(self.env["water.container"].search([
-            ("partner_id", "=", cliente.id),
-            ("product_id", "in", candidates.product_tmpl_id.ids),
-            ("quantity", ">", 0),
-        ]).product_id.ids)
         products_by_code = {}
         for product in candidates:
-            code = product.default_code
-            current = products_by_code.get(code)
-            if current is None:
-                products_by_code[code] = product
-                continue
-
-            # Codigo duplicado: reemplaza al actual solo si es el que el cliente tiene
-            new_is_held = product.product_tmpl_id.id in held_templates
-            current_is_held = current.product_tmpl_id.id in held_templates
-            if new_is_held and not current_is_held:
-                products_by_code[code] = product
+            products_by_code.setdefault(product.default_code, product)
         return products_by_code
 
-    def _withdrawal_availability(self, cliente, products):
+    def _customer_containers(self, cliente, products):
         """Lee una sola vez los envases del cliente para los productos dados.
         Es el estado previo a la venta de la misma request."""
         containers = self.env["water.container"].search([
@@ -435,20 +653,23 @@ class IvessOperationDelivery(models.AbstractModel):
         ])
         quantity = {}
         lots = {}
+        lot_states = {}
         for container in containers:
             # VERIFICAR lineas x un mismo cliente con mismo product_id y mismo state: se suman cantidades.
             key = (container.product_id.id, container.state)
             quantity[key] = quantity.get(key, 0) + container.quantity
             if container.lot_id:
-                lots[(container.product_id.id, container.lot_id.name)] = container.lot_id
-        return WithdrawalAvailability(quantity, lots)
+                lot_key = (container.product_id.id, container.lot_id.name)
+                lots[lot_key] = container.lot_id
+                lot_states[lot_key] = container.state
+        return CustomerContainers(quantity, lots, lot_states)
 
-    def _process_sale(self, cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key, duplicated_codes):
+    def _process_sale(self, cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key):
         """Crea la venta, la confirma y prepara y valida su picking.
         Confirmar y validar son best effort: la venta ya ocurrio, asi que si
         fallan se registra el error y se sigue."""
         order = self._create_sale_order(
-            cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key, duplicated_codes,
+            cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key,
         )
         outcome = SaleOutcome(order, self.env["stock.picking"])
         outcome.confirm_error = self._confirm_sale_order(order)
@@ -464,7 +685,7 @@ class IvessOperationDelivery(models.AbstractModel):
                 )
         return outcome
 
-    def _create_sale_order(self, cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key, duplicated_codes):
+    def _create_sale_order(self, cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key):
         # El precio de la app es absoluto: discount en 0 evita que
         # pricelist_custom aplique el descuento del cliente encima.
         order_lines = []
@@ -487,12 +708,6 @@ class IvessOperationDelivery(models.AbstractModel):
             "delivery_route_id": recorrido.id,
             "order_line": order_lines,
         })
-        if duplicated_codes:
-            order.message_post(body="#REVISAR Codigos de producto repetidos: se tomo el producto mas antiguo. %s" % "; ".join(
-                "%s: tomado id %s, descartados ids %s" % (
-                    code, candidates[0].id, ", ".join(str(p.id) for p in candidates[1:]),
-                ) for code, candidates in sorted(duplicated_codes.items())
-            ))
         return order
 
     def _confirm_sale_order(self, order):
@@ -555,7 +770,7 @@ class IvessOperationDelivery(models.AbstractModel):
             return str(e)
         return False
 
-    def _build_response(self, linea, sale_outcome, withdrawal_outcome):
+    def _build_response(self, linea, sale_outcome, withdrawal_outcome, replacement_outcome):
         result = {"success": True, "route_line_id": linea.id}
         warnings = []
         if sale_outcome.order:
@@ -577,6 +792,21 @@ class IvessOperationDelivery(models.AbstractModel):
                 warnings.append("No se pudo confirmar el picking de retiro (quedo en borrador): %s" % withdrawal_outcome.confirm_error)
             elif withdrawal_outcome.validate_error:
                 warnings.append("No se pudo validar el picking de retiro: %s" % withdrawal_outcome.validate_error)
+        for key, outcome, label in (
+            ("replacement_out", replacement_outcome.out, "entrega"),
+            ("replacement_in", replacement_outcome.in_, "retiro"),
+        ):
+            if not (outcome.picking or outcome.create_error):
+                continue
+            result[key + "_picking_id"] = outcome.picking.id
+            result[key + "_picking_validated"] = outcome.picking.state == "done"
+            # Excluyentes, igual que en el retiro
+            if outcome.create_error:
+                warnings.append("No se pudo crear el picking de recambio (%s): %s" % (label, outcome.create_error))
+            elif outcome.confirm_error:
+                warnings.append("No se pudo confirmar el picking de recambio (%s) (quedo en borrador): %s" % (label, outcome.confirm_error))
+            elif outcome.validate_error:
+                warnings.append("No se pudo validar el picking de recambio (%s): %s" % (label, outcome.validate_error))
         if warnings:
             result["warning"] = "; ".join(warnings)
         return result
@@ -592,6 +822,12 @@ class IvessOperationDelivery(models.AbstractModel):
         if linea.withdrawal_picking_id:
             result["withdrawal_picking_id"] = linea.withdrawal_picking_id.id
             result["withdrawal_picking_validated"] = linea.withdrawal_picking_id.state == "done"
+        if linea.replacement_out_picking_id:
+            result["replacement_out_picking_id"] = linea.replacement_out_picking_id.id
+            result["replacement_out_picking_validated"] = linea.replacement_out_picking_id.state == "done"
+        if linea.replacement_in_picking_id:
+            result["replacement_in_picking_id"] = linea.replacement_in_picking_id.id
+            result["replacement_in_picking_validated"] = linea.replacement_in_picking_id.state == "done"
         return result
 
     def _app_datetime_to_utc(self, fecha, hora):

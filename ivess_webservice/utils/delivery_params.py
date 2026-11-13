@@ -41,6 +41,19 @@ WITHDRAWAL_ITEM_SCHEMA = {
 }
 WITHDRAWAL_ITEM_OPTIONAL = {"retiro_tipo_envase", "retiro_series"}
 
+# Recambio de envases: se combina con una venta o con un motivo de no compra; nunca va solo.
+REPLACEMENT_SCHEMA = {
+    "item_recambio": list,
+}
+REPLACEMENT_REASON_SCHEMA = {
+    "recambio_motivo": int,
+}
+REPLACEMENT_ITEM_SCHEMA = {
+    "recambio_cod_producto": str,
+    "recambio_cantidad": (int, float),
+}
+REPLACEMENT_ITEM_OPTIONAL = {"recambio_tipo_envase", "recambio_series_entregado", "recambio_series_recibido"}
+
 CONTAINER_STATE = {
     "V": "en_comodato",
     "P": "prestado",
@@ -49,9 +62,10 @@ CONTAINER_STATE = {
 
 @dataclass(frozen=True)
 class ItemSpec:
-    """Nombres de los campos de una lista de items. Venta y retiro se validan
-    con las mismas reglas; solo cambian los nombres y si el tipo aplica a los
-    frio/calor (strict_tipo)."""
+    """Nombres de los campos de una lista de items. Venta, retiro y recambio se
+    validan con las mismas reglas; solo cambian los nombres de los campos.
+    series_received: solo el recambio, que tiene dos listas de series: series
+    es la del envase entregado y series_received la del recibido."""
     list_key: str
     code: str
     qty: str
@@ -60,7 +74,8 @@ class ItemSpec:
     schema: dict
     optional: set
     price: str | None = None
-    strict_tipo: bool = False
+    series_received: str | None = None
+    requires_replacement: bool = False
 
 
 SALE_ITEMS = ItemSpec(
@@ -79,10 +94,22 @@ WITHDRAWAL_ITEMS = ItemSpec(
     "retiro_cantidad", 
     "retiro_tipo_envase", 
     "retiro_series",
-    WITHDRAWAL_ITEM_SCHEMA, 
-    WITHDRAWAL_ITEM_OPTIONAL, 
-    strict_tipo=True,
+    WITHDRAWAL_ITEM_SCHEMA,
+    WITHDRAWAL_ITEM_OPTIONAL,
 )
+REPLACEMENT_ITEMS = ItemSpec(
+    "item_recambio",
+    "recambio_cod_producto",
+    "recambio_cantidad",
+    "recambio_tipo_envase",
+    "recambio_series_entregado",
+    REPLACEMENT_ITEM_SCHEMA,
+    REPLACEMENT_ITEM_OPTIONAL,
+    series_received="recambio_series_recibido",
+    requires_replacement=True,
+)
+REPLACEMENT_REASON_KEY = "recambio_motivo"
+
 # Categorias de error de parametros. El orden es la prioridad: se informa
 # solo la primera categoria que tenga detalles.
 PARAM_ERROR_MESSAGES = {
@@ -149,25 +176,33 @@ def validate_header(params):
 
 
 def case_param_names(params):
-    """Parametros propios del caso: item_retiro siempre; item_venta solo cuando
-    no hay motivo de no compra."""
-    names = {WITHDRAWAL_ITEMS.list_key}
+    """Parametros propios del caso: item_retiro, item_recambio y recambio_motivo
+    siempre; item_venta solo cuando no hay motivo de no compra."""
+    names = {WITHDRAWAL_ITEMS.list_key, REPLACEMENT_ITEMS.list_key, REPLACEMENT_REASON_KEY}
     if params["motivo_no_compra"] == 0:
         names.add(SALE_ITEMS.list_key)
     return names
 
 
 def validate_case_params(params):
-    """Fase 2: parametros propios del caso (item_venta, item_retiro y cada item).
-    Sin motivo de no compra la visita es una venta: item_venta es obligatorio.
-    item_retiro acompana a una venta o a una no compra; nunca va solo."""
+    """Fase 2: parametros propios del caso (item_venta, item_retiro, item_recambio
+    y cada item). Sin motivo de no compra la visita es una venta: item_venta es
+    obligatorio. item_retiro e item_recambio acompanan a una venta o a una no
+    compra; nunca van solos. recambio_motivo es obligatorio con item_recambio y
+    no aplica sin el."""
     errors = ParamErrors()
     if params["motivo_no_compra"] == 0:
         check_schema(params, SALE_SCHEMA, errors)
     # item_retiro en null equivale a ausente; una lista vacia es faltante.
     if params.get(WITHDRAWAL_ITEMS.list_key) is not None:
         check_schema(params, WITHDRAWAL_SCHEMA, errors)
-    for spec in (SALE_ITEMS, WITHDRAWAL_ITEMS):
+    # Idem item_recambio; recambio_motivo se exige solo si hay recambio.
+    if params.get(REPLACEMENT_ITEMS.list_key) is not None:
+        check_schema(params, REPLACEMENT_SCHEMA, errors)
+        check_schema(params, REPLACEMENT_REASON_SCHEMA, errors)
+    elif params.get(REPLACEMENT_REASON_KEY) is not None:
+        errors.add("not_applicable", REPLACEMENT_REASON_KEY + " (sin item_recambio)")
+    for spec in (SALE_ITEMS, WITHDRAWAL_ITEMS, REPLACEMENT_ITEMS):
         validate_items(params, spec, errors)
     return errors
 
@@ -194,14 +229,18 @@ def validate_items(params, spec, errors):
                 errors.add("invalid_type", prefix + spec.tipo + " (str)")
             elif tipo not in CONTAINER_STATE:
                 errors.add("invalid_value", prefix + spec.tipo + " (%s)" % "/".join(CONTAINER_STATE))
-        series = item.get(spec.series)
-        if series is not None:                  # caso de productos con seguimiento por numero de serie, requieren series
+        # caso de productos con seguimiento por numero de serie, requieren series
+        # (el recambio tiene dos listas: entregado y recibido)
+        for series_key in (spec.series, spec.series_received):
+            series = item.get(series_key) if series_key else None
+            if series is None:
+                continue
             if type(series) is not list:
-                errors.add("invalid_type", prefix + spec.series + " (list)")
+                errors.add("invalid_type", prefix + series_key + " (list)")
             else:
                 for serie_index, serie in enumerate(series):
                     if type(serie) is not str or not serie.strip():
-                        errors.add("invalid_type", "%s%s[%s] (str)" % (prefix, spec.series, serie_index))
+                        errors.add("invalid_type", "%s%s[%s] (str)" % (prefix, series_key, serie_index))
         if item_errors:
             continue
         if item[spec.qty] <= 0:
@@ -211,9 +250,8 @@ def validate_items(params, spec, errors):
 
 
 def validate_tipo(items, products_by_code, spec=SALE_ITEMS):
-    """tipo (venta_tipo_envase / retiro_tipo_envase): obligatorio solo en productos que requieren estado de envase.
-    En la venta se acepta tambien en retornables frio/calor; en el retiro (strict_tipo) no:
-    el frio/calor se identifica por serie."""
+    """tipo (venta_tipo_envase / retiro_tipo_envase / recambio_tipo_envase): obligatorio solo en productos que requieren estado de envase.
+    En cualquier otro producto es not_applicable: el frio/calor queda siempre en estado asignado."""
     errors = ParamErrors()
     for index, item in enumerate(items):
         product = products_by_code[item[spec.code]]
@@ -221,71 +259,141 @@ def validate_tipo(items, products_by_code, spec=SALE_ITEMS):
         prefix = "%s[%s]." % (spec.list_key, index)
         if requires_container_state(product) and not has_tipo:
             errors.add("missing", prefix + spec.tipo + " (%s es retornable)" % product.default_code)
-        elif spec.strict_tipo and not requires_container_state(product) and has_tipo:
+        elif not requires_container_state(product) and has_tipo:
             errors.add("not_applicable", prefix + spec.tipo + " (%s no admite tipo de envase)" % product.default_code)
-        elif not spec.strict_tipo and not product.is_returnable and has_tipo:
-            errors.add("not_applicable", prefix + spec.tipo + " (%s no es retornable)" % product.default_code)
     return errors
 
 
-def validate_series(items, products_by_code, spec=SALE_ITEMS):
+def validate_is_container(items, products_by_code, spec):
+    """El producto de retiro o recambio tiene que ser un envase (retornable o
+    frio/calor). Sin esto, un producto comun pasaba la validacion y recien
+    fallaba (o no) contra los envases del cliente."""
+    errors = ParamErrors()
+    for index, item in enumerate(items):
+        product = products_by_code[item[spec.code]]
+        if not (product.is_returnable or product.is_frio_calor):
+            prefix = "%s[%s]." % (spec.list_key, index)
+            errors.add("invalid_value", prefix + spec.code + " (%s no es un envase)" % product.default_code)
+    return errors
+
+
+def validate_allows_replacement(items, products_by_code, spec):
+    """Solo los productos con allows_replacement admiten recambio. Aplica solo a
+    los specs que lo exigen (requires_replacement): el retiro no tiene esta
+    restriccion, asi que con su spec no devuelve errores."""
+    errors = ParamErrors()
+    if not spec.requires_replacement:
+        return errors
+    for index, item in enumerate(items):
+        product = products_by_code[item[spec.code]]
+        if not product.allows_replacement:
+            prefix = "%s[%s]." % (spec.list_key, index)
+            errors.add("invalid_value", prefix + spec.code + " (%s no admite recambio)" % product.default_code)
+    return errors
+
+
+def validate_series(items, products_by_code, spec=SALE_ITEMS, series_key=None):
     """series: obligatoria (una por unidad) solo con seguimiento por numero de serie.
+    series_key es la lista a validar; por defecto spec.series. El recambio tiene
+    dos: spec.series (envase entregado) y spec.series_received (recibido).
     Devuelve (errors, requested_series) con requested_series = {(product_id, serie)}."""
+    series_key = series_key or spec.series
     errors = ParamErrors()
     requested_series = set()
     for index, item in enumerate(items):
         product = products_by_code[item[spec.code]]
-        series = item.get(spec.series) or []
+        series = item.get(series_key) or []
         prefix = "%s[%s]." % (spec.list_key, index)
         if product.tracking != "serial":
             if series:
-                errors.add("not_applicable", prefix + spec.series + " (%s no tiene seguimiento por serie)" % product.default_code)
+                errors.add("not_applicable", prefix + series_key + " (%s no tiene seguimiento por serie)" % product.default_code)
             continue
         if not series:
-            errors.add("missing", prefix + spec.series + " (%s tiene seguimiento por serie)" % product.default_code)
+            errors.add("missing", prefix + series_key + " (%s tiene seguimiento por serie)" % product.default_code)
             continue
-        if not float(item[spec.qty]).is_integer() or len(series) != item[spec.qty]:
-            errors.add("invalid_value", prefix + spec.series + " (una serie por unidad: cantidad entera igual a %s series)" % len(series))
+        if len(series) != item[spec.qty]:
+            errors.add("invalid_value", prefix + series_key + " (una serie por unidad: cantidad entera igual a %s series)" % len(series))
         for serie in series:
             if (product.id, serie) in requested_series:
-                errors.add("invalid_value", prefix + spec.series + " (%s repetida)" % serie)
+                errors.add("invalid_value", prefix + series_key + " (%s repetida)" % serie)
             requested_series.add((product.id, serie))
     return errors, requested_series
 
 
+def validate_series_overlap(first, second, first_name, second_name):
+    """Una misma serie no puede estar en dos lados de la request a la vez:
+    entregado y recibido del recambio, venta y entregado, retiro y recibido.
+    first y second son sets {(product_id, serie)}; first_name y second_name
+    nombran la lista de cada uno, solo para el mensaje."""
+    errors = ParamErrors()
+    for _product_id, serie in sorted(first & second): #interseccion de conjuntos (series repetidas)
+        errors.add("invalid_value", "%s (%s esta en %s y en %s)" % (first_name, serie, first_name, second_name))
+    return errors
+
+
+FRIO_CALOR_STATE = "asignado"
+
+
+def effective_state(product, tipo):
+    """Estado de envase con el que el producto queda (o esta) en el cliente:
+    el que indica tipo en retornables comunes, 'asignado' en frio/calor (el
+    tipo no se informa) y None si el producto no es envase."""
+    if requires_container_state(product):
+        return CONTAINER_STATE[tipo]
+    if product.is_frio_calor:
+        return FRIO_CALOR_STATE
+    return None
+
+
 @dataclass(frozen=True)
-class WithdrawalAvailability:
-    """Envases del cliente, ya leidos de la base.
-    quantity: {(product_template_id, estado): cantidad}, solo envases con cantidad > 0.
-    lots: {(product_template_id, nombre_de_serie): lote} de los envases con serie."""
+class CustomerContainers:
+    """Envases del cliente, ya leidos de la base. Todo indexado por
+    product_template_id (water.container.product_id es un template).
+    quantity: {(template, estado): cantidad}, solo envases con cantidad > 0.
+    lots: {(template, nombre_de_serie): lote} de los envases con serie.
+    lot_states: {(template, nombre_de_serie): estado} de esos mismos envases."""
     quantity: dict
     lots: dict
+    lot_states: dict
 
 
-def validate_withdrawal_availability(items, products_by_code, availability):
-    """Que el cliente tenga lo que se retira. Los repetidos se suman por
-    (producto, estado). Los productos con serie se validan por serie."""
+def validate_customer_availability(demands, products_by_code, containers):
+    """Que el cliente tenga lo que se le saca: retiro y lado recibido del recambio.
+    demands: lista de (spec, series_key, items), un elemento por flujo. La
+    demanda se suma entre flujos, porque salen del mismo stock del cliente.
+    Con serie, se valida cada serie: que sea un envase del cliente y que este
+    en el estado efectivo del item. Sin serie, las cantidades se suman por
+    (template, estado efectivo), tambien en frio/calor ('asignado')."""
     errors = ParamErrors()
     requested = {}          # {(template, estado): cantidad pedida}
-    code_by_template = {}   # {template: default_code}, solo para el mensaje de error
-    for index, item in enumerate(items):
-        product = products_by_code[item[WITHDRAWAL_ITEMS.code]]
-        tmpl_id = product.product_tmpl_id.id # availability indexada x template
-        if product.tracking == "serial":
-            prefix = "%s[%s]." % (WITHDRAWAL_ITEMS.list_key, index)
-            for serie in item.get(WITHDRAWAL_ITEMS.series) or []:
-                if (tmpl_id, serie) not in availability.lots:
-                    errors.add("invalid_value", prefix + WITHDRAWAL_ITEMS.series + " (%s no es un envase del cliente)" % serie)
-        if requires_container_state(product):
-            state = CONTAINER_STATE[item[WITHDRAWAL_ITEMS.tipo]]
+    sources = {}            # {(template, estado): {campos de cantidad}}, solo para el mensaje
+    code_by_template = {}   # {template: default_code}, solo para el mensaje
+    for spec, series_key, items in demands:
+        for index, item in enumerate(items):
+            product = products_by_code[item[spec.code]]
+            tmpl_id = product.product_tmpl_id.id    # containers indexado x template
+            state = effective_state(product, item.get(spec.tipo))
+            if state is None:                       # no es envase: lo rechaza validate_is_container
+                continue
+            if product.tracking == "serial":
+                prefix = "%s[%s]." % (spec.list_key, index)
+                for serie in item.get(series_key) or []:
+                    key = (tmpl_id, serie)
+                    if key not in containers.lots:
+                        errors.add("invalid_value", prefix + series_key + " (%s no es un envase del cliente)" % serie)
+                    elif containers.lot_states[key] != state:
+                        errors.add("invalid_value", prefix + series_key + " (%s esta en estado %s y se informo %s)" % (
+                            serie, containers.lot_states[key], state,
+                        ))
+                continue
             key = (tmpl_id, state)
-            requested[key] = requested.get(key, 0) + item[WITHDRAWAL_ITEMS.qty]
+            requested[key] = requested.get(key, 0) + item[spec.qty]
+            sources.setdefault(key, set()).add(spec.qty)
             code_by_template[tmpl_id] = product.default_code
     for (tmpl_id, state), quantity in requested.items():
-        available = availability.quantity.get((tmpl_id, state), 0)
+        available = containers.quantity.get((tmpl_id, state), 0)
         if quantity > available:
-            code = code_by_template[tmpl_id]
-            errors.add("invalid_value", "%s (%s en estado %s: se retiran %s, el cliente tiene %s)" % (
-                WITHDRAWAL_ITEMS.qty, code, state, quantity, available,
+            errors.add("invalid_value", "%s (%s en estado %s: se sacan %s, el cliente tiene %s)" % (
+                " + ".join(sorted(sources[(tmpl_id, state)])), code_by_template[tmpl_id], state, quantity, available,
             ))
     return errors
