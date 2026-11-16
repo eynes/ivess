@@ -73,6 +73,9 @@
                                     <field name="collection_journal_ids" widget="many2many_tags"/>
                                     <field name="repair_order_sequence_ids" widget="many2many_tags" invisible="is_technical_delivery == False"/>
                                 </group>
+                                    <group>
+                                        <field name="route_number_journal_id"/>
+                                    </group>
                             </group>
                         </page>
                     </notebook>

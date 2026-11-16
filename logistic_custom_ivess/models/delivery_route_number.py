@@ -79,6 +79,11 @@ class DeliveryRouteNumber(models.Model):
         'sequence_id',
         string='Repair Orders Booklets',
     )
+    route_number_journal_id = fields.Many2one(
+        'account.journal',
+        string='Route Number Journal',
+        domain=[('type', 'in', ['receipt'])],
+    )
     region_id = fields.Many2one(
         'delivery.route.region',
         string='Región',
