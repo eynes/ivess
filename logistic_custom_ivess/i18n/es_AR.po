@@ -1270,6 +1270,11 @@ msgid "Repair Orders Booklets"
 msgstr "Talonarios de Ordenes de Reparaciones"
 
 #. module: logistic_custom_ivess
+#: model:ir.model.fields,field_description:logistic_custom_ivess.field_delivery_route_number__route_number_journal_id
+msgid "Route Number Journal"
+msgstr "Diario del reparto"
+
+#. module: logistic_custom_ivess
 #. odoo-python
 #: code:addons/logistic_custom_ivess/models/client_type.py:0
 msgid "The code must be unique"

@@ -26,7 +26,7 @@ SALE_SCHEMA = {
 }
 SALE_ITEM_SCHEMA = {
     "venta_cod_producto": str,
-    "venta_cantidad": (int, float),
+    "venta_cantidad": int,
     "venta_precio": (int, float),
 }
 SALE_ITEM_OPTIONAL = {"venta_tipo_envase", "venta_series"}
@@ -37,7 +37,7 @@ WITHDRAWAL_SCHEMA = {
 }
 WITHDRAWAL_ITEM_SCHEMA = {
     "retiro_cod_producto": str,
-    "retiro_cantidad": (int, float),
+    "retiro_cantidad": int,
 }
 WITHDRAWAL_ITEM_OPTIONAL = {"retiro_tipo_envase", "retiro_series"}
 
@@ -50,7 +50,7 @@ REPLACEMENT_REASON_SCHEMA = {
 }
 REPLACEMENT_ITEM_SCHEMA = {
     "recambio_cod_producto": str,
-    "recambio_cantidad": (int, float),
+    "recambio_cantidad": int,
 }
 REPLACEMENT_ITEM_OPTIONAL = {"recambio_tipo_envase", "recambio_series_entregado", "recambio_series_recibido"}
 
