@@ -8,6 +8,7 @@ class IvessMessagesReport(models.Model):
     distribution_id = fields.Many2one("template.delivery.route", readonly=True)
     customer_code = fields.Char(readonly=True)
     partner_message = fields.Text(readonly=True)
+    message_id = fields.Integer(readonly=True)
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -17,6 +18,7 @@ class IvessMessagesReport(models.Model):
                     drl.id AS id,
                     dr.template_delivery_route_id AS distribution_id,
                     drl.customer_code AS customer_code,
+                    pdm.id AS message_id,
                     pdm.message_text AS partner_message
                 FROM delivery_route_line drl
                 JOIN delivery_route dr
@@ -60,17 +62,25 @@ class IvessMessagesReport(models.Model):
             ("apply_to_all", "=", True),
             ("delivery_route_number_ids", "in", template.delivery_number_id.id),
         ])
+        read_general_messages = general_messages.read(["id", "message_text"])
 
         records = self.search([("distribution_id", "=", template.id)], order="customer_code")
-        raw_records = records.read(["customer_code", "partner_message"])
+        raw_records = records.read(["customer_code", "partner_message", "message_id"])
 
         return {
             "distribution": distribution,
-            "general_messages": general_messages.mapped("message_text"),
+            "general_messages": [
+                {
+                    "message_id": msg["id"],
+                    "message": msg["message_text"],
+                }
+                for msg in read_general_messages
+            ],
             "customers": [
                 {
                     "customer_code": rec["customer_code"],
                     "partner_message": rec["partner_message"],
+                    "message_id": rec["message_id"],
                 }
                 for rec in raw_records
             ],
