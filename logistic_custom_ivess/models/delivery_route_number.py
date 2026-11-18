@@ -84,6 +84,12 @@ class DeliveryRouteNumber(models.Model):
         string='Route Number Journal',
         domain=[('type', 'in', ['receipt'])],
     )
+    cash_journal_id = fields.Many2one(
+        'account.journal',
+        string='Diario de efectivo',
+        domain=[('type', '=', 'cash')],
+        help='Diario de efectivo donde se registran las cobranzas en efectivo que informa la app en este reparto.',
+    )
     region_id = fields.Many2one(
         'delivery.route.region',
         string='Región',

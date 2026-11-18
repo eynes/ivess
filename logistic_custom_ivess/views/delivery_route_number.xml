@@ -75,6 +75,7 @@
                                 </group>
                                     <group>
                                         <field name="route_number_journal_id"/>
+                                        <field name="cash_journal_id"/>
                                     </group>
                             </group>
                         </page>

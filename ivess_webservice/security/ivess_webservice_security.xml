@@ -10,10 +10,13 @@
          Crear sale.order exige el grupo de vendedor: hay campos con restriccion
          de grupo (p.ej. quotation.document) que no se resuelven con ACLs.
          Validar el picking de la venta exige stock.group_stock_user
-         (ivess_roles_custom.button_validate). -->
+         (ivess_roles_custom.button_validate).
+         Validar el cobro en efectivo genera el asiento contable: crear account.move,
+         account.move.line y account.partial.reconcile exige account.group_account_invoice. -->
     <function model="res.groups" name="write"
               eval="[[ref('group_ivess_webservice_user')], {'implied_ids': [
                   (4, ref('sales_team.group_sale_salesman')),
                   (4, ref('stock.group_stock_user')),
+                  (4, ref('account.group_account_invoice')),
               ]}]"/>
 </odoo>

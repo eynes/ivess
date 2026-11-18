@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from odoo import Command, api, models
-from odoo.exceptions import UserError
+from odoo import Command, api, fields, models
+from odoo.exceptions import UserError, ValidationError
 from odoo.fields import Domain
 from datetime import datetime
 import pytz
 
 from ..utils.delivery_params import (
     BASIC_HEADER_SCHEMA,
+    COLLECTION_DETAIL,
     CONTAINER_STATE,
     REPLACEMENT_ITEMS,
     REPLACEMENT_REASON_KEY,
@@ -41,6 +42,7 @@ ROUTE_LINE_VISIT_FIELDS = (
     "replacement_out_picking_id",
     "replacement_in_picking_id",
     "replacement_reason_id",
+    "cobranza_id",
 )
 
 
@@ -73,6 +75,17 @@ class ReplacementOutcome:
     in_: PickingOutcome
 
 
+@dataclass
+class CollectionOutcome:
+    """Resultado de la cobranza: el cobro y errores no fatales. Sin cobro y con
+    create_error, no se llego a crear. Con cobro y validate_error, quedo en
+    borrador sin validar (error al validar o periodo contable cerrado). Un
+    cheque o una retencion quedan en borrador por diseno, sin error."""
+    order: models.BaseModel
+    create_error: str | bool = False
+    validate_error: str | bool = False
+
+
 class IvessOperationDelivery(models.AbstractModel):
     _name = "ivess.operation.delivery"
     _description = "Servicio de envio de movimientos de ivess"
@@ -80,8 +93,8 @@ class IvessOperationDelivery(models.AbstractModel):
     @api.model
     def send_operation(self, **kwargs):
         """Registra la visita de un reparto: con venta o con motivo de no compra,
-        y en ambos casos con o sin retiro y recambio de envases (ninguno de los
-        dos va solo).
+        y en ambos casos con o sin retiro y recambio de envases y con o sin
+        cobranza (ninguno de los tres va solo).
 
         Fases: validar parametros -> resolver registros (ubicacion, reparto,
         cliente, motivo de recambio, recorrido) y la linea de la visita (un
@@ -89,8 +102,9 @@ class IvessOperationDelivery(models.AbstractModel):
         recambio contra productos, series y envases del cliente -> crear y
         confirmar la venta, preparar y validar su picking -> crear y validar el
         picking de retiro -> crear y validar los pickings del recambio (salida
-        del envase entregado y entrada del recibido) -> escribir o crear la
-        linea del recorrido -> responder.
+        del envase entregado y entrada del recibido) -> crear el cobro del
+        cliente y validarlo si es efectivo -> escribir o crear la linea del
+        recorrido -> responder.
 
         Todas las validaciones van antes de cualquier escritura: un return de
         error no hace rollback.
@@ -128,6 +142,9 @@ class IvessOperationDelivery(models.AbstractModel):
         item_retiro = kwargs.get(WITHDRAWAL_ITEMS.list_key) or []
         item_recambio = kwargs.get(REPLACEMENT_ITEMS.list_key) or []
         motivo_recambio_id = kwargs.get(REPLACEMENT_REASON_KEY)
+        cobrado = kwargs.get("cobrado")
+        detalle_valores = kwargs.get("detalle_valores")
+        numero_recibo = kwargs.get("numero_recibo")
 
         # Fase 3: resolver registros (ubicacion, reparto, cliente, motivo,
         # recorrido) y la linea de la visita. Un reintento responde sin escribir.
@@ -316,6 +333,13 @@ class IvessOperationDelivery(models.AbstractModel):
                     for container in assigned
                 ))}
 
+        # Cobranza: diarios, numero del recibo y periodo contable. Solo lee.
+        collection = {}
+        if cobrado is not None:
+            collection, error = self._resolve_collection(reparto, fecha_operacion, detalle_valores, numero_recibo)
+            if error:
+                return {"error": error}
+
         # Fase 5: escribir. Desde aca los fallos ya no cortan el flujo: se
         # informan como warning. Venta, retiro y despues la linea del recorrido.
         vals = {
@@ -359,6 +383,13 @@ class IvessOperationDelivery(models.AbstractModel):
             if replacement_outcome.in_.picking:
                 vals["replacement_in_picking_id"] = replacement_outcome.in_.picking.id
 
+        # Cobranza 
+        collection_outcome = CollectionOutcome(self.env["account.payment.order"])
+        if collection:
+            collection_outcome = self._process_collection(cliente, fecha_operacion, cobrado, collection)
+            if collection_outcome.order:
+                vals["cobranza_id"] = collection_outcome.order.id
+
         if linea:
             linea.write(vals)
         else:
@@ -371,7 +402,7 @@ class IvessOperationDelivery(models.AbstractModel):
             })
 
         # Fase 6: respuesta
-        return self._build_response(linea, outcome, withdrawal_outcome, replacement_outcome)
+        return self._build_response(linea, outcome, withdrawal_outcome, replacement_outcome, collection_outcome)
 
     def _resolve_route_line(self, recorrido, cliente, fuera_ruta, visit_date_hour):
         """Elige la linea del recorrido para la visita. Devuelve
@@ -409,6 +440,179 @@ class IvessOperationDelivery(models.AbstractModel):
                 cliente.customer_code, recorrido.delivery_number_id.location_id.aguas_idreparto,
             )
         return none, free, False
+
+    def _resolve_collection(self, reparto, fecha_operacion, detalle_valores, numero_recibo):
+        """Resuelve lo que necesita la cobranza para crearse sin fallar: el
+        diario del cobro, el numero del recibo y el diario o impuesto de la
+        linea segun detalle_valores. Solo lee: un error se devuelve sin
+        escribir. Devuelve (collection, error); collection tiene "detail" (de
+        COLLECTION_DETAIL), "journal", "number" (False si no vino
+        numero_recibo) y, segun el detalle, "cash_journal" y "period_error"
+        (motivo por el que el efectivo no se puede validar, o False),
+        "check_journal" o "tax" y "tax_account".
+
+        Sin numero_recibo el diario es el del reparto (route_number_journal_id);
+        con numero_recibo es su talonario de cobranzas (collection_journal_ids,
+        que tiene un unico diario). El numero se guarda tal cual vino, sin tocar
+        la secuencia del diario."""
+        detail = COLLECTION_DETAIL[detalle_valores]
+        number = numero_recibo.strip() if numero_recibo is not None else False
+        journal = reparto.collection_journal_ids[:1] if number else reparto.route_number_journal_id
+        if not journal:
+            campo = "talonario de cobranzas" if number else "diario del reparto"
+            return {}, "El reparto %s no tiene %s configurado para registrar la cobranza." % (
+                reparto.location_id.aguas_idreparto, campo,
+            ) 
+        if number and self.env["account.payment.order"].search_count([
+            ("type", "=", "receipt"),
+            ("journal_id", "=", journal.id),
+            ("number", "=", number),
+        ]):
+            return {}, "Ya existe una cobranza con el numero %s en el diario %s." % (number, journal.code)
+
+        collection = {"detail": detail, "journal": journal, "number": number}
+        company = journal.company_id
+        if detail == "efectivo":
+            collection["cash_journal"] = reparto.cash_journal_id
+            if not collection["cash_journal"]:
+                return {}, "El reparto %s no tiene diario de efectivo configurado." % reparto.location_id.aguas_idreparto
+            # Solo el efectivo se valida (contabiliza): los demas quedan en borrador.
+            # Un periodo cerrado no corta la visita: el cobro se crea en borrador sin
+            # validar y el motivo se informa como warning.
+            collection["period_error"] = self._check_journal_period(journal, fields.Date.to_date(fecha_operacion))
+        elif detail == "cheque":
+            collection["check_journal"] = self.env["account.journal"].search([
+                ("type", "=", "third_party_checks"),
+                ("company_id", "=", company.id),
+            ], limit=1)
+            if not collection["check_journal"]:
+                return {}, "No existe un diario de cheques de terceros para registrar la cobranza."
+        else:
+            # Impuesto de retencion de venta cuyo asiento tenga cuenta (get_retention_account lanza error si no).
+            for tax in self.env["account.tax"].search([
+                ("tax_group_id.group_type", "=", "retention"),
+                ("type_tax_use", "=", "sale"),
+                ("company_id", "=", company.id),
+            ], order="id"):
+                try:
+                    collection["tax_account"] = tax.get_retention_account()
+                except ValidationError:
+                    continue
+                collection["tax"] = tax
+                break
+            if "tax" not in collection:
+                return {}, "No existe un impuesto de retencion de venta con cuenta para registrar la cobranza."
+        return collection, False
+
+    def _check_journal_period(self, journal, fecha):
+        """Replica la validacion de ivess_validate_period.account.move._post
+        (si el modulo esta instalado) antes de crear el cobro: ante un periodo
+        invalido ese modulo hace commit() y despues lanza el error, lo que
+        rompe los savepoints y deja el cobro a medio crear. Por eso, con un
+        periodo invalido, el cobro no se valida y queda en borrador. Mismo
+        chequeo que ivess_invoice_import. Devuelve el motivo o False."""
+        if not hasattr(self.env["account.move"], "_validate_period"):
+            return False
+        if not journal.due_date:
+            return "El diario '%s' no tiene fecha de cierre establecida." % journal.code
+        if fecha < journal.due_date:
+            return "La fecha de la operacion (%s) es anterior a la fecha de cierre del diario '%s' (%s)." % (
+                fecha.strftime("%d-%m-%Y"), journal.code, journal.due_date.strftime("%d-%m-%Y"),
+            )
+        return False
+
+    def _process_collection(self, cliente, fecha_operacion, cobrado, collection):
+        """Crea el cobro del cliente y, solo si es efectivo, lo valida. Cada
+        etapa va en su propio savepoint y los fallos se informan como warning
+        sin tumbar la visita. Si falla la creacion no queda cobro. Un cheque o
+        una retencion quedan en borrador con una nota para que una persona
+        complete los datos PENDIENTE. El efectivo queda en borrador, con nota,
+        si falla la validacion o si el periodo contable esta cerrado.
+        collection: ver _resolve_collection."""
+        outcome = CollectionOutcome(self.env["account.payment.order"])
+        date = fields.Date.to_date(fecha_operacion)
+        try:
+            with self.env.cr.savepoint():
+                outcome.order = self._create_collection_order(cliente, date, cobrado, collection)
+        except UserError as e:
+            outcome.create_error = str(e)
+            return outcome
+        if collection["detail"] != "efectivo":
+            outcome.order.message_post(
+                body="Cobranza cargada desde la app con datos pendientes de completar (%s)" % collection["detail"]
+            )
+            return outcome
+        # Con el periodo cerrado ni se intenta validar: ver _check_journal_period
+        outcome.validate_error = collection["period_error"] or self._validate_collection_order(outcome.order)
+        if outcome.validate_error:
+            outcome.order.message_post(
+                body="La validacion automatica desde la app fallo y la cobranza quedo en borrador: %s" % outcome.validate_error
+            )
+        return outcome
+
+    def _create_collection_order(self, cliente, date, cobrado, collection):
+        """Cobro (account.payment.order de tipo receipt) en borrador, con una
+        unica linea segun el detalle. Sin facturas imputadas: queda como pago a
+        cuenta. Con numero_recibo se fija el numero tal cual; posted_before=True
+        evita que proforma_voucher lo pise con la secuencia del diario (mismo
+        recurso que ivess_invoice_import). disable_retentions evita el calculo
+        automatico de retenciones de anticipo. En cheque y retencion los datos
+        que la app no manda van en PENDIENTE o vacios; en Python solo son
+        obligatorios el numero, el diario y el formato del cheque."""
+        journal = collection["journal"]
+        vals = {
+            "type": "receipt",
+            "partner_id": cliente.id,
+            "journal_id": journal.id,
+            "company_id": journal.company_id.id,
+            "date": date,
+            "disable_retentions": True, 
+        }
+        if collection["number"]:
+            vals["number"] = collection["number"]
+            vals["posted_before"] = True
+        detail = collection["detail"]
+        if detail == "efectivo":
+            vals["payment_mode_line_ids"] = [Command.create({
+                "payment_mode_id": collection["cash_journal"].id,
+                "amount": cobrado,
+                "date": date,
+            })]
+        elif detail == "cheque":
+            vals["third_party_check_receipt_ids"] = [Command.create({
+                "journal_id": collection["check_journal"].id,
+                "company_id": journal.company_id.id,
+                "number": "00000000",
+                "checkbook_format": "physical",
+                "amount": cobrado,
+                "reception_date": date,
+            })]
+        else:
+            vals["retention_ids"] = [Command.create({
+                "retention_id": collection["tax"].id,
+                "account_id": collection["tax_account"].id,
+                "name": collection["tax"].name,
+                "certificate_no": "PENDIENTE",
+                "amount": cobrado,
+                "date": date,
+            })]
+        return self.env["account.payment.order"].create(vals)
+
+    def _validate_collection_order(self, order):
+        """Valida el cobro (genera el asiento contable). Si falla se deshace
+        solo la validacion: el cobro queda en borrador y vinculado. Devuelve el
+        error o False. proforma_voucher no lanza ante un error al generar el
+        asiento: lo captura, deja el cobro en borrador y devuelve un popup, por
+        eso el exito se verifica por el estado."""
+        try:
+            with self.env.cr.savepoint():
+                result = order.proforma_voucher()
+                if order.state != "posted":
+                    message = result.get("context", {}).get("message") if isinstance(result, dict) else None
+                    raise UserError(message or "No se pudo validar la cobranza %s." % order.display_name)
+        except UserError as e:
+            return str(e)
+        return False
 
     def _process_withdrawal(self, cliente, reparto, items, products_by_code, lot_by_key,
                             spec=WITHDRAWAL_ITEMS, series_key=None, label="retiro"):
@@ -770,7 +974,7 @@ class IvessOperationDelivery(models.AbstractModel):
             return str(e)
         return False
 
-    def _build_response(self, linea, sale_outcome, withdrawal_outcome, replacement_outcome):
+    def _build_response(self, linea, sale_outcome, withdrawal_outcome, replacement_outcome, collection_outcome):
         result = {"success": True, "route_line_id": linea.id}
         warnings = []
         if sale_outcome.order:
@@ -807,6 +1011,15 @@ class IvessOperationDelivery(models.AbstractModel):
                 warnings.append("No se pudo confirmar el picking de recambio (%s) (quedo en borrador): %s" % (label, outcome.confirm_error))
             elif outcome.validate_error:
                 warnings.append("No se pudo validar el picking de recambio (%s): %s" % (label, outcome.validate_error))
+        if collection_outcome.order or collection_outcome.create_error:
+            result["payment_order_id"] = collection_outcome.order.id
+            result["payment_order_validated"] = collection_outcome.order.state == "posted"
+            # Excluyentes, igual que en el retiro. Un cheque o una retencion quedan en
+            # borrador por diseno: payment_order_validated en false y sin warning.
+            if collection_outcome.create_error:
+                warnings.append("No se pudo crear la cobranza: %s" % collection_outcome.create_error)
+            elif collection_outcome.validate_error:
+                warnings.append("No se pudo validar la cobranza (quedo en borrador): %s" % collection_outcome.validate_error)
         if warnings:
             result["warning"] = "; ".join(warnings)
         return result
@@ -828,6 +1041,9 @@ class IvessOperationDelivery(models.AbstractModel):
         if linea.replacement_in_picking_id:
             result["replacement_in_picking_id"] = linea.replacement_in_picking_id.id
             result["replacement_in_picking_validated"] = linea.replacement_in_picking_id.state == "done"
+        if linea.cobranza_id:
+            result["payment_order_id"] = linea.cobranza_id.id
+            result["payment_order_validated"] = linea.cobranza_id.state == "posted"
         return result
 
     def _app_datetime_to_utc(self, fecha, hora):

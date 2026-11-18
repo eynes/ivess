@@ -655,6 +655,12 @@ class DeliveryRouteLine(models.Model):
         string='Motivo de recambio',
         help='Motivo del recambio de envases de esta visita. Es uno solo por visita.',
     )
+    cobranza_id = fields.Many2one(
+        'account.payment.order',
+        string='Cobranza',
+        help='Cobro que la app registro en esta visita.',
+        copy=False,
+    )
     delivery_date = fields.Date(
         string='Fecha de Visita',
         related='route_id.delivery_date',
@@ -1017,6 +1023,7 @@ class DeliveryRouteLine(models.Model):
                 'replacement_out_picking_id': rec.replacement_out_picking_id.id,
                 'replacement_in_picking_id': rec.replacement_in_picking_id.id,
                 'replacement_reason_id': rec.replacement_reason_id.id,
+                'cobranza_id': rec.cobranza_id.id,
                 'origin': 'rastrillo',
             }])
 
