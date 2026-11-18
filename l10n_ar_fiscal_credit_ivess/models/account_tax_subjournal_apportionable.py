@@ -46,6 +46,7 @@ class AccountTaxSubjournalApportionableWizard(models.TransientModel):
             raise UserError(_('There were no moves for this period'))
 
         c_taxes = [0] * len(cols)
+        vat_ids = {tax['id'] for tax in vat_cols}
         final_consumer_id = self.env.ref('l10n_ar_eynes.fiscal_position_cf').id
         ri_id = self.env.ref('l10n_ar_eynes.fiscal_position_ri').id
 
@@ -162,6 +163,7 @@ class AccountTaxSubjournalApportionableWizard(models.TransientModel):
                     lines[key]['vat_taxes'][tax_id][
                         line['fiscal_credit']
                     ] += amount
+            self._add_vat_tax_line(lines[key], line, vat_ids, amount)
 
             if not (line['tax_line_id'] or line['tax_ids']):
                 # SI NO ES LINEA DE IMPUESTO O ES LINEA SIN IMPUESTOS CORRESPONDE A NO GRAVADO
@@ -234,13 +236,14 @@ class AccountTaxSubjournalApportionableWizard(models.TransientModel):
             )
 
             first_vat = True
-            for vat_values in line['vat_taxes'].values():
+            for tax_id, vat_values in line['vat_taxes'].items():
                 vat_split = list(vat_values.keys())
                 vat_split.remove('name')
                 # FIX: 'is_exempt' no es un valor de fiscal_credit, se
                 # separa para no iterarlo como si fuera uno.
                 if 'is_exempt' in vat_split:
                     vat_split.remove('is_exempt')
+                vat_amounts = self._split_vat_amount(line, tax_id, vat_values)
 
                 # FIX: un impuesto es "0% IVA" tanto si esta marcado
                 # is_exempt=True (p.ej. "IVA Exento") como si su alicuota
@@ -272,14 +275,7 @@ class AccountTaxSubjournalApportionableWizard(models.TransientModel):
                         )  # +2 for no_taxed and total
                     base_vat_amount = vat_values[raw_fiscal_credit]
                     vat_aliquot = vat_values['name']
-                    try:
-                        vat_amount = round(
-                            base_vat_amount
-                            * (float(vat_aliquot.replace('%', '')) / 100),
-                            2,
-                        )
-                    except ValueError:
-                        vat_amount = 0.0
+                    vat_amount = vat_amounts[raw_fiscal_credit]
 
                     # FIX: si no hay fiscal_credit clasificado pero el IVA
                     # es 0%, se asume 'direct_exempt' en vez de descartar
