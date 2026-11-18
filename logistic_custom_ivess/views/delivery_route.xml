@@ -67,6 +67,7 @@
                                     <field name="replacement_out_picking_id" widget="many2one_link" optional="show"/>
                                     <field name="replacement_in_picking_id" widget="many2one_link" optional="show"/>
                                     <field name="replacement_reason_id" widget="many2one_link" optional="show"/>
+                                    <field name="cobranza_id" widget="many2one_link" optional="show"/>
                                     <field name="frequency" optional="show"/>
                                     <field name="origin" optional="show"/>
                                     <field name="is_vacation" optional="show" readonly="1"/>

@@ -21,6 +21,7 @@
         "ivess_partner_custom",
         "pricelist_custom",
         "aguas_fc_integration",
+        "account_import_clearance",
     ],
     "data": [
         "data/ir_sequence.xml",

@@ -54,6 +54,20 @@ REPLACEMENT_ITEM_SCHEMA = {
 }
 REPLACEMENT_ITEM_OPTIONAL = {"recambio_tipo_envase", "recambio_series_entregado", "recambio_series_recibido"}
 
+# Cobranza: se combina con una venta o con un motivo de no compra; nunca va sola.
+# cobrado y detalle_valores van juntos; numero_recibo es opcional.
+COLLECTION_SCHEMA = {
+    "cobrado": (int, float),
+    "detalle_valores": int,
+    "numero_recibo": str,
+}
+# detalle_valores: que valor se cobro. Define la linea que lleva el cobro.
+COLLECTION_DETAIL = {
+    1: "efectivo",
+    2: "cheque",
+    3: "retencion",
+}
+
 CONTAINER_STATE = {
     "V": "en_comodato",
     "P": "prestado",
@@ -176,20 +190,20 @@ def validate_header(params):
 
 
 def case_param_names(params):
-    """Parametros propios del caso: item_retiro, item_recambio y recambio_motivo
-    siempre; item_venta solo cuando no hay motivo de no compra."""
-    names = {WITHDRAWAL_ITEMS.list_key, REPLACEMENT_ITEMS.list_key, REPLACEMENT_REASON_KEY}
+    """Parametros propios del caso: item_retiro, item_recambio, recambio_motivo
+    y los de la cobranza siempre; item_venta solo cuando no hay motivo de no compra."""
+    names = {WITHDRAWAL_ITEMS.list_key, REPLACEMENT_ITEMS.list_key, REPLACEMENT_REASON_KEY, *COLLECTION_SCHEMA}
     if params["motivo_no_compra"] == 0:
         names.add(SALE_ITEMS.list_key)
     return names
 
 
 def validate_case_params(params):
-    """Fase 2: parametros propios del caso (item_venta, item_retiro, item_recambio
-    y cada item). Sin motivo de no compra la visita es una venta: item_venta es
-    obligatorio. item_retiro e item_recambio acompanan a una venta o a una no
-    compra; nunca van solos. recambio_motivo es obligatorio con item_recambio y
-    no aplica sin el."""
+    """Fase 2: parametros propios del caso (item_venta, item_retiro, item_recambio,
+    cada item y la cobranza). Sin motivo de no compra la visita es una venta:
+    item_venta es obligatorio. item_retiro, item_recambio y la cobranza
+    acompanan a una venta o a una no compra; nunca van solos. recambio_motivo
+    es obligatorio con item_recambio y no aplica sin el."""
     errors = ParamErrors()
     if params["motivo_no_compra"] == 0:
         check_schema(params, SALE_SCHEMA, errors)
@@ -202,9 +216,37 @@ def validate_case_params(params):
         check_schema(params, REPLACEMENT_REASON_SCHEMA, errors)
     elif params.get(REPLACEMENT_REASON_KEY) is not None:
         errors.add("not_applicable", REPLACEMENT_REASON_KEY + " (sin item_recambio)")
+    validate_collection(params, errors)
     for spec in (SALE_ITEMS, WITHDRAWAL_ITEMS, REPLACEMENT_ITEMS):
         validate_items(params, spec, errors)
     return errors
+
+
+def validate_collection(params, errors):
+    """Cobranza: cobrado dispara el caso y exige detalle_valores; numero_recibo
+    es opcional. Sin cobrado, detalle_valores y numero_recibo no aplican.
+    cobrado en null equivale a ausente. Los rangos se miran solo si el tipo es
+    correcto, para no informar dos errores del mismo parametro."""
+    amount = params.get("cobrado")
+    detail = params.get("detalle_valores")
+    receipt = params.get("numero_recibo")
+    if amount is None:
+        for key in ("detalle_valores", "numero_recibo"):
+            if params.get(key) is not None:
+                errors.add("not_applicable", key + " (sin cobrado)")
+        return
+    # numero_recibo es opcional: check_schema lo daria por faltante, asi que se exige solo si viene
+    schema = dict(COLLECTION_SCHEMA)
+    if receipt is None:
+        del schema["numero_recibo"]
+    check_schema(params, schema, errors)
+    # type() y no isinstance(): bool es subclase de int
+    if type(amount) in (int, float) and amount <= 0:
+        errors.add("invalid_value", "cobrado (> 0)")
+    if type(detail) is int and detail not in COLLECTION_DETAIL:
+        errors.add("invalid_value", "detalle_valores (%s)" % "/".join(map(str, COLLECTION_DETAIL)))
+    if type(receipt) is str and not receipt.strip():
+        errors.add("invalid_value", "numero_recibo (no vacio)")
 
 
 def validate_items(params, spec, errors):
