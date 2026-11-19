@@ -4,19 +4,18 @@
 
         <!-- ══════════════════════════════════════════════════════════════════
              PURCHASE ORDER FORM — restricciones de botones por grupo
-             Referencia CSV: filas 4 y 7
-             • button_confirm      → solo purchase_manager / system (fila 4)
+             Referencia CSV: fila 7
              • action_view_invoice → stat-button de facturas, solo managers (fila 7)
+             "Confirmar pedido" (fila 4) queda visible para todo Compras: lo que
+             pasa al confirmar lo decide purchase.order._approval_allowed()
+             (models/purchase_order.py). El Usuario Compras deja la orden
+             "Por aprobar".
         ══════════════════════════════════════════════════════════════════════ -->
         <record id="view_purchase_order_form_cabr" model="ir.ui.view">
             <field name="name">purchase.order.form.cabr</field>
             <field name="model">purchase.order</field>
             <field name="inherit_id" ref="purchase.purchase_order_form"/>
             <field name="arch" type="xml">
-
-                <button name="button_confirm" position="attributes">
-                    <attribute name="groups">purchase.group_purchase_manager,base.group_system</attribute>
-                </button>
 
                 <button name="action_view_invoice" position="attributes">
                     <attribute name="groups">purchase.group_purchase_manager,base.group_system</attribute>
