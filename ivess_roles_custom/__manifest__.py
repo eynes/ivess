@@ -2,7 +2,7 @@
 # License LGPL-3.0 or later (https://www.gnu.org/licenses/lgpl.html).
 {
     "name": "IVESS - Roles y Permisos Compras y Abastecimiento",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "summary": "Matriz de permisos para los roles del área de Compras y Abastecimiento",
     "description": """
         Implementa la matriz de accesos para los roles del área de Compras
@@ -25,6 +25,9 @@
 
         Control total:
           · Administrador TOTAL (base.group_system)
+
+        Doble validación de órdenes de compra:
+          · Aprobador de órdenes de compra (ivess_roles_custom.group_purchase_approver)
 
         La matriz de permisos completa está documentada en
         security/ir.model.access.csv y en los comentarios de security/security.xml.
