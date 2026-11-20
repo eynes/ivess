@@ -245,8 +245,10 @@ def validate_collection(params, errors):
         errors.add("invalid_value", "cobrado (> 0)")
     if type(detail) is int and detail not in COLLECTION_DETAIL:
         errors.add("invalid_value", "detalle_valores (%s)" % "/".join(map(str, COLLECTION_DETAIL)))
-    if type(receipt) is str and not receipt.strip():
-        errors.add("invalid_value", "numero_recibo (no vacio)")
+    # isdecimal y no isdigit: isdigit acepta caracteres como "²" que int() no convierte.
+    # Tambien cubre el vacio y los espacios. Hace falta int() para avanzar la secuencia
+    if type(receipt) is str and not receipt.isdecimal():
+        errors.add("invalid_value", "numero_recibo (solo digitos)")
 
 
 def validate_items(params, spec, errors):

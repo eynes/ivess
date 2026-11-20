@@ -596,7 +596,20 @@ class IvessOperationDelivery(models.AbstractModel):
                 "amount": cobrado,
                 "date": date,
             })]
-        return self.env["account.payment.order"].create(vals)
+        order = self.env["account.payment.order"].create(vals)
+        if collection["number"]:
+            self._advance_journal_sequence(journal, collection["number"])
+        return order
+
+    def _advance_journal_sequence(self, journal, number):
+        """Con numero_recibo el cobro no consume la secuencia (posted_before):
+        se la sube a max(actual, numero + 1) para que el proximo automatico, y
+        el next_number de get_talonarios, no repita un numero ya usado. Se
+        escribe en la secuencia con sudo porque el inverse de
+        journal.sequence_number_next hace lo mismo y el usuario del servicio no
+        puede escribir account.journal."""
+        sequence = journal.sequence_id._get_current_sequence().sudo()
+        sequence.number_next = max(sequence.number_next_actual, int(number) + 1)
 
     def _validate_collection_order(self, order):
         """Valida el cobro (genera el asiento contable). Si falla se deshace
