@@ -1,6 +1,6 @@
 [submodule "l10n_ar_eynes"]
 	path = l10n_ar_eynes
-	url = https://gitlab.eynes.com.ar/localization/l10n_ar_eynes.git
+	url = git@gitlab.eynes.com.ar:localization/l10n_ar_eynes.git
 	branch = 19.0
 [submodule "reporting-engine"]
 	path = reporting-engine
@@ -8,7 +8,7 @@
 	branch = 19.0
 [submodule "month_year_widget"]
 	path = month_year_widget
-	url = https://gitlab.eynes.com.ar/otros/month_year_widget.git
+	url = git@gitlab.eynes.com.ar:otros/month_year_widget.git
 	branch = 19.0
 [submodule "server-ux"]
 	path = server-ux
@@ -20,7 +20,7 @@
 	branch = 19.0-mig-web_notify
 [submodule "popup_messages"]
 	path = popup_messages
-	url = https://gitlab.eynes.com.ar/otros/popup_messages.git
+	url = git@gitlab.eynes.com.ar:otros/popup_messages.git
 	branch = 19.0
 [submodule "odooapps"]
 	path = odooapps
@@ -32,7 +32,7 @@
 	branch = 19.0
 [submodule "account_import_clearance"]
 	path = account_import_clearance
-	url = https://gitlab.eynes.com.ar/jenck/account_import_clearance.git
+	url = git@gitlab.eynes.com.ar:jenck/account_import_clearance.git
 	branch = 19.0-ivess
 [submodule "account_financial_reporting"]
 	path = account_financial_reporting
