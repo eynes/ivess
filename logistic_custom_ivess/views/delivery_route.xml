@@ -66,6 +66,7 @@
                                     <field name="withdrawal_picking_id" widget="many2one_link" optional="show"/>
                                     <field name="replacement_out_picking_id" widget="many2one_link" optional="show"/>
                                     <field name="replacement_in_picking_id" widget="many2one_link" optional="show"/>
+                                    <field name="comodato_withdrawal_picking_id" widget="many2one_link" optional="show"/>
                                     <field name="replacement_reason_id" widget="many2one_link" optional="show"/>
                                     <field name="cobranza_id" widget="many2one_link" optional="show"/>
                                     <field name="frequency" optional="show"/>
@@ -150,6 +151,7 @@
                 <field name="withdrawal_picking_id" string="Remito de retiro" widget="many2one"/>
                 <field name="replacement_out_picking_id" string="Remito de recambio (entrega)" widget="many2one"/>
                 <field name="replacement_in_picking_id" string="Remito de recambio (retiro)" widget="many2one"/>
+                <field name="comodato_withdrawal_picking_id" string="Remito de retiro (venta en comodato)" widget="many2one"/>
                 <field name="replacement_reason_id" string="Motivo de recambio" widget="many2one"/>
                 <field name="cobranza_ids" string="Cobranzas" widget="many2many_tags"/>
                 <button name="action_ver_cobranzas" type="object" icon="fa-external-link"

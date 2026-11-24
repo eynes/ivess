@@ -650,6 +650,12 @@ class DeliveryRouteLine(models.Model):
         string='Remito de recambio (retiro)',
         help='Picking de entrada con los envases que el repartidor recupero del cliente en el recambio de esta visita.',
     )
+    comodato_withdrawal_picking_id = fields.Many2one(
+        'stock.picking',
+        string='Remito de retiro (venta en comodato)',
+        help='Picking de entrada con los envases que el servicio retiro automaticamente del cliente '
+             'por una venta en comodato en esta visita. Es distinto del retiro que informa la app.',
+    )
     replacement_reason_id = fields.Many2one(
         'replacement.reason',
         string='Motivo de recambio',
@@ -1022,6 +1028,7 @@ class DeliveryRouteLine(models.Model):
                 'withdrawal_picking_id': rec.withdrawal_picking_id.id,
                 'replacement_out_picking_id': rec.replacement_out_picking_id.id,
                 'replacement_in_picking_id': rec.replacement_in_picking_id.id,
+                'comodato_withdrawal_picking_id': rec.comodato_withdrawal_picking_id.id,
                 'replacement_reason_id': rec.replacement_reason_id.id,
                 'cobranza_id': rec.cobranza_id.id,
                 'origin': 'rastrillo',
