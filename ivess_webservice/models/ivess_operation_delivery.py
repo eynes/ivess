@@ -15,6 +15,9 @@ from ..utils.delivery_params import (
     WITHDRAWAL_ITEMS,
     CustomerContainers,
     case_param_names,
+    comodato_sale_products,
+    comodato_withdrawal_items,
+    requested_quantity,
     requires_container_state,
     validate_allows_replacement,
     validate_case_params,
@@ -41,6 +44,7 @@ ROUTE_LINE_VISIT_FIELDS = (
     "withdrawal_picking_id",
     "replacement_out_picking_id",
     "replacement_in_picking_id",
+    "comodato_withdrawal_picking_id",
     "replacement_reason_id",
     "cobranza_id",
 )
@@ -101,7 +105,10 @@ class IvessOperationDelivery(models.AbstractModel):
         reintento responde sin escribir) -> validar la venta, el retiro y el
         recambio contra productos, series y envases del cliente -> crear y
         confirmar la venta, preparar y validar su picking -> crear y validar el
-        picking de retiro -> crear y validar los pickings del recambio (salida
+        picking de retiro -> si la venta es en comodato (tipo 'V', sin serie),
+        crear y validar un picking de retiro aparte con los envases que el
+        cliente devuelve a cambio, hasta lo que tenga (comodato_withdrawal_picking_id)
+        -> crear y validar los pickings del recambio (salida
         del envase entregado y entrada del recibido) -> crear el cobro del
         cliente y validarlo si es efectivo -> escribir o crear la linea del
         recorrido -> responder.
@@ -222,10 +229,14 @@ class IvessOperationDelivery(models.AbstractModel):
 
         # Retiro y recambio comparten productos y envases del cliente: se buscan
         # y validan juntos, porque la demanda sobre el cliente (retiro + recibido) se suma.
+        # La venta en comodato tambien entra: necesita el estado del cliente para
+        # calcular su retiro automatico.
+        comodato_products = comodato_sale_products(item_venta, products_by_code) if item_venta else {}
         container_products = {}
         customer_lots = {}
         delivered_series = set()
-        if item_retiro or item_recambio:
+        comodato_items = []
+        if item_retiro or item_recambio or comodato_products:
             flows = [
                 (spec, items)
                 for spec, items in ((WITHDRAWAL_ITEMS, item_retiro), (REPLACEMENT_ITEMS, item_recambio))
@@ -242,6 +253,10 @@ class IvessOperationDelivery(models.AbstractModel):
                     name for name, items in (("retiro", item_retiro), ("recambio", item_recambio)) if items
                 )
                 return {"error": "No existen productos de %s con los codigos: %s" % (flow_names, ", ".join(sorted(missing_codes)))}
+            # Los de la venta en comodato se suman para entrar al snapshot del cliente
+            # y para que la fase 5 los encuentre al armar el picking.
+            for code, product in comodato_products.items():
+                container_products.setdefault(code, product)
 
             for spec, items in flows:
                 error = (
@@ -299,6 +314,14 @@ class IvessOperationDelivery(models.AbstractModel):
             if error:
                 return {"error": error}
             customer_lots = containers.lots
+
+            # Retiro automatico de la venta en comodato: lo explicito va primero
+            # (ya validado arriba) y el automatico toma lo que le queda al cliente.
+            if comodato_products:
+                comodato_items = comodato_withdrawal_items(
+                    item_venta, products_by_code, containers,
+                    requested_quantity(demands, container_products),
+                )
 
         # Lotes de las series de la venta y del envase entregado: una sola busqueda.
         lot_by_key = {}
@@ -369,6 +392,17 @@ class IvessOperationDelivery(models.AbstractModel):
             if withdrawal_outcome.picking:
                 vals["withdrawal_picking_id"] = withdrawal_outcome.picking.id
 
+        # Retiro automatico de la venta en comodato: picking aparte del retiro que
+        # informa la app, para distinguirlos en la linea.
+        comodato_outcome = PickingOutcome(self.env["stock.picking"])
+        if comodato_items:
+            comodato_outcome = self._process_withdrawal(
+                cliente, reparto, comodato_items, container_products, customer_lots,
+                label="retiro automatico por venta en comodato",
+            )
+            if comodato_outcome.picking:
+                vals["comodato_withdrawal_picking_id"] = comodato_outcome.picking.id
+
         # Recambio: despues del retiro. Salida primero, asi lo recibido no tapa la falta de stock del entregado.
         replacement_outcome = ReplacementOutcome(
             PickingOutcome(self.env["stock.picking"]), PickingOutcome(self.env["stock.picking"]),
@@ -402,7 +436,9 @@ class IvessOperationDelivery(models.AbstractModel):
             })
 
         # Fase 6: respuesta
-        return self._build_response(linea, outcome, withdrawal_outcome, replacement_outcome, collection_outcome)
+        return self._build_response(
+            linea, outcome, withdrawal_outcome, comodato_outcome, replacement_outcome, collection_outcome,
+        )
 
     def _resolve_route_line(self, recorrido, cliente, fuera_ruta, visit_date_hour):
         """Elige la linea del recorrido para la visita. Devuelve
@@ -987,7 +1023,7 @@ class IvessOperationDelivery(models.AbstractModel):
             return str(e)
         return False
 
-    def _build_response(self, linea, sale_outcome, withdrawal_outcome, replacement_outcome, collection_outcome):
+    def _build_response(self, linea, sale_outcome, withdrawal_outcome, comodato_outcome, replacement_outcome, collection_outcome):
         result = {"success": True, "route_line_id": linea.id}
         warnings = []
         if sale_outcome.order:
@@ -1009,6 +1045,16 @@ class IvessOperationDelivery(models.AbstractModel):
                 warnings.append("No se pudo confirmar el picking de retiro (quedo en borrador): %s" % withdrawal_outcome.confirm_error)
             elif withdrawal_outcome.validate_error:
                 warnings.append("No se pudo validar el picking de retiro: %s" % withdrawal_outcome.validate_error)
+        if comodato_outcome.picking or comodato_outcome.create_error:
+            result["comodato_withdrawal_picking_id"] = comodato_outcome.picking.id
+            result["comodato_withdrawal_picking_validated"] = comodato_outcome.picking.state == "done"
+            # Excluyentes, igual que en el retiro
+            if comodato_outcome.create_error:
+                warnings.append("No se pudo crear el retiro automatico por venta en comodato: %s" % comodato_outcome.create_error)
+            elif comodato_outcome.confirm_error:
+                warnings.append("No se pudo confirmar el picking de retiro por venta en comodato (quedo en borrador): %s" % comodato_outcome.confirm_error)
+            elif comodato_outcome.validate_error:
+                warnings.append("No se pudo validar el picking de retiro por venta en comodato: %s" % comodato_outcome.validate_error)
         for key, outcome, label in (
             ("replacement_out", replacement_outcome.out, "entrega"),
             ("replacement_in", replacement_outcome.in_, "retiro"),
@@ -1048,6 +1094,9 @@ class IvessOperationDelivery(models.AbstractModel):
         if linea.withdrawal_picking_id:
             result["withdrawal_picking_id"] = linea.withdrawal_picking_id.id
             result["withdrawal_picking_validated"] = linea.withdrawal_picking_id.state == "done"
+        if linea.comodato_withdrawal_picking_id:
+            result["comodato_withdrawal_picking_id"] = linea.comodato_withdrawal_picking_id.id
+            result["comodato_withdrawal_picking_validated"] = linea.comodato_withdrawal_picking_id.state == "done"
         if linea.replacement_out_picking_id:
             result["replacement_out_picking_id"] = linea.replacement_out_picking_id.id
             result["replacement_out_picking_validated"] = linea.replacement_out_picking_id.state == "done"
