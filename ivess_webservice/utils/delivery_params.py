@@ -401,6 +401,25 @@ class CustomerContainers:
     lot_states: dict
 
 
+def requested_quantity(demands, products_by_code):
+    """Cantidad que la request saca del cliente, sin serie: {(template,
+    estado efectivo): cantidad}. demands: lista de (spec, series_key, items),
+    un elemento por flujo (retiro y lado recibido del recambio). Se suma
+    entre flujos, porque salen del mismo stock del cliente. Los envases con
+    serie no cuentan (se validan serie por serie) ni los productos que no
+    son envase."""
+    requested = {}
+    for spec, _series_key, items in demands:
+        for item in items:
+            product = products_by_code[item[spec.code]]
+            state = effective_state(product, item.get(spec.tipo))
+            if state is None or product.tracking == "serial":
+                continue
+            key = (product.product_tmpl_id.id, state)
+            requested[key] = requested.get(key, 0) + item[spec.qty]
+    return requested
+
+
 def validate_customer_availability(demands, products_by_code, containers):
     """Que el cliente tenga lo que se le saca: retiro y lado recibido del recambio.
     demands: lista de (spec, series_key, items), un elemento por flujo. La
@@ -409,7 +428,7 @@ def validate_customer_availability(demands, products_by_code, containers):
     en el estado efectivo del item. Sin serie, las cantidades se suman por
     (template, estado efectivo), tambien en frio/calor ('asignado')."""
     errors = ParamErrors()
-    requested = {}          # {(template, estado): cantidad pedida}
+    requested = requested_quantity(demands, products_by_code)   # {(template, estado): cantidad pedida}
     sources = {}            # {(template, estado): {campos de cantidad}}, solo para el mensaje
     code_by_template = {}   # {template: default_code}, solo para el mensaje
     for spec, series_key, items in demands:
@@ -431,7 +450,6 @@ def validate_customer_availability(demands, products_by_code, containers):
                         ))
                 continue
             key = (tmpl_id, state)
-            requested[key] = requested.get(key, 0) + item[spec.qty]
             sources.setdefault(key, set()).add(spec.qty)
             code_by_template[tmpl_id] = product.default_code
     for (tmpl_id, state), quantity in requested.items():
@@ -441,3 +459,51 @@ def validate_customer_availability(demands, products_by_code, containers):
                 " + ".join(sorted(sources[(tmpl_id, state)])), code_by_template[tmpl_id], state, quantity, available,
             ))
     return errors
+
+def _is_comodato_sale(item, product):
+    """El item de venta entrega un envase en comodato que el servicio retira
+    solo: retornable comun (no frio/calor), sin serie y con tipo 'V'."""
+    return (
+        requires_container_state(product)
+        and product.tracking != "serial"
+        and item.get(SALE_ITEMS.tipo) == "V"
+    )
+
+def comodato_sale_products(item_venta, products_by_code):
+    """Productos de la venta que se entregan en comodato y se retiran solos
+    (ver _is_comodato_sale). Devuelve {default_code: producto}."""
+    products = {}
+    for item in item_venta:
+        product = products_by_code[item[SALE_ITEMS.code]]
+        if _is_comodato_sale(item, product):
+            products.setdefault(item[SALE_ITEMS.code], product)
+    return products
+
+def comodato_withdrawal_items(item_venta, products_by_code, containers, requested):
+    """Items de retiro (con la forma de WITHDRAWAL_ITEMS) que la venta en
+    comodato genera sola: por cada template vendido en comodato,
+    min(vendido, en_comodato que tiene el cliente - lo que la request ya
+    saca). Lo explicito (retiro y recibido del recambio) tiene prioridad, asi
+    el automatico nunca pide mas de lo que el cliente tiene. Sin nada para
+    retirar (primera venta) no devuelve items.
+    requested: {(template, estado): cantidad}, de requested_quantity."""
+    state = CONTAINER_STATE["V"]   # comodato: el estado que tiene el cliente
+    sold = {}   # {template: [codigo, cantidad vendida]}
+    for item in item_venta:
+        code = item[SALE_ITEMS.code]
+        product = products_by_code[code]
+        if _is_comodato_sale(item, product):
+            entry = sold.setdefault(product.product_tmpl_id.id, [code, 0])
+            entry[1] += item[SALE_ITEMS.qty]
+    items = []
+    for tmpl_id, (code, quantity) in sold.items():
+        key = (tmpl_id, state)
+        available = containers.quantity.get(key, 0) - requested.get(key, 0)
+        withdraw = min(quantity, available)
+        if withdraw > 0:
+            items.append({
+                WITHDRAWAL_ITEMS.code: code,
+                WITHDRAWAL_ITEMS.qty: withdraw,
+                WITHDRAWAL_ITEMS.tipo: "V",
+            })
+    return items
