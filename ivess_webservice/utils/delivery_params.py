@@ -295,29 +295,33 @@ def validate_items(params, spec, errors):
 
 def validate_tipo(items, products_by_code, spec=SALE_ITEMS):
     """tipo (venta_tipo_envase / retiro_tipo_envase / recambio_tipo_envase): obligatorio solo en productos que requieren estado de envase.
-    En cualquier otro producto es not_applicable: el frio/calor queda siempre en estado asignado."""
+    En cualquier otro producto es not_applicable: el frio/calor queda siempre en estado asignado.
+    products_by_code: {codigo: producto envase} (ver _container_products): en un kit
+    (botellon) es su componente retornable. Los mensajes nombran el codigo que
+    mando la app, no el del componente."""
     errors = ParamErrors()
     for index, item in enumerate(items):
         product = products_by_code[item[spec.code]]
         has_tipo = item.get(spec.tipo) is not None
         prefix = "%s[%s]." % (spec.list_key, index)
         if requires_container_state(product) and not has_tipo:
-            errors.add("missing", prefix + spec.tipo + " (%s es retornable)" % product.default_code)
+            errors.add("missing", prefix + spec.tipo + " (%s es retornable)" % item[spec.code])
         elif not requires_container_state(product) and has_tipo:
-            errors.add("not_applicable", prefix + spec.tipo + " (%s no admite tipo de envase)" % product.default_code)
+            errors.add("not_applicable", prefix + spec.tipo + " (%s no admite tipo de envase)" % item[spec.code])
     return errors
 
 
 def validate_is_container(items, products_by_code, spec):
     """El producto de retiro o recambio tiene que ser un envase (retornable o
     frio/calor). Sin esto, un producto comun pasaba la validacion y recien
-    fallaba (o no) contra los envases del cliente."""
+    fallaba (o no) contra los envases del cliente.
+    products_by_code: {codigo: producto envase}, como en validate_tipo."""
     errors = ParamErrors()
     for index, item in enumerate(items):
         product = products_by_code[item[spec.code]]
         if not (product.is_returnable or product.is_frio_calor):
             prefix = "%s[%s]." % (spec.list_key, index)
-            errors.add("invalid_value", prefix + spec.code + " (%s no es un envase)" % product.default_code)
+            errors.add("invalid_value", prefix + spec.code + " (%s no es un envase)" % item[spec.code])
     return errors
 
 
@@ -430,7 +434,7 @@ def validate_customer_availability(demands, products_by_code, containers):
     errors = ParamErrors()
     requested = requested_quantity(demands, products_by_code)   # {(template, estado): cantidad pedida}
     sources = {}            # {(template, estado): {campos de cantidad}}, solo para el mensaje
-    code_by_template = {}   # {template: default_code}, solo para el mensaje
+    code_by_template = {}   # {template: codigo que mando la app}, solo para el mensaje
     for spec, series_key, items in demands:
         for index, item in enumerate(items):
             product = products_by_code[item[spec.code]]
@@ -451,7 +455,7 @@ def validate_customer_availability(demands, products_by_code, containers):
                 continue
             key = (tmpl_id, state)
             sources.setdefault(key, set()).add(spec.qty)
-            code_by_template[tmpl_id] = product.default_code
+            code_by_template[tmpl_id] = item[spec.code]
     for (tmpl_id, state), quantity in requested.items():
         available = containers.quantity.get((tmpl_id, state), 0)
         if quantity > available:

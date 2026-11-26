@@ -203,6 +203,7 @@ class IvessOperationDelivery(models.AbstractModel):
             return {"error": "La ubicacion del reparto %s no pertenece a ningun almacen." % aguas_idreparto}
 
         products_by_code = {}
+        sale_containers = {}  # {codigo: producto envase}: el componente retornable si el producto es un kit
         sale_series = set()
         if item_venta:
             codes = {item[SALE_ITEMS.code] for item in item_venta}
@@ -218,7 +219,12 @@ class IvessOperationDelivery(models.AbstractModel):
             if missing_codes:
                 return {"error": "No existen productos con los codigos: %s" % ", ".join(sorted(missing_codes))}
 
-            error = validate_tipo(item_venta, products_by_code).message()
+            # El botellon es un kit: el tipo de envase y el estado salen de su componente retornable
+            sale_containers, error = self._container_products(products_by_code)
+            if error:
+                return {"error": error}
+
+            error = validate_tipo(item_venta, sale_containers).message()
             if error:
                 return {"error": error}
 
@@ -231,7 +237,7 @@ class IvessOperationDelivery(models.AbstractModel):
         # y validan juntos, porque la demanda sobre el cliente (retiro + recibido) se suma.
         # La venta en comodato tambien entra: necesita el estado del cliente para
         # calcular su retiro automatico.
-        comodato_products = comodato_sale_products(item_venta, products_by_code) if item_venta else {}
+        comodato_products = comodato_sale_products(item_venta, sale_containers) if item_venta else {}
         container_products = {}
         customer_lots = {}
         delivered_series = set()
@@ -246,13 +252,19 @@ class IvessOperationDelivery(models.AbstractModel):
             for spec, items in flows:
                 for item in items:
                     codes.add(item[spec.code])
-            container_products = self._withdrawal_products(codes)
-            missing_codes = codes - set(container_products)
+            # flow_products: el producto como lo manda la app (kit o envase); de el sale
+            # allows_replacement. container_products: el producto envase (el componente
+            # retornable si es un kit); de el sale todo lo demas.
+            flow_products = self._withdrawal_products(codes)
+            missing_codes = codes - set(flow_products)
             if missing_codes:
                 flow_names = " o ".join(
                     name for name, items in (("retiro", item_retiro), ("recambio", item_recambio)) if items
                 )
                 return {"error": "No existen productos de %s con los codigos: %s" % (flow_names, ", ".join(sorted(missing_codes)))}
+            container_products, error = self._container_products(flow_products)
+            if error:
+                return {"error": error}
             # Los de la venta en comodato se suman para entrar al snapshot del cliente
             # y para que la fase 5 los encuentre al armar el picking.
             for code, product in comodato_products.items():
@@ -261,7 +273,7 @@ class IvessOperationDelivery(models.AbstractModel):
             for spec, items in flows:
                 error = (
                     validate_is_container(items, container_products, spec).message()
-                    or validate_allows_replacement(items, container_products, spec).message()
+                    or validate_allows_replacement(items, flow_products, spec).message()
                     or validate_tipo(items, container_products, spec).message()
                 )
                 if error:
@@ -319,7 +331,7 @@ class IvessOperationDelivery(models.AbstractModel):
             # (ya validado arriba) y el automatico toma lo que le queda al cliente.
             if comodato_products:
                 comodato_items = comodato_withdrawal_items(
-                    item_venta, products_by_code, containers,
+                    item_venta, sale_containers, containers,
                     requested_quantity(demands, container_products),
                 )
 
@@ -378,7 +390,7 @@ class IvessOperationDelivery(models.AbstractModel):
         outcome = SaleOutcome(self.env["sale.order"], self.env["stock.picking"]) # vacio: visita sin venta
         if item_venta:
             outcome = self._process_sale(
-                cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key,
+                cliente, reparto, recorrido, item_venta, products_by_code, sale_containers, lot_by_key,
             )
             vals["sale_order_id"] = outcome.order.id
             if outcome.picking:
@@ -896,6 +908,35 @@ class IvessOperationDelivery(models.AbstractModel):
             products_by_code.setdefault(product.default_code, product)
         return products_by_code
 
+    def _container_products(self, products_by_code):
+        """Producto que hace de envase de cada producto de la request. Devuelve
+        ({default_code: producto_envase}, error).
+
+        El botellon es un kit (BoM phantom): el producto que manda la app es el
+        kit, pero el envase retornable (el que tiene is_returnable, tipo de
+        envase y water.container) es su componente. Para un kit con exactamente
+        un componente retornable se devuelve ese componente. Para cualquier otro
+        producto (envase comun, frio/calor, kit sin componente retornable, promo)
+        se devuelve el mismo producto.
+
+        Con mas de un componente retornable es un error de configuracion: se
+        devuelve ({}, mensaje). Solo lee."""
+        products = self.env["product.product"].union(*products_by_code.values())
+        # sudo como mrp al explotar el kit: el usuario del servicio no tiene por que leer BoMs
+        boms = self.env["mrp.bom"].sudo()._bom_find(products, company_id=self.env.company.id, bom_type="phantom")
+        container_by_code = {}
+        for code, product in products_by_code.items():
+            bom = boms.get(product)
+            if not bom or product.is_promo:
+                container_by_code[code] = product
+                continue
+            returnable = bom.bom_line_ids.product_id.filtered(lambda p: p.product_tmpl_id.is_returnable)
+            if len(returnable) > 1:
+                return {}, "El producto %s tiene mas de un componente retornable en su lista de materiales." % code
+            # browse con el env del servicio: el componente no debe quedar con sudo
+            container_by_code[code] = self.env["product.product"].browse(returnable.id) if returnable else product
+        return container_by_code, False
+
     def _customer_containers(self, cliente, products):
         """Lee una sola vez los envases del cliente para los productos dados.
         Es el estado previo a la venta de la misma request."""
@@ -917,12 +958,12 @@ class IvessOperationDelivery(models.AbstractModel):
                 lot_states[lot_key] = container.state
         return CustomerContainers(quantity, lots, lot_states)
 
-    def _process_sale(self, cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key):
+    def _process_sale(self, cliente, reparto, recorrido, item_venta, products_by_code, sale_containers, lot_by_key):
         """Crea la venta, la confirma y prepara y valida su picking.
         Confirmar y validar son best effort: la venta ya ocurrio, asi que si
         fallan se registra el error y se sigue."""
         order = self._create_sale_order(
-            cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key,
+            cliente, reparto, recorrido, item_venta, products_by_code, sale_containers, lot_by_key,
         )
         outcome = SaleOutcome(order, self.env["stock.picking"])
         outcome.confirm_error = self._confirm_sale_order(order)
@@ -938,14 +979,15 @@ class IvessOperationDelivery(models.AbstractModel):
                 )
         return outcome
 
-    def _create_sale_order(self, cliente, reparto, recorrido, item_venta, products_by_code, lot_by_key):
+    def _create_sale_order(self, cliente, reparto, recorrido, item_venta, products_by_code, sale_containers, lot_by_key):
         # El precio de la app es absoluto: discount en 0 evita que
         # pricelist_custom aplique el descuento del cliente encima.
         order_lines = []
         for item in item_venta:
-            product = products_by_code[item[SALE_ITEMS.code]]
+            product = products_by_code[item[SALE_ITEMS.code]]   # la linea es del producto vendido (el kit)
             container_state = False
-            if requires_container_state(product):
+            # el estado de envase lo decide el envase (el componente retornable si es un kit)
+            if requires_container_state(sale_containers[item[SALE_ITEMS.code]]):
                 container_state = CONTAINER_STATE[item[SALE_ITEMS.tipo]]
             order_lines.append(Command.create({
                 "product_id": product.id,

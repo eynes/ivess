@@ -34,6 +34,23 @@ class StockMove(models.Model):
         # _sync_water_containers usa el estado de cada move para elegir el envase.
         return super()._prepare_merge_moves_distinct_fields() + ['container_state']
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        # El estado de envase solo tiene sentido en productos retornables. Al explotar
+        # un kit (ej. botellon = envase + agua) todos los componentes heredan el estado
+        # del kit, siendo que solo el envase es retornable. 
+        # Para evitar inconsistencias, se fuerza a False el estado en los componentes no retornables.
+        product_ids = {vals['product_id'] for vals in vals_list if vals.get('container_state') and vals.get('product_id')}
+        if product_ids:
+            products = self.env['product.product'].browse(product_ids)
+            not_returnable = set(products.filtered(lambda p: not p.product_tmpl_id.is_returnable).ids)
+            vals_list = [
+                dict(vals, container_state=False)
+                if vals.get('container_state') and vals.get('product_id') in not_returnable else vals
+                for vals in vals_list
+            ]
+        return super().create(vals_list)
+
     def _action_assign(self, force_qty=False):
         res = super()._action_assign(force_qty=force_qty)
         

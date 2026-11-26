@@ -1,4 +1,5 @@
 from odoo import fields, models
+from odoo.exceptions import UserError
 
 
 class StockPicking(models.Model):
@@ -23,6 +24,12 @@ class StockPicking(models.Model):
                 lambda m: m.state == 'done' and m.is_returnable and not m.is_frio_calor and not m.water_container_id
             )
             for move in returnable_moves:
+                if not move.container_state:
+                    # self.env._ y no _: el "for _ in range" de mas abajo pisa a _ en esta funcion
+                    raise UserError(self.env._(
+                        "%(picking)s: el envase %(product)s no tiene estado (prestado, comodato o asignado)",
+                        picking=picking.name, product=move.product_id.display_name,
+                    ))
                 product_tmpl = move.product_id.product_tmpl_id
                 lots = move.lot_ids or self.env['stock.lot']
                 container = None
