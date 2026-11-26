@@ -632,27 +632,27 @@ class DeliveryRouteLine(models.Model):
     )
     stock_picking_id = fields.Many2one(
         'stock.picking',
-        string='Remito de venta',
+        string='Rem. Venta',
         help='Picking de salida con los productos que el repartidor vendio al cliente en esta visita.'
     )
     withdrawal_picking_id = fields.Many2one(
         'stock.picking',
-        string='Remito de retiro',
+        string='Rem. Retiro',
         help='Picking de entrada con los envases que el repartidor retiro del cliente en esta visita.',
     )
     replacement_out_picking_id = fields.Many2one(
         'stock.picking',
-        string='Remito de recambio (entrega)',
+        string='Rem. Recambio ent.',
         help='Picking de salida con los envases que el repartidor entrego al cliente en el recambio de esta visita.',
     )
     replacement_in_picking_id = fields.Many2one(
         'stock.picking',
-        string='Remito de recambio (retiro)',
+        string='Rem. Recambio ret.',
         help='Picking de entrada con los envases que el repartidor recupero del cliente en el recambio de esta visita.',
     )
     comodato_withdrawal_picking_id = fields.Many2one(
         'stock.picking',
-        string='Remito de retiro (venta en comodato)',
+        string='Rem. Comodato',
         help='Picking de entrada con los envases que el servicio retiro automaticamente del cliente '
              'por una venta en comodato en esta visita. Es distinto del retiro que informa la app.',
     )

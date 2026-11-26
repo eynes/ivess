@@ -1,4 +1,8 @@
+import logging
+
 from odoo import api, models
+
+_logger = logging.getLogger(__name__)
 
 
 class IvessProductsReport(models.Model):
@@ -17,6 +21,16 @@ class IvessProductsReport(models.Model):
         promo_products = products.filtered("is_promo")
         boms = self.env["mrp.bom"].search([("product_tmpl_id", "in", promo_products.ids)])
         bom_by_tmpl_id = {bom.product_tmpl_id.id: bom for bom in boms}
+
+        # El botellon es un kit no retornable: si la app tiene que mandar el tipo de envase lo
+        # decide su componente retornable, igual que en send_operation. Solo cambia el flag de los
+        # kits; el resto de los productos queda con el suyo.
+        variant_by_tmpl_id = {p.id: p.product_variant_id for p in products if p.product_variant_id}
+        container_by_tmpl_id, error = self.env["ivess.operation.delivery"]._container_products(variant_by_tmpl_id)
+        if error:
+            # Kit mal configurado: el catalogo no se corta, cada producto informa su propio flag
+            _logger.warning("get_products: %s", error)
+            container_by_tmpl_id = variant_by_tmpl_id
 
         final_records = []
         for product in products:
@@ -54,7 +68,7 @@ class IvessProductsReport(models.Model):
                 "abbreviation": product.abbreviation,
                 "volume": product.volume,
                 "exclude_from_regular": product.exclude_from_regular,
-                "is_returnable": product.is_returnable,
+                "is_returnable": container_by_tmpl_id[product.id].is_returnable if product.id in container_by_tmpl_id else product.is_returnable,
                 "type": product.type,
                 "order": product.order,
                 "tax_amount": tax.amount if tax else 0,
