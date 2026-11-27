@@ -24,6 +24,18 @@ class StockMove(models.Model):
         string='Es Frio/Calor',
     )
 
+    requested_lot_ids = fields.Many2many(
+        'stock.lot',
+        'stock_move_requested_lot_rel',
+        'move_id',
+        'lot_id',
+        string='Series Pedidas',
+        copy=False,
+        help='Campo técnico: series que el servicio web ivess pide entregar en un picking de salida en '
+            'borrador. Asignar lot_ids en un move de salida reserva el stock y lo saca de borrador, por '
+            'eso se guardan acá hasta confirmar. No tiene vista.',
+    )
+
     @api.onchange('water_container_id')
     def _onchange_water_container_id(self):
         self.container_state = self.water_container_id.state if self.water_container_id else False
