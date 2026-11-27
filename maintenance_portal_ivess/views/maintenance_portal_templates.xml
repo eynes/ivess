@@ -1309,6 +1309,10 @@
                         <t t-esc="maint_request.name"/>
                     </h5>
                     <div class="d-flex gap-2 align-items-center flex-wrap">
+                        <span t-if="has_rotura_field and maint_request.x_studio_rotura"
+                              class="badge rounded-pill text-bg-danger">
+                            <i class="fa fa-exclamation-triangle me-1"/>Rotura
+                        </span>
                         <span t-attf-class="badge rounded-pill text-bg-#{priority_badge.get(maint_request.priority, 'secondary')}">
                             <i class="fa fa-flag me-1"/>
                             <t t-esc="priority_labels.get(maint_request.priority, maint_request.priority)"/>
@@ -1801,7 +1805,10 @@
                     <h5 class="mb-0"><i class="fa fa-edit me-2"/>Editar: <t t-esc="maint_request.name"/></h5>
                 </div>
                 <div class="card-body">
-                    <form t-att-action="action_url" method="post">
+                    <div t-if="rotura_error_msg" class="alert alert-danger" role="alert">
+                        <t t-esc="rotura_error_msg"/>
+                    </div>
+                    <form t-att-action="action_url" method="post" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
                         <div class="row g-3 mb-3">
@@ -1966,6 +1973,10 @@
                             </div>
                         </div>
 
+                        <t t-call="maintenance_portal_ivess.portal_workshop_rotura_fields">
+                            <t t-set="rotura_checked" t-value="has_rotura_field and maint_request.x_studio_rotura"/>
+                        </t>
+
                         <div class="row g-3 mb-3">
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Notas</label>
@@ -2083,6 +2094,73 @@
 
 
     <!-- ============================================================
+         Taller: tilde Rotura + fotos (bloque P). Usado por
+         portal_workshop_new y portal_workshop_edit.
+         Variables: rotura_checked (bool), photo_count, max_photos
+    ============================================================ -->
+    <template id="portal_workshop_rotura_fields" name="Taller: Rotura y fotos">
+        <t t-if="has_rotura_field">
+            <div class="row g-3 mb-3">
+                <div class="col-12">
+                    <div class="form-check">
+                        <input type="hidden" name="rotura_present" value="1"/>
+                        <input class="form-check-input" type="checkbox" name="rotura" id="ws_rotura_check"
+                               value="on" t-att-checked="'checked' if rotura_checked else None"/>
+                        <label class="form-check-label fw-semibold" for="ws_rotura_check">
+                            <i class="fa fa-exclamation-triangle me-1 text-danger"/>Rotura
+                        </label>
+                    </div>
+                </div>
+                <div class="col-12" id="ws_rotura_photos"
+                     t-att-style="None if rotura_checked else 'display:none'"
+                     t-att-data-existing="photo_count" t-att-data-max="max_photos">
+                    <label class="form-label fw-semibold" for="ws_rotura_files">Fotos de la rotura</label>
+                    <input type="file" name="rotura_photos" id="ws_rotura_files" class="form-control"
+                           multiple="multiple" accept="image/*"/>
+                    <div class="form-text">
+                        Hasta <t t-esc="max_photos"/> fotos por orden, 10 MB cada una<t t-if="photo_count"> (ya tiene <t t-esc="photo_count"/>)</t>.
+                    </div>
+                    <div class="text-danger small mt-1" id="ws_rotura_js_error" style="display:none"/>
+                </div>
+            </div>
+            <script>
+            (function () {
+                var check = document.getElementById('ws_rotura_check');
+                var box = document.getElementById('ws_rotura_photos');
+                var files = document.getElementById('ws_rotura_files');
+                var err = document.getElementById('ws_rotura_js_error');
+                if (!check || !box) return;
+                var existing = parseInt(box.dataset.existing || '0', 10);
+                var max = parseInt(box.dataset.max || '5', 10);
+                var maxBytes = 10 * 1024 * 1024;
+                check.addEventListener('change', function () {
+                    box.style.display = this.checked ? '' : 'none';
+                    err.style.display = 'none';
+                });
+                check.form.addEventListener('submit', function (ev) {
+                    if (!check.checked) return;
+                    var list = Array.prototype.slice.call(files.files || []);
+                    var msg = '';
+                    if (existing + list.length &gt; max) {
+                        msg = 'Se pueden subir hasta ' + max + ' fotos por orden (ya tiene ' + existing + ')';
+                    } else if (list.some(function (f) { return f.size &gt; maxBytes; })) {
+                        msg = 'Cada foto puede pesar hasta 10 MB';
+                    } else if (list.some(function (f) { return f.type.indexOf('image/') !== 0; })) {
+                        msg = 'Solo se pueden subir imágenes';
+                    }
+                    if (msg) {
+                        ev.preventDefault();
+                        err.textContent = msg;
+                        err.style.display = 'block';
+                    }
+                });
+            })();
+            </script>
+        </t>
+    </template>
+
+
+    <!-- ============================================================
          Nueva solicitud Workshop: /my/workshop/new
     ============================================================ -->
     <template id="portal_workshop_new" name="Nuevo Servicio de Taller">
@@ -2106,7 +2184,10 @@
                     <h5 class="mb-0"><i class="fa fa-plus-circle me-2"/>Nueva solicitud de taller</h5>
                 </div>
                 <div class="card-body">
-                    <form action="/my/workshop/new" method="post">
+                    <div t-if="rotura_error_msg" class="alert alert-danger" role="alert">
+                        <t t-esc="rotura_error_msg"/>
+                    </div>
+                    <form action="/my/workshop/new" method="post" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
                         <!-- Asunto -->
@@ -2114,6 +2195,7 @@
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Asunto <span class="text-danger">*</span></label>
                                 <input type="text" name="name" class="form-control"
+                                       t-att-value="form_values.get('name')"
                                        placeholder="Descripción breve del servicio requerido" required="required"/>
                             </div>
                         </div>
@@ -2194,8 +2276,10 @@
                                 <label class="form-label fw-semibold">Equipo <span class="text-danger">*</span></label>
                                 <div class="position-relative">
                                     <input type="text" id="ws_new_equip_name" class="form-control" required="required"
+                                           t-att-value="form_equipment.display_name if form_equipment else None"
                                            autocomplete="off" placeholder="Buscar equipo..."/>
-                                    <input type="hidden" name="equipment_id" id="ws_new_equip_id" value=""/>
+                                    <input type="hidden" name="equipment_id" id="ws_new_equip_id"
+                                           t-att-value="form_equipment.id if form_equipment else ''"/>
                                     <div id="ws_new_equip_suggestions"
                                          class="list-group position-absolute w-100 shadow-sm"
                                          style="z-index:1000; display:none; max-height:200px; overflow-y:auto;"/>
@@ -2240,9 +2324,13 @@
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Notas</label>
                                 <textarea name="description" class="form-control" rows="4"
-                                          placeholder="Detalle el trabajo a realizar..."/>
+                                          placeholder="Detalle el trabajo a realizar..."><t t-esc="form_values.get('description')"/></textarea>
                             </div>
                         </div>
+
+                        <t t-call="maintenance_portal_ivess.portal_workshop_rotura_fields">
+                            <t t-set="rotura_checked" t-value="form_values.get('rotura') == 'on'"/>
+                        </t>
 
                         <!-- Mantenimiento recurrente -->
                         <div class="row g-3 mb-2">

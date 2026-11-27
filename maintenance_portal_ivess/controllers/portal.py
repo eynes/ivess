@@ -5,6 +5,7 @@ import re
 from datetime import datetime as _dt
 from odoo import http
 from odoo.http import request
+from odoo.tools.mimetypes import guess_mimetype
 from odoo.addons.portal.controllers.portal import CustomerPortal, pager as portal_pager
 
 _logger = logging.getLogger(__name__)
@@ -48,6 +49,11 @@ _KANBAN_STATE_BADGE = {
 
 _MAINTENANCE_DOMAIN = [('is_internal_maintenance', '=', True)]
 _WORKSHOP_DOMAIN = [('is_workshop', '=', True)]
+
+# Bloque P: Rotura + fotos (solo portal de taller)
+_ROTURA_FIELD = 'x_studio_rotura'
+_ROTURA_MAX_PHOTOS = 5
+_ROTURA_MAX_BYTES = 10 * 1024 * 1024
 
 _HTML_TAG_RE = re.compile(r'<[^>]+>')
 
@@ -486,6 +492,98 @@ class MaintenancePortalController(CustomerPortal):
 
         return maint_request
 
+    # ── Taller: Rotura + fotos (bloque P) ─────────────────────────────────────
+
+    def _ws_has_rotura_field(self):
+        """x_studio_rotura es un campo de Studio: el modulo lo usa solo si existe."""
+        return _ROTURA_FIELD in request.env['maintenance.request']._fields
+
+    def _ws_rotura_from_post(self, post):
+        """True/False segun el tilde 'Rotura'; None si el form no lo trajo o el campo no existe.
+        El checkbox destildado no viaja en el POST, por eso el hidden rotura_present."""
+        if not self._ws_has_rotura_field() or not post.get('rotura_present'):
+            return None
+        return post.get('rotura') == 'on'
+
+    def _ws_photo_count(self, maint_request):
+        """Fotos (adjuntos imagen) que ya tiene la orden."""
+        return request.env['ir.attachment'].sudo().search_count([
+            ('res_model', '=', 'maintenance.request'),
+            ('res_id', '=', maint_request.id),
+            ('mimetype', '=like', 'image/%'),
+        ])
+
+    def _ws_limit_message(self, existing):
+        return 'Se pueden subir hasta %d fotos por orden (ya tiene %d)' % (_ROTURA_MAX_PHOTOS, existing)
+
+    def _ws_read_photos(self):
+        """Lee las fotos del multipart. Devuelve (photos, error). Si algun archivo es
+        invalido (no imagen / mas de 10 MB) no se acepta ninguno."""
+        photos = []
+        for storage in request.httprequest.files.getlist('rotura_photos'):
+            if not storage or not storage.filename:
+                continue
+            data = storage.read(_ROTURA_MAX_BYTES + 1)
+            if not data:
+                continue
+            if len(data) > _ROTURA_MAX_BYTES:
+                return [], 'La foto "%s" supera los 10 MB' % storage.filename
+            mimetype = guess_mimetype(data)
+            if not mimetype.startswith('image/'):
+                return [], 'El archivo "%s" no es una imagen' % storage.filename
+            photos.append((storage.filename, data, mimetype))
+        return photos, None
+
+    def _ws_attach_photos(self, maint_request, photos):
+        """Guarda las fotos como ir.attachment de la orden y las publica en el chatter."""
+        if not photos:
+            return
+        # Los adjuntos se crean via message_post: quedan en la orden (res_model/res_id)
+        # y enlazados al mensaje del chatter.
+        maint_request.sudo().message_post(
+            body='Fotos de rotura subidas desde el portal',
+            attachments=[(name, data) for name, data, _mimetype in photos],
+            author_id=request.env.user.partner_id.id,
+            message_type='comment',
+            subtype_xmlid='mail.mt_note',
+        )
+
+    def _ws_rotura_values(self, maint_request=None):
+        """Valores de template comunes a alta/edicion/detalle de taller."""
+        return {
+            'has_rotura_field': self._ws_has_rotura_field(),
+            'max_photos': _ROTURA_MAX_PHOTOS,
+            'photo_count': self._ws_photo_count(maint_request) if maint_request else 0,
+        }
+
+    def _ws_new_values(self, **extra):
+        taller_team = request.env['maintenance.team'].sudo().search(
+            [('name', 'ilike', 'Taller Mecánico')], limit=1,
+        )
+        current_employee = request.env['hr.employee'].sudo().search(
+            [('user_id', '=', request.env.uid)], limit=1,
+        )
+        values = self._prepare_portal_layout_values()
+        values.update(self._maint_edit_context(is_workshop=True))
+        values.update(self._ws_rotura_values())
+        values.update({
+            'page_name': 'workshop_new',
+            'back_url': '/my/workshop',
+            'back_label': 'Servicios de Taller',
+            'action_url': '/my/workshop/new',
+            'default_team': taller_team,
+            'current_employee': current_employee,
+            'form_values': {},
+            'rotura_error_msg': None,
+        })
+        values.update(extra)
+        equip_id = self._maint_cast_int(values['form_values'].get('equipment_id'))
+        values['form_equipment'] = (
+            request.env['maintenance.equipment'].sudo().browse(equip_id).exists() if equip_id
+            else request.env['maintenance.equipment']
+        )
+        return values
+
     def _closure_reason_context(self, is_workshop=False):
         """Returns closure_parents (recordset) and closure_children_json (str) for templates."""
         type_field = 'is_workshop' if is_workshop else 'is_maintenance'
@@ -841,6 +939,7 @@ class MaintenancePortalController(CustomerPortal):
         values = self._prepare_portal_layout_values()
         values.update(self._maint_detail_values(maint_request))
         values.update(self._closure_reason_context(is_workshop=True))
+        values.update(self._ws_rotura_values())
         values.update({
             'page_name': 'workshop_detail',
             'back_url': '/my/workshop',
@@ -877,29 +976,26 @@ class MaintenancePortalController(CustomerPortal):
         if redir:
             return redir
         if request.httprequest.method == 'POST':
+            rotura = self._ws_rotura_from_post(post)
+            photos, error = ([], None)
+            if rotura:
+                photos, error = self._ws_read_photos()
+                if not error and len(photos) > _ROTURA_MAX_PHOTOS:
+                    error = self._ws_limit_message(0)
+            if error:
+                # No se crea nada: se vuelve al form con el mensaje y lo ya tipeado.
+                values = self._ws_new_values(rotura_error_msg=error, form_values=post)
+                return request.render('maintenance_portal_ivess.portal_workshop_new', values)
             new_req = self._maint_create_from_post(post)
             if new_req:
+                if rotura:
+                    # Primero las fotos y despues el write: asi la automatizacion
+                    # "Taller: avisar rotura" corre como actualizacion (False -> True).
+                    self._ws_attach_photos(new_req, photos)
+                    new_req.sudo().write({_ROTURA_FIELD: True})
                 return request.redirect(f'/my/workshop/{new_req.id}')
             return request.redirect('/my/workshop/new')
-
-        taller_team = request.env['maintenance.team'].sudo().search(
-            [('name', 'ilike', 'Taller Mecánico')], limit=1,
-        )
-        current_employee = request.env['hr.employee'].sudo().search(
-            [('user_id', '=', request.env.uid)], limit=1,
-        )
-
-        values = self._prepare_portal_layout_values()
-        values.update(self._maint_edit_context(is_workshop=True))
-        values.update({
-            'page_name': 'workshop_new',
-            'back_url': '/my/workshop',
-            'back_label': 'Servicios de Taller',
-            'action_url': '/my/workshop/new',
-            'default_team': taller_team,
-            'current_employee': current_employee,
-        })
-        return request.render('maintenance_portal_ivess.portal_workshop_new', values)
+        return request.render('maintenance_portal_ivess.portal_workshop_new', self._ws_new_values())
 
     @http.route(
         ['/my/workshop/<int:request_id>/edit'],
@@ -914,9 +1010,30 @@ class MaintenancePortalController(CustomerPortal):
             return request.redirect('/my/workshop')
         if request.httprequest.method == 'POST':
             self._maint_write_from_post(maint_request, post)
+            rotura = self._ws_rotura_from_post(post)
+            if rotura is None:
+                return request.redirect(f'/my/workshop/{request_id}')
+            if bool(maint_request[_ROTURA_FIELD]) != rotura:
+                maint_request.write({_ROTURA_FIELD: rotura})
+            if not rotura:
+                return request.redirect(f'/my/workshop/{request_id}')
+            photos, error = self._ws_read_photos()
+            if error:
+                return request.redirect(f'/my/workshop/{request_id}/edit?rotura_error=invalid')
+            existing = self._ws_photo_count(maint_request)
+            if existing + len(photos) > _ROTURA_MAX_PHOTOS:
+                # No se guarda ninguna foto de esta subida; el resto del form si.
+                return request.redirect(f'/my/workshop/{request_id}/edit?rotura_error=limit')
+            self._ws_attach_photos(maint_request, photos)
             return request.redirect(f'/my/workshop/{request_id}')
         values = self._prepare_portal_layout_values()
         values.update(self._maint_edit_context(is_workshop=True))
+        values.update(self._ws_rotura_values(maint_request))
+        rotura_error_msg = None
+        if post.get('rotura_error') == 'limit':
+            rotura_error_msg = self._ws_limit_message(values['photo_count'])
+        elif post.get('rotura_error') == 'invalid':
+            rotura_error_msg = 'Alguna foto no es válida (solo imágenes de hasta 10 MB)'
         values.update({
             'maint_request': maint_request,
             'page_name': 'workshop_edit',
@@ -924,6 +1041,7 @@ class MaintenancePortalController(CustomerPortal):
             'back_label': 'Servicios de Taller',
             'action_url': f'/my/workshop/{request_id}/edit',
             'description_text': _strip_html(maint_request.description),
+            'rotura_error_msg': rotura_error_msg,
         })
         return request.render('maintenance_portal_ivess.portal_workshop_edit', values)
 
